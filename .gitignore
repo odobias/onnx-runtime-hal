@@ -6,8 +6,18 @@ obj/
 # Downloaded / linked SDKs (large; fetched by scripts/setup-intel.ps1)
 third_party/
 
-# Compiled-model cache
+# Python virtual env (created by scripts/get-model.ps1)
+.venv/
+__pycache__/
+
+# Models & audio (fetched/exported by scripts; never committed)
+models/
+*.wav
 *.blob
+*_openvino_model/
+*-ov/
+
+# Compiled-model cache
 cache/
 
 # Visual Studio
@@ -16,8 +26,3 @@ cache/
 *.suo
 *.VC.db
 *.VC.opendb
-
-# Models & audio (bring your own; keep the repo light)
-*.wav
-*_openvino_model/
-*-ov/

@@ -43,12 +43,30 @@ binary) for when they're implemented.
 
 ## Build & run (PowerShell 7)
 
+The repo is **self-installing** — a fresh clone pulls everything it needs (toolchain,
+SDK, model, audio); none of it is committed.
+
 ```powershell
-cd C:\Projects\whisper-npu-hal
-.\scripts\setup-intel.ps1     # links/downloads the OpenVINO GenAI C++ SDK
-.\scripts\build.ps1           # MSBuild Release|x64 (prefers VS 2026)
-.\scripts\run.ps1             # NPU, hybrid model, cold/warm cache demo
-# or directly:
+git clone https://github.com/odobias/whisper-npu-hal
+cd whisper-npu-hal
+.\scripts\bootstrap.ps1       # installs prereqs + SDK + model + audio, then builds
+.\scripts\run.ps1             # NPU, exported model, cold/warm cache demo
+```
+
+`bootstrap.ps1` runs these steps (also usable individually):
+
+| Script | Fetches / does | Output (gitignored) |
+|---|---|---|
+| `setup-intel.ps1` | OpenVINO GenAI C++ SDK (download or link) | `third_party/` |
+| `get-model.ps1` | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper-tiny-en-ov/` |
+| `get-audio.ps1` | public-domain 16 kHz sample | `models/jfk.wav` |
+| `build.ps1` | MSBuild Release\|x64 (prefers VS 2026) | `build/` |
+
+If VS Build Tools is installed for the first time, reboot and re-run `bootstrap.ps1`.
+
+Run directly if you prefer:
+
+```powershell
 .\build\x64\Release\WhisperNpuHal.App.exe <model_dir> <audio.wav> intel npu 5 --cache .\build\cache\npu
 ```
 
