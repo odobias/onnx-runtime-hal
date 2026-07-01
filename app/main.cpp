@@ -2,6 +2,7 @@
 //
 // Usage: whisper_hal <model_dir> <audio.wav> [backend] [device] [runs]
 //                    [--cache <dir>] [--ref "<reference text>"] [--json]
+//                    [--results <csv>]
 //   backend: auto | intel | amd | qualcomm     (default: auto)
 //   device : npu  | gpu | cpu                   (default: npu)
 //   runs   : timed iterations                   (default: 5)
@@ -10,9 +11,12 @@
 //   --json        : emit one machine-readable JSON record (for the harness)
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -100,13 +104,88 @@ double percentile(std::vector<double> v, double pct) {
     return v[lo] + (v[hi] - v[lo]) * (idx - lo);
 }
 
+std::string csv_escape(const std::string& s) {
+    bool quote = s.find_first_of(",\"\r\n") != std::string::npos;
+    if (!quote) return s;
+
+    std::string out = "\"";
+    for (char c : s) {
+        if (c == '"') out += "\"\"";
+        else out += c;
+    }
+    out += '"';
+    return out;
+}
+
+std::string utc_now_iso8601() {
+    const std::time_t now = std::time(nullptr);
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &now);
+#else
+    gmtime_r(&now, &tm);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
+}
+
+void append_result_csv(const std::string& path,
+                       const std::string& requested_backend,
+                       const whisper_npu::IWhisperEngine& engine,
+                       whisper_npu::Device device,
+                       const std::string& model_dir,
+                       const std::string& audio_path,
+                       double audio_seconds,
+                       int runs,
+                       int warmup,
+                       const std::string& cache_dir,
+                       double cold_load,
+                       double warm_load,
+                       double mean_seconds,
+                       double rtf,
+                       const std::string& text) {
+    namespace fs = std::filesystem;
+    const fs::path csv_path(path);
+    if (csv_path.has_parent_path()) fs::create_directories(csv_path.parent_path());
+
+    const bool write_header = !fs::exists(csv_path) || fs::file_size(csv_path) == 0;
+    std::ofstream out(csv_path, std::ios::app);
+    if (!out) throw std::runtime_error("cannot open results CSV for append: " + path);
+
+    if (write_header) {
+        out << "timestamp_utc,requested_backend,resolved_backend,device,device_name,"
+               "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
+               "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
+               "realtime_factor,transcription\n";
+    }
+
+    out << csv_escape(utc_now_iso8601()) << ','
+        << csv_escape(requested_backend) << ','
+        << csv_escape(engine.backend_name()) << ','
+        << csv_escape(to_string(device)) << ','
+        << csv_escape(engine.device_name()) << ','
+        << csv_escape(model_dir) << ','
+        << csv_escape(audio_path) << ','
+        << std::setprecision(9) << audio_seconds << ','
+        << runs << ','
+        << warmup << ','
+        << csv_escape(cache_dir) << ','
+        << cold_load << ','
+        << warm_load << ','
+        << mean_seconds << ','
+        << rtf << ','
+        << (rtf > 0.0 ? 1.0 / rtf : 0.0) << ','
+        << csv_escape(text) << '\n';
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
     using namespace whisper_npu;
 
     std::vector<std::string> pos;
-    std::string cache_dir, reference;
+    std::string cache_dir, reference, results_csv;
     bool json_out = false, have_ref = false;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -117,6 +196,8 @@ int main(int argc, char* argv[]) {
             have_ref = true;
         } else if (a == "--json") {
             json_out = true;
+        } else if (a == "--results" && i + 1 < argc) {
+            results_csv = argv[++i];
         } else {
             pos.push_back(a);
         }
@@ -125,7 +206,14 @@ int main(int argc, char* argv[]) {
     if (pos.size() < 2) {
         std::cerr << "Usage: " << argv[0]
                   << " <model_dir> <audio.wav> [backend] [device] [runs]"
-                     " [--cache <dir>] [--ref \"text\"] [--json]\n";
+                     " [--cache <dir>] [--ref \"text\"] [--json] [--results <csv>]\n"
+                  << "  backend: auto | intel | amd | qualcomm   (default auto)\n"
+                  << "  device : npu | gpu | cpu                 (default npu)\n"
+                  << "  runs   : timed iterations                (default 5)\n"
+                  << "  --cache <dir>: persist compiled model; loads twice (cold/warm)\n"
+                  << "  --ref \"text\": reference transcript -> compute WER/CER\n"
+                  << "  --json: emit one machine-readable JSON record\n"
+                  << "  --results <csv>: append a benchmark result row\n\n";
         std::cerr << "Compiled-in backends:";
         for (Backend b : available_backends()) std::cerr << " " << to_string(b);
         if (available_backends().empty()) std::cerr << " (none!)";
@@ -149,6 +237,7 @@ int main(int argc, char* argv[]) {
     }
     const int runs = pos.size() > 4 ? std::max(1, std::atoi(pos[4].c_str())) : 5;
     const int warmup = 1;
+    const std::string requested_backend = to_string(backend);
 
     auto fail = [&](int code, const std::string& msg) {
         if (json_out) {
@@ -226,6 +315,16 @@ int main(int argc, char* argv[]) {
     ErrorRate er;
     if (have_ref) er = compute_error_rate(reference, text);
 
+    if (!results_csv.empty()) {
+        try {
+            append_result_csv(results_csv, requested_backend, *engine, opt.device, opt.model_dir,
+                              audio_path, audio_len, runs, warmup, cache_dir,
+                              cold_load, warm_load, mean, rtf, text);
+        } catch (const std::exception& e) {
+            return fail(5, std::string("Failed to append results CSV: ") + e.what());
+        }
+    }
+
     if (json_out) {
         std::ostringstream js;
         js << std::fixed << std::setprecision(6);
@@ -292,6 +391,7 @@ int main(int argc, char* argv[]) {
                       << er.cer * 100.0 << "%  (ref " << er.ref_words << " words)\n";
         }
         std::cout << "transcription: " << text << "\n";
+        if (!results_csv.empty()) std::cout << "results csv  : " << results_csv << "\n";
     }
     return 0;
 }

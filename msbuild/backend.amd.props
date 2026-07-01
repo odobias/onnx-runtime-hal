@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- AMD backend: ONNX Runtime + VitisAI EP (Ryzen AI). Imported only when
-     EnableAmd=true. Point OrtAmdDir at your Ryzen AI / ONNX Runtime SDK, e.g.
-     /p:EnableAmd=true /p:OrtAmdDir=C:\ryzen-ai\onnxruntime -->
+     EnableAmd=true. Point RyzenAiDir at your Ryzen AI SDK, e.g.
+     /p:EnableAmd=true /p:RyzenAiDir=C:\Program Files\RyzenAI\1.8.0-beta -->
 <Project>
   <PropertyGroup>
-    <OrtAmdDir Condition="'$(OrtAmdDir)'=='' and '$(RYZEN_AI_ORT_DIR)'!=''">$(RYZEN_AI_ORT_DIR)</OrtAmdDir>
-    <OrtAmdInclude Condition="'$(OrtAmdInclude)'==''">$(OrtAmdDir)\include</OrtAmdInclude>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'=='' and '$(RYZEN_AI_INSTALLATION_PATH)'!=''">$(RYZEN_AI_INSTALLATION_PATH)</RyzenAiDir>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'==''">C:\Program Files\RyzenAI\1.8.0-beta</RyzenAiDir>
+    <OrtAmdDir Condition="'$(OrtAmdDir)'==''">$(RyzenAiDir)\onnxruntime</OrtAmdDir>
+    <OrtAmdInclude Condition="'$(OrtAmdInclude)'==''">$(OrtAmdDir)\include\onnxruntime\core\session</OrtAmdInclude>
     <OrtAmdLibDir Condition="'$(OrtAmdLibDir)'==''">$(OrtAmdDir)\lib</OrtAmdLibDir>
+    <OrtAmdBinDir Condition="'$(OrtAmdBinDir)'==''">$(OrtAmdDir)\bin</OrtAmdBinDir>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
