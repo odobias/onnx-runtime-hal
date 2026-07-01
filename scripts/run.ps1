@@ -16,6 +16,8 @@ param(
     [int]$Runs = 5,
     [string]$Configuration = "Release",
     [string]$Results = "",
+    [string]$Label = "",
+    [string]$Ref = "",
     [switch]$NoCache,
     [switch]$NoResults
 )
@@ -48,6 +50,10 @@ if (-not $NoCache) {
 $resultArgs = @()
 if (-not $NoResults) {
     $resultArgs = @("--results", $Results)
+    if ($Label) { $resultArgs += @("--label", $Label) }
 }
 
-& $exe $Model $Audio $Backend $Device $Runs @cacheArgs @resultArgs
+$refArgs = @()
+if ($Ref) { $refArgs = @("--ref", $Ref) }
+
+& $exe $Model $Audio $Backend $Device $Runs @cacheArgs @resultArgs @refArgs

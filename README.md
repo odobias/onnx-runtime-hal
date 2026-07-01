@@ -96,20 +96,30 @@ Compare quantization *methods* across `variant × device × clip`:
 `manifest.json` is the backend-neutral contract: each entry has `backend`, `precision`,
 `method`, `model_dir`, `devices`. Adding AMD/Qualcomm means **appending entries with
 `backend=amd|qualcomm`** (and their own model dirs/devices) — the harness, metrics, and
-report need no changes. Example NPU result (whisper-tiny.en, 12 clips):
+report need no changes.
+
+Reports land in `results/` (tracked): `quantization-benchmark.{md,csv}` (aggregate sweep)
+plus one canonical per-variant row appended to `results/benchmark-results.csv` (the shared
+cross-backend file — AMD/Intel rows share the same schema). Example NPU result
+(whisper-tiny.en, 12 LibriSpeech clips):
 
 | Variant | Prec | Size MB | Cold s | Warm s | Mean ms | xRT | WER % |
 |---|---|---|---|---|---|---|---|
-| fp32 | fp32 | 150.7 | 12.8 | 0.7 | 141.0 | 70.5 | 9.57 |
-| fp16 | fp16 | 78.8 | 10.1 | 0.8 | 141.7 | 69.1 | 9.57 |
-| int8 | int8 | 44.9 | 11.2 | 0.7 | 143.0 | 67.9 | 10.23 |
-| int4 | int4 | 37.6 | 19.3 | 0.8 | 154.9 | 63.9 | 14.85 |
+| fp32 | fp32 | 150.7 | 10.0 | 0.70 | 137.3 | 71.3 | 9.57 |
+| fp16 | fp16 | 78.8 | 9.4 | 0.62 | 139.3 | 71.1 | 9.57 |
+| int8 | int8 | 44.9 | 10.5 | 0.70 | 141.5 | 60.1 | 10.23 |
+| int4 | int4 | 37.6 | 21.7 | 0.70 | 119.9 | 83.1 | 14.85 |
 
-Takeaways: **fp16 is a free win** (half the size, identical WER); **int8** trades +0.7% WER
-for 3.3× smaller; **int4** is both less accurate *and slower* on this NPU (dequant overhead),
-so it's a poor fit here. Full W+A INT8 and the INT8-encoder/FP32-decoder hybrid aren't
-auto-exported yet (full stateful INT8 doesn't run on the NPU — see the findings docs); the
-manifest is ready to hold them as extra methods once wired.
+Takeaways (this NPU): **fp16 is a free win** — half the size, identical WER. **int8** trades
++0.7% WER for 3.3× smaller. **int4** is the smallest and, on these kernels, not slower at
+inference — but it costs ~5 pts of WER and the longest cold compile (~22 s), so it's an
+accuracy-poor trade for a tiny model. Warm cache makes every NPU load ~0.7 s regardless of
+precision. (GPU/CPU land at slightly lower WER on fp32/fp16 — 8.6% vs the NPU's 9.6% —
+purely from kernel numerics; see the full table in `results/`.)
+
+Full W+A INT8 and the INT8-encoder/FP32-decoder hybrid aren't auto-exported yet (full
+stateful INT8 doesn't run on the NPU — see the findings docs); the manifest is ready to hold
+them as extra methods once wired.
 
 ## AMD Ryzen AI
 

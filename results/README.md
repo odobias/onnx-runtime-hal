@@ -31,4 +31,23 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 - `mean_infer_seconds`: mean measured transcription latency.
 - `rtf`: real-time factor, `mean_infer_seconds / audio_seconds`.
 - `realtime_factor`: inverse RTF.
+- `label`: free-form tag for the row, e.g. the quantization variant (`wten-ov-int8`). Empty if unset.
+- `model_size_mb`: on-disk size of `model_dir`. Empty if unavailable.
+- `avg_logprob`: mean per-token log-prob the model self-reports (confidence proxy). Empty when the backend can't provide token metrics.
+- `ttft_ms` / `tpot_ms` / `throughput_tps`: time-to-first-token, time-per-output-token, tokens/sec. Empty when unavailable.
+- `wer` / `cer`: word/char error rate vs. `--ref` (fraction, 0..1). Empty when no reference was given.
 - `transcription`: final transcription text from the last measured run.
+
+The trailing metric columns are backend-neutral and optional: each backend fills
+only what it can measure (e.g. the Intel OpenVINO backend reports confidence and
+token perf; the AMD scaffold currently leaves them empty). This keeps one schema
+across machines so files concatenate cleanly.
+
+## Quantization sweep
+
+`scripts\benchmark.ps1` compares quantization variants from `models\manifest.json`
+across `variant × device × clip` and writes an aggregate report to
+`results\quantization-benchmark.{md,csv}` (micro-averaged WER/CER, confidence, load
+and latency). It also appends one canonical per-variant row to
+`benchmark-results.csv` via the shared CLI, so single-run and swept results live in
+the same schema.

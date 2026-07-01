@@ -130,6 +130,19 @@ std::string utc_now_iso8601() {
     return oss.str();
 }
 
+// Format an optional numeric CSV cell: empty string when the backend didn't
+// provide it (keeps the shared schema backend-neutral -- a backend fills only the
+// metrics it can measure).
+std::string opt_num(double v, bool present, int prec = 6) {
+    if (!present) return "";
+    std::ostringstream o;
+    o << std::setprecision(prec) << v;
+    return o.str();
+}
+
+// Shared, backend-neutral results schema. The trailing metric columns (label +
+// confidence/perf/accuracy) are populated only when the backend/run can supply
+// them, so rows from Intel/AMD/Qualcomm machines share one schema and concatenate.
 void append_result_csv(const std::string& path,
                        const std::string& requested_backend,
                        const whisper_npu::IWhisperEngine& engine,
@@ -144,7 +157,12 @@ void append_result_csv(const std::string& path,
                        double warm_load,
                        double mean_seconds,
                        double rtf,
-                       const std::string& text) {
+                       const std::string& text,
+                       const std::string& label,
+                       double model_size_mb_val,
+                       const whisper_npu::TranscribeResult& last,
+                       bool have_ref,
+                       const whisper_npu::ErrorRate& er) {
     namespace fs = std::filesystem;
     const fs::path csv_path(path);
     if (csv_path.has_parent_path()) fs::create_directories(csv_path.parent_path());
@@ -157,9 +175,11 @@ void append_result_csv(const std::string& path,
         out << "timestamp_utc,requested_backend,resolved_backend,device,device_name,"
                "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
                "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
-               "realtime_factor,transcription\n";
+               "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
+               "throughput_tps,wer,cer,transcription\n";
     }
 
+    const bool tok = last.has_token_metrics;
     out << csv_escape(utc_now_iso8601()) << ','
         << csv_escape(requested_backend) << ','
         << csv_escape(engine.backend_name()) << ','
@@ -176,6 +196,14 @@ void append_result_csv(const std::string& path,
         << mean_seconds << ','
         << rtf << ','
         << (rtf > 0.0 ? 1.0 / rtf : 0.0) << ','
+        << csv_escape(label) << ','
+        << opt_num(model_size_mb_val, model_size_mb_val >= 0.0, 6) << ','
+        << opt_num(last.avg_logprob, tok, 6) << ','
+        << opt_num(last.ttft_ms, tok, 6) << ','
+        << opt_num(last.tpot_ms, tok, 6) << ','
+        << opt_num(last.throughput_tps, tok, 6) << ','
+        << opt_num(er.wer, have_ref, 6) << ','
+        << opt_num(er.cer, have_ref, 6) << ','
         << csv_escape(text) << '\n';
 }
 
@@ -185,7 +213,7 @@ int main(int argc, char* argv[]) {
     using namespace whisper_npu;
 
     std::vector<std::string> pos;
-    std::string cache_dir, reference, results_csv;
+    std::string cache_dir, reference, results_csv, label;
     bool json_out = false, have_ref = false;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -198,6 +226,8 @@ int main(int argc, char* argv[]) {
             json_out = true;
         } else if (a == "--results" && i + 1 < argc) {
             results_csv = argv[++i];
+        } else if (a == "--label" && i + 1 < argc) {
+            label = argv[++i];
         } else {
             pos.push_back(a);
         }
@@ -213,7 +243,8 @@ int main(int argc, char* argv[]) {
                   << "  --cache <dir>: persist compiled model; loads twice (cold/warm)\n"
                   << "  --ref \"text\": reference transcript -> compute WER/CER\n"
                   << "  --json: emit one machine-readable JSON record\n"
-                  << "  --results <csv>: append a benchmark result row\n\n";
+                  << "  --results <csv>: append a benchmark result row\n"
+                  << "  --label <text>: tag the results row (e.g. quantization variant)\n\n";
         std::cerr << "Compiled-in backends:";
         for (Backend b : available_backends()) std::cerr << " " << to_string(b);
         if (available_backends().empty()) std::cerr << " (none!)";
@@ -319,7 +350,8 @@ int main(int argc, char* argv[]) {
         try {
             append_result_csv(results_csv, requested_backend, *engine, opt.device, opt.model_dir,
                               audio_path, audio_len, runs, warmup, cache_dir,
-                              cold_load, warm_load, mean, rtf, text);
+                              cold_load, warm_load, mean, rtf, text,
+                              label, size_mb, last, have_ref, er);
         } catch (const std::exception& e) {
             return fail(5, std::string("Failed to append results CSV: ") + e.what());
         }
