@@ -55,6 +55,21 @@ public:
         TranscribeResult out;
         out.text = static_cast<std::string>(result);
         out.infer_seconds = secs;
+
+        // Confidence: WhisperDecodedResults.scores holds the summed token log-prob
+        // for each hypothesis (index 0 = the returned transcription).
+        if (!result.scores.empty()) {
+            out.sequence_logprob = static_cast<double>(result.scores[0]);
+        }
+        auto& pm = result.perf_metrics;
+        out.generated_tokens = static_cast<long>(pm.get_num_generated_tokens());
+        if (out.generated_tokens > 0) {
+            out.avg_logprob = out.sequence_logprob / static_cast<double>(out.generated_tokens);
+        }
+        out.ttft_ms = pm.get_ttft().mean;
+        out.tpot_ms = pm.get_tpot().mean;
+        out.throughput_tps = pm.get_throughput().mean;
+        out.has_token_metrics = true;
         return out;
     }
 

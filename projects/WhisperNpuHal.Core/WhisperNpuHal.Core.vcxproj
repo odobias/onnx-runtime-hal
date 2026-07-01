@@ -54,6 +54,7 @@
   <ItemGroup>
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\whisper_engine.hpp" />
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\audio.hpp" />
+    <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\metrics.hpp" />
     <ClInclude Include="$(WhisperHalRoot)src\backends\backend_registry.hpp" />
   </ItemGroup>
 

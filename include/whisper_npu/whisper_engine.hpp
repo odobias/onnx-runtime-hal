@@ -47,9 +47,25 @@ struct EngineOptions {
     std::string cache_dir;
 };
 
+// Backend-neutral result + metrics. Every backend fills `text`/`infer_seconds`;
+// the remaining fields are best-effort. `has_token_metrics` indicates whether the
+// token-level confidence/perf fields below were populated by the backend (so a
+// common harness can compare only what's actually available across platforms).
 struct TranscribeResult {
     std::string text;
-    double infer_seconds = 0.0;  // wall-clock of the generate/inference call
+    double infer_seconds = 0.0;   // wall-clock of the generate/inference call
+
+    // Confidence (self-reported by the model; miscalibration is possible).
+    double sequence_logprob = 0.0;  // sum of token log-probs for the chosen hypothesis
+    double avg_logprob = 0.0;       // sequence_logprob / generated_tokens (higher = more confident)
+    long generated_tokens = 0;
+
+    // Fine-grained performance (backend may leave these at -1 if unsupported).
+    double ttft_ms = -1.0;          // time to first token
+    double tpot_ms = -1.0;          // time per output token
+    double throughput_tps = -1.0;   // tokens/second
+
+    bool has_token_metrics = false;
 };
 
 // 16 kHz, mono, float PCM normalized to [-1, 1].

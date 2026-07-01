@@ -1,20 +1,26 @@
 // whisper_hal CLI: backend-agnostic Whisper runner / benchmark built on the HAL.
 //
-// Usage: whisper_hal <model_dir> <audio.wav> [backend] [device] [runs] [--cache <dir>]
+// Usage: whisper_hal <model_dir> <audio.wav> [backend] [device] [runs]
+//                    [--cache <dir>] [--ref "<reference text>"] [--json]
 //   backend: auto | intel | amd | qualcomm     (default: auto)
 //   device : npu  | gpu | cpu                   (default: npu)
 //   runs   : timed iterations                   (default: 5)
-//   --cache <dir> : persist the compiled model here. When set, the app loads the
-//                   engine twice (cold vs warm) to demonstrate cache load speedup.
+//   --cache <dir> : persist compiled model; loads twice (cold vs warm)
+//   --ref "<text>": reference transcript -> compute WER/CER
+//   --json        : emit one machine-readable JSON record (for the harness)
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "whisper_npu/audio.hpp"
+#include "whisper_npu/metrics.hpp"
 #include "whisper_npu/whisper_engine.hpp"
 
 namespace {
@@ -49,17 +55,68 @@ std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
+std::string json_escape(const std::string& s) {
+    std::string o;
+    o.reserve(s.size() + 8);
+    for (char c : s) {
+        switch (c) {
+            case '"': o += "\\\""; break;
+            case '\\': o += "\\\\"; break;
+            case '\n': o += "\\n"; break;
+            case '\r': o += "\\r"; break;
+            case '\t': o += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    o += buf;
+                } else {
+                    o += c;
+                }
+        }
+    }
+    return o;
+}
+
+double model_size_mb(const std::string& dir) {
+    std::error_code ec;
+    uintmax_t total = 0;
+    std::filesystem::path p(dir);
+    if (!std::filesystem::exists(p, ec)) return -1.0;
+    for (auto it = std::filesystem::recursive_directory_iterator(p, ec);
+         !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_regular_file(ec)) total += it->file_size(ec);
+    }
+    return static_cast<double>(total) / 1e6;
+}
+
+double percentile(std::vector<double> v, double pct) {
+    if (v.empty()) return 0.0;
+    std::sort(v.begin(), v.end());
+    const double idx = pct / 100.0 * (v.size() - 1);
+    const size_t lo = static_cast<size_t>(std::floor(idx));
+    const size_t hi = static_cast<size_t>(std::ceil(idx));
+    if (lo == hi) return v[lo];
+    return v[lo] + (v[hi] - v[lo]) * (idx - lo);
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
     using namespace whisper_npu;
 
     std::vector<std::string> pos;
-    std::string cache_dir;
+    std::string cache_dir, reference;
+    bool json_out = false, have_ref = false;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--cache" && i + 1 < argc) {
             cache_dir = argv[++i];
+        } else if (a == "--ref" && i + 1 < argc) {
+            reference = argv[++i];
+            have_ref = true;
+        } else if (a == "--json") {
+            json_out = true;
         } else {
             pos.push_back(a);
         }
@@ -67,11 +124,8 @@ int main(int argc, char* argv[]) {
 
     if (pos.size() < 2) {
         std::cerr << "Usage: " << argv[0]
-                  << " <model_dir> <audio.wav> [backend] [device] [runs] [--cache <dir>]\n"
-                  << "  backend: auto | intel | amd | qualcomm   (default auto)\n"
-                  << "  device : npu | gpu | cpu                 (default npu)\n"
-                  << "  runs   : timed iterations                (default 5)\n"
-                  << "  --cache <dir>: persist compiled model; loads twice (cold/warm)\n\n";
+                  << " <model_dir> <audio.wav> [backend] [device] [runs]"
+                     " [--cache <dir>] [--ref \"text\"] [--json]\n";
         std::cerr << "Compiled-in backends:";
         for (Backend b : available_backends()) std::cerr << " " << to_string(b);
         if (available_backends().empty()) std::cerr << " (none!)";
@@ -96,84 +150,148 @@ int main(int argc, char* argv[]) {
     const int runs = pos.size() > 4 ? std::max(1, std::atoi(pos[4].c_str())) : 5;
     const int warmup = 1;
 
+    auto fail = [&](int code, const std::string& msg) {
+        if (json_out) {
+            std::cout << "{\"ok\":false,\"error\":\"" << json_escape(msg) << "\"}\n";
+        } else {
+            std::cerr << msg << "\n";
+        }
+        return code;
+    };
+
     WavData wav;
     try {
         wav = read_wav(audio_path);
     } catch (const std::exception& e) {
-        std::cerr << "Failed to read WAV: " << e.what() << "\n";
-        return 2;
+        return fail(2, std::string("Failed to read WAV: ") + e.what());
     }
     const double audio_len =
         static_cast<double>(wav.samples.size()) /
         static_cast<double>(wav.sample_rate ? wav.sample_rate : 16000);
 
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "Audio  : " << audio_path << "  (" << audio_len << "s @ "
-              << wav.sample_rate << " Hz, " << wav.channels << " ch)\n";
-    std::cout << "Backend: " << to_string(backend) << "   Device: " << to_string(opt.device)
-              << "   Runs: " << runs << "\n";
-    std::cout << "Cache  : " << (cache_dir.empty() ? std::string("(disabled)") : cache_dir) << "\n";
-    if (wav.sample_rate != 16000) {
-        std::cerr << "WARNING: expected 16000 Hz mono; no resampling is done.\n";
+    if (!json_out) {
+        std::cout << std::fixed << std::setprecision(2);
+        std::cout << "Audio  : " << audio_path << "  (" << audio_len << "s @ "
+                  << wav.sample_rate << " Hz, " << wav.channels << " ch)\n";
+        std::cout << "Backend: " << to_string(backend) << "   Device: " << to_string(opt.device)
+                  << "   Runs: " << runs << "\n";
+        std::cout << "Cache  : " << (cache_dir.empty() ? std::string("(disabled)") : cache_dir)
+                  << "\n\n";
     }
-    std::cout << "\n";
 
-    // --- Cold load (compiles; writes cache if enabled) -----------------------
+    // Cold load (compiles; writes cache if enabled).
     std::unique_ptr<IWhisperEngine> engine;
-    double cold_load = 0.0;
+    double cold_load = 0.0, warm_load = -1.0;
     try {
         engine = create_engine(backend, opt);
         cold_load = engine->load_seconds();
     } catch (const std::exception& e) {
-        std::cerr << "Engine creation failed: " << e.what() << "\n";
-        return 3;
+        return fail(3, std::string("Engine creation failed: ") + e.what());
     }
-    std::cout << "Engine : " << engine->backend_name() << "  [" << engine->device_name() << "]\n";
-    std::cout << std::setprecision(3);
-    std::cout << "load (cold)  : " << cold_load << " s\n";
 
-    // --- Warm load (imports cached blob) to demonstrate the caching win ------
+    // Warm load (imports cached blob) to quantify the caching win.
     if (!cache_dir.empty()) {
         try {
             auto warm = create_engine(backend, opt);
-            const double warm_load = warm->load_seconds();
-            std::cout << "load (warm)  : " << warm_load << " s";
-            if (warm_load > 0.0) {
-                std::cout << "   (" << std::setprecision(1) << (cold_load / warm_load)
-                          << "x faster than cold)" << std::setprecision(3);
-            }
-            std::cout << "\n";
-            engine = std::move(warm);  // use the warm-loaded engine for inference
+            warm_load = warm->load_seconds();
+            engine = std::move(warm);
         } catch (const std::exception& e) {
-            std::cerr << "Warm reload failed: " << e.what() << "\n";
+            if (!json_out) std::cerr << "Warm reload failed: " << e.what() << "\n";
         }
     }
-    std::cout << "\n";
 
-    // --- Inference benchmark -------------------------------------------------
+    // Inference benchmark.
+    std::vector<double> lat;
+    std::string text;
+    TranscribeResult last;
     try {
         for (int i = 0; i < warmup; ++i) engine->transcribe(wav.samples);
-
-        std::vector<double> lat;
-        std::string text;
         for (int i = 0; i < runs; ++i) {
-            auto r = engine->transcribe(wav.samples);
-            lat.push_back(r.infer_seconds);
-            text = trim(r.text);
+            last = engine->transcribe(wav.samples);
+            lat.push_back(last.infer_seconds);
+            text = trim(last.text);
         }
-        double mean = 0.0;
-        for (double l : lat) mean += l;
-        mean /= static_cast<double>(lat.size());
-        const double rtf = mean / audio_len;
-
-        std::cout << std::setprecision(1);
-        std::cout << "mean infer   : " << mean * 1000.0 << " ms   " << std::setprecision(3)
-                  << "RTF=" << rtf << std::setprecision(1) << "  (" << 1.0 / rtf
-                  << "x real time)\n";
-        std::cout << "transcription: " << text << "\n";
     } catch (const std::exception& e) {
-        std::cerr << "Transcription failed: " << e.what() << "\n";
-        return 4;
+        return fail(4, std::string("Transcription failed: ") + e.what());
+    }
+
+    double mean = 0.0;
+    for (double l : lat) mean += l;
+    mean /= static_cast<double>(lat.size());
+    const double median = percentile(lat, 50.0);
+    const double p90 = percentile(lat, 90.0);
+    const double rtf = mean / audio_len;
+    const double size_mb = model_size_mb(opt.model_dir);
+
+    ErrorRate er;
+    if (have_ref) er = compute_error_rate(reference, text);
+
+    if (json_out) {
+        std::ostringstream js;
+        js << std::fixed << std::setprecision(6);
+        js << "{";
+        js << "\"ok\":true";
+        js << ",\"backend\":\"" << json_escape(engine->backend_name()) << "\"";
+        js << ",\"device\":\"" << json_escape(engine->device_name()) << "\"";
+        js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
+        js << ",\"model_size_mb\":" << size_mb;
+        js << ",\"audio\":\"" << json_escape(audio_path) << "\"";
+        js << ",\"audio_len_s\":" << audio_len;
+        js << ",\"runs\":" << runs;
+        js << ",\"load_cold_s\":" << cold_load;
+        js << ",\"load_warm_s\":" << warm_load;
+        js << ",\"mean_ms\":" << mean * 1000.0;
+        js << ",\"median_ms\":" << median * 1000.0;
+        js << ",\"p90_ms\":" << p90 * 1000.0;
+        js << ",\"rtf\":" << rtf;
+        js << ",\"xrt\":" << (rtf > 0 ? 1.0 / rtf : 0.0);
+        js << ",\"avg_logprob\":" << last.avg_logprob;
+        js << ",\"sequence_logprob\":" << last.sequence_logprob;
+        js << ",\"generated_tokens\":" << last.generated_tokens;
+        js << ",\"ttft_ms\":" << last.ttft_ms;
+        js << ",\"tpot_ms\":" << last.tpot_ms;
+        js << ",\"throughput_tps\":" << last.throughput_tps;
+        js << ",\"has_token_metrics\":" << (last.has_token_metrics ? "true" : "false");
+        if (have_ref) {
+            js << ",\"wer\":" << er.wer;
+            js << ",\"cer\":" << er.cer;
+            js << ",\"ref_words\":" << er.ref_words;
+            js << ",\"word_edits\":" << er.word_edits;
+            js << ",\"ref_chars\":" << er.ref_chars;
+            js << ",\"char_edits\":" << er.char_edits;
+            js << ",\"ref\":\"" << json_escape(reference) << "\"";
+        }
+        js << ",\"text\":\"" << json_escape(text) << "\"";
+        js << "}";
+        std::cout << js.str() << "\n";
+    } else {
+        std::cout << "Engine : " << engine->backend_name() << "  [" << engine->device_name() << "]\n";
+        std::cout << std::setprecision(3);
+        std::cout << "load (cold)  : " << cold_load << " s\n";
+        if (warm_load >= 0.0) {
+            std::cout << "load (warm)  : " << warm_load << " s";
+            if (warm_load > 0.0) std::cout << "   (" << std::setprecision(1) << (cold_load / warm_load)
+                                           << "x faster)" << std::setprecision(3);
+            std::cout << "\n";
+        }
+        std::cout << std::setprecision(1);
+        std::cout << "infer mean   : " << mean * 1000.0 << " ms  (median " << median * 1000.0
+                  << ", p90 " << p90 * 1000.0 << ")\n";
+        std::cout << "RTF          : " << std::setprecision(3) << rtf << std::setprecision(1)
+                  << "  (" << 1.0 / rtf << "x real time)\n";
+        if (last.has_token_metrics) {
+            std::cout << "confidence   : avg_logprob " << std::setprecision(4) << last.avg_logprob
+                      << " over " << last.generated_tokens << " tokens\n";
+            std::cout << std::setprecision(1);
+            std::cout << "token perf   : ttft " << last.ttft_ms << " ms, tpot " << last.tpot_ms
+                      << " ms, " << last.throughput_tps << " tok/s\n";
+        }
+        if (size_mb >= 0) std::cout << "model size   : " << std::setprecision(1) << size_mb << " MB\n";
+        if (have_ref) {
+            std::cout << "accuracy     : WER " << std::setprecision(2) << er.wer * 100.0 << "%  CER "
+                      << er.cer * 100.0 << "%  (ref " << er.ref_words << " words)\n";
+        }
+        std::cout << "transcription: " << text << "\n";
     }
     return 0;
 }
