@@ -179,7 +179,8 @@ pointed at non-Intel silicon, etc. — are recorded as failures, not crashes, pe
 backend-neutral contract as the quantization benchmark.
 
 Measured on this dev machine (AMD Threadripper PRO 7955WX, 16C/32T, NVIDIA T1000 — i.e.
-**zero Intel NPU/GPU hardware**), whisper-tiny.en fp16, 12 LibriSpeech clips:
+**zero Intel NPU/GPU hardware**) with `compare-devices.ps1`, whisper-tiny.en fp16, 12
+LibriSpeech clips:
 
 | Device | Status | Threads | Cold s | Warm s | Mean ms | xRT | tok/s | WER % |
 |---|---|---|---|---|---|---|---|---|
@@ -192,15 +193,57 @@ compile for). GPU fails because OpenVINO's `GPU` plugin only targets **Intel**
 GPUs (Level Zero / oneAPI) — it doesn't drive the NVIDIA card, so kernel selection fails
 partway through compiling the model graph. Both are genuine `ok:false` results with a
 real error string, not a script bug — that's the graceful-degradation contract working
-as designed. **CPU's own number is real and unremarkable-in-a-good-way**: 91x real-time
-on a 32-thread workstation chip is plenty fast for whisper-tiny.en; it just isn't the
-point of this repo (an idle high-core-count CPU also isn't a fair power/latency
-comparison against a purpose-built NPU on a laptop's power budget — treat this table as
-"does it run and is it correct", not a verdict on NPU vs. CPU efficiency).
+as designed.
 
-To get real NPU/GPU rows, run `compare-devices.ps1` on actual Intel NPU/GPU hardware
-(Core Ultra / Meteor Lake or newer for NPU; Intel integrated or Arc/Flex for GPU) and
-drop the resulting `build\reports\device-compare.md` numbers in here.
+### Cross-machine comparison (via the shared results ledger)
+
+`results/benchmark-results.csv` is the cross-machine ledger (see `results/README.md`):
+every machine appends its own canonical rows with the same schema, so results from
+different hardware concatenate without any code changes. It already had one full
+NPU/GPU/CPU × fp32/fp16/int8/int4 sweep from a real Intel NPU/GPU laptop; this machine
+added its own CPU-only rows on top (same clip `ls_000`, same `--ref`, `runs=2` — matched
+methodology, so the comparison below is apples-to-apples, not vibes):
+
+| Precision | Their CPU | Their GPU | Their NPU | **This CPU (32T Threadripper)** | Speedup vs their CPU |
+|---|---|---|---|---|---|
+| fp32 | 267.7 ms (21.9x) | 119.3 ms (49.1x) | 115.0 ms (50.9x) | **77.9 ms (75.2x)** | 3.44x |
+| fp16 | 227.8 ms (25.7x) | 105.2 ms (55.7x) | 109.6 ms (53.4x) | **68.5 ms (85.5x)** | 3.33x |
+| int8 | 194.2 ms (30.2x) | 161.7 ms (36.2x) | 113.0 ms (51.8x) | **66.4 ms (88.2x)** | 2.92x |
+| int4 | 187.9 ms (31.2x) | 122.6 ms (47.7x) | 84.2 ms (69.6x) | **73.1 ms (80.1x)** | 2.57x |
+
+(mean latency, xRT in parens; WER/CER were identical to their numbers at every
+precision on this clip — same model, same math, just different silicon.)
+
+The uncomfortable-for-NPU-marketing part: **this workstation's CPU alone beats their
+dedicated NPU and GPU on raw latency, at every precision.** That is a real, measured
+result, not a benchmarking mistake — and it is *not* the flex it looks like. A
+32-thread desktop-class CPU pulls an order of magnitude more power than a laptop NPU,
+and whisper-tiny is small enough that a NPU's fixed per-call overhead (compile-time
+batching, driver dispatch) eats into its efficiency advantage before the model is big
+enough to need it. This table answers "which is faster on this specific tiny model,
+right now" — it does not answer "which is more efficient" or "which scales better to
+larger Whisper checkpoints," and treating a latency win here as a verdict on NPUs in
+general would be exactly the kind of unearned generalization worth pushing back on.
+
+To add another machine's rows, run the loop below on it and let it append to (or, once
+merged, git-diff-and-commit into) `results/benchmark-results.csv`:
+
+```powershell
+.\scripts\export-variants.ps1
+.\scripts\get-eval-set.ps1
+foreach ($id in (Get-Content .\models\manifest.json | ConvertFrom-Json).variants.id) {
+    .\build\x64\Release\WhisperNpuHal.App.exe .\models\variants\$id .\models\eval\ls_000.wav `
+        intel cpu 2 --cache ".\cache\$id-CPU" `
+        --ref "MISTER QUILTER IS THE APOSTLE OF THE MIDDLE CLASSES AND WE ARE GLAD TO WELCOME HIS GOSPEL" `
+        --results .\results\benchmark-results.csv --label $id
+}
+```
+
+Swap `cpu` for `npu`/`gpu` on hardware that has them. `benchmark.ps1` is deliberately
+**not** used for this — it overwrites (not appends) `results/quantization-benchmark.*`,
+which would blow away the other machine's NPU/GPU sweep already committed there;
+`results/benchmark-results.csv` is the only file in `results/` designed to be
+appended to by multiple machines.
 
 ## Adding a backend
 
