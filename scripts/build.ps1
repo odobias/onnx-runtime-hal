@@ -4,13 +4,15 @@
 #
 #   .\build.ps1                       # Release|x64, Intel backend
 #   .\build.ps1 -Configuration Debug
-#   .\build.ps1 -EnableAmd            # also compile the AMD backend (needs ORT SDK)
+#   .\build.ps1 -EnableAmd -DisableIntel
 
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")][string]$Configuration = "Release",
     [switch]$EnableAmd,
+    [switch]$DisableIntel,
     [switch]$EnableQualcomm,
+    [string]$RyzenAiDir = "",
     [switch]$Rebuild
 )
 
@@ -44,17 +46,22 @@ Write-Host "Using MSBuild: $($found.msbuild)" -ForegroundColor Cyan
 Write-Host ("VS install   : {0}  {1}" -f $found.vs, ($(if ($isVs2026) { '(VS 2026)' } else { '(NOT VS 2026 -- fallback)' }))) -ForegroundColor $(if ($isVs2026) { 'Green' } else { 'Yellow' })
 
 $target = if ($Rebuild) { "Rebuild" } else { "Build" }
+$enableIntel = -not $DisableIntel
 $args = @(
     $sln,
     "/t:$target",
     "/p:Configuration=$Configuration",
     "/p:Platform=x64",
+    "/p:EnableIntel=$([bool]$enableIntel)".ToLower(),
     "/p:EnableAmd=$([bool]$EnableAmd)".ToLower(),
     "/p:EnableQualcomm=$([bool]$EnableQualcomm)".ToLower(),
     "/m",
     "/nologo",
     "/v:minimal"
 )
+if ($RyzenAiDir) {
+    $args += "/p:RyzenAiDir=$RyzenAiDir"
+}
 & $found.msbuild @args
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit 1 }
 

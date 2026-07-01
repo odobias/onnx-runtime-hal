@@ -39,13 +39,15 @@ if ($MaxClips -gt 0 -and $clips.Count -gt $MaxClips) { $clips = $clips[0..($MaxC
 Write-Host ("Manifest: {0} variant(s) | Eval: {1} clip(s) | Runs: {2}" -f `
         $manifestObj.variants.Count, $clips.Count, $Runs) -ForegroundColor Cyan
 
-$reportsDir = Join-Path $root "build\reports"
+$reportsDir = Join-Path $root "results"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
+$sharedCsv = Join-Path $reportsDir "benchmark-results.csv"
 $cacheRoot = Join-Path $root "cache"
 
-function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref) {
-    $args = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
-    $raw = & $exe @args 2>$null
+function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref, $resultsCsv, $label) {
+    $a = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
+    if ($resultsCsv) { $a += @("--results", $resultsCsv, "--label", $label) }
+    $raw = & $exe @a 2>$null
     $line = ($raw | Where-Object { $_ -match '^\{"ok"' } | Select-Object -Last 1)
     if (-not $line) { return [pscustomobject]@{ ok = $false; error = "no-json-output" } }
     return $line | ConvertFrom-Json
@@ -77,7 +79,10 @@ foreach ($v in $manifestObj.variants) {
         foreach ($c in $clips) {
             $audio = Join-Path $root ($c.audio -replace '/', '\')
             if (-not (Test-Path $audio)) { continue }
-            $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref
+            # Emit one canonical row per (variant x device) into the shared CSV using
+            # the first clip; the rest feed only the aggregate report below.
+            $emitCsv = if ($first) { $sharedCsv } else { $null }
+            $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref $emitCsv $v.id
             if (-not $r.ok) {
                 $status = "unsupported/error"; $errMsg = $r.error
                 Write-Host ("   {0}: {1}" -f $c.id, $r.error) -ForegroundColor Yellow
@@ -131,9 +136,9 @@ foreach ($v in $manifestObj.variants) {
 }
 
 # --- Write reports ---
-$csvPath = Join-Path $reportsDir "benchmark.csv"
-$detailCsv = Join-Path $reportsDir "benchmark-detail.csv"
-$mdPath = Join-Path $reportsDir "benchmark.md"
+$csvPath = Join-Path $reportsDir "quantization-benchmark.csv"
+$detailCsv = Join-Path $reportsDir "quantization-benchmark-detail.csv"
+$mdPath = Join-Path $reportsDir "quantization-benchmark.md"
 $summary | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
 $detail | Export-Csv -Path $detailCsv -NoTypeInformation -Encoding UTF8
 

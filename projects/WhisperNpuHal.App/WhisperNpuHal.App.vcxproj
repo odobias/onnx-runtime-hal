@@ -72,4 +72,25 @@
     <Copy SourceFiles="@(IntelRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Message Importance="high" Text="Copied Intel OpenVINO runtime to $(OutDir)" />
   </Target>
+
+  <!-- Copy RyzenAI / ONNX Runtime VitisAI EP runtime DLLs next to the exe so the
+       AMD backend runs without an activated Python or conda environment. -->
+  <Target Name="CopyAmdRuntime" AfterTargets="Build" Condition="'$(EnableAmd)'=='true'">
+    <ItemGroup>
+      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_providers_shared.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_providers_vitisai.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_vitisai_ep.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_vitis_ai_custom_ops.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\dyn_dispatch_core.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\dyn_bins.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\vaiml.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\aiecompiler_client.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\DirectML.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\z.dll" />
+      <AmdRuntime Include="$(OrtAmdBinDir)\zstd.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AmdRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied AMD RyzenAI runtime to $(OutDir)" />
+  </Target>
 </Project>

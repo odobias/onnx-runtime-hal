@@ -19,6 +19,8 @@ models/
 
 # Compiled-model cache
 cache/
+original-info-signature.txt
+original-model-signature.txt
 
 # Visual Studio
 .vs/
