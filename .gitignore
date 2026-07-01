@@ -1,0 +1,23 @@
+# Build output
+build/
+bin/
+obj/
+
+# Downloaded / linked SDKs (large; fetched by scripts/setup-intel.ps1)
+third_party/
+
+# Compiled-model cache
+*.blob
+cache/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Models & audio (bring your own; keep the repo light)
+*.wav
+*_openvino_model/
+*-ov/

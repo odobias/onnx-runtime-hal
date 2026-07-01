@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Qualcomm backend: ONNX Runtime + QNN EP (Snapdragon Hexagon). Imported only
+     when EnableQualcomm=true. Point OrtQnnDir at your ONNX Runtime (QNN) SDK, e.g.
+     /p:EnableQualcomm=true /p:OrtQnnDir=C:\qnn\onnxruntime  (typically ARM64). -->
+<Project>
+  <PropertyGroup>
+    <OrtQnnDir Condition="'$(OrtQnnDir)'=='' and '$(QNN_ORT_DIR)'!=''">$(QNN_ORT_DIR)</OrtQnnDir>
+    <OrtQnnInclude Condition="'$(OrtQnnInclude)'==''">$(OrtQnnDir)\include</OrtQnnInclude>
+    <OrtQnnLibDir Condition="'$(OrtQnnLibDir)'==''">$(OrtQnnDir)\lib</OrtQnnLibDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OrtQnnInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WHISPER_HAL_QUALCOMM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OrtQnnLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

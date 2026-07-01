@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AMD backend: ONNX Runtime + VitisAI EP (Ryzen AI). Imported only when
+     EnableAmd=true. Point OrtAmdDir at your Ryzen AI / ONNX Runtime SDK, e.g.
+     /p:EnableAmd=true /p:OrtAmdDir=C:\ryzen-ai\onnxruntime -->
+<Project>
+  <PropertyGroup>
+    <OrtAmdDir Condition="'$(OrtAmdDir)'=='' and '$(RYZEN_AI_ORT_DIR)'!=''">$(RYZEN_AI_ORT_DIR)</OrtAmdDir>
+    <OrtAmdInclude Condition="'$(OrtAmdInclude)'==''">$(OrtAmdDir)\include</OrtAmdInclude>
+    <OrtAmdLibDir Condition="'$(OrtAmdLibDir)'==''">$(OrtAmdDir)\lib</OrtAmdLibDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OrtAmdInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WHISPER_HAL_AMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OrtAmdLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>
