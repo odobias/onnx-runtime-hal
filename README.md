@@ -27,6 +27,7 @@ app/main.cpp                             CLI runner: cold/warm load, inference b
 msbuild/*.props                          Shared + per-backend build settings
 projects/*/*.vcxproj, WhisperNpuHal.sln  MSBuild projects (Core static lib + App exe)
 scripts/                                 setup / build / run / export / benchmark helpers
+scripts/compare-devices.ps1              NPU vs GPU vs CPU comparison for one variant
 ```
 
 The application depends only on `whisper_npu/whisper_engine.hpp`. Backends are selected
@@ -110,6 +111,57 @@ so it's a poor fit here. Full W+A INT8 and the INT8-encoder/FP32-decoder hybrid 
 auto-exported yet (full stateful INT8 doesn't run on the NPU — see the findings docs); the
 manifest is ready to hold them as extra methods once wired.
 
+## Device comparison (NPU vs GPU vs CPU)
+
+CPU is not a separate backend or code path — it's the same Intel OpenVINO backend, just
+targeting `Device::CPU` instead of `NPU`/`GPU` (`ov_device()` in
+`intel_openvino_engine.cpp` maps all three to plain OpenVINO device strings). It's also
+the one device guaranteed to exist on *any* x86_64 machine, making it the natural
+baseline: "is the NPU actually worth it, or is CPU good enough?"
+
+```powershell
+.\scripts\run.ps1 -Device cpu                    # single run on CPU
+.\scripts\run.ps1 -Device cpu -Threads 8         # pin OpenVINO to 8 inference threads
+.\scripts\compare-devices.ps1                    # fp16 variant across NPU, GPU, CPU
+.\scripts\compare-devices.ps1 -Devices CPU -Threads 16 -Runs 5
+```
+
+`--threads N` (CLI) / `-Threads N` (`run.ps1`/`compare-devices.ps1`) maps to OpenVINO's
+`ov::inference_num_threads` and only applies to the CPU device; NPU/GPU use their own
+scheduler and ignore it. It matters: on a 32-thread workstation, whisper-tiny.en (fp16)
+went from **249 ms/clip at 1 thread to 93 ms/clip at 32 threads** (~2.7x) — CPU thread
+count is not a cosmetic knob, it's the main lever you have.
+
+`compare-devices.ps1` runs a single variant (fp16 by default) across every requested
+device and pivots the report on *device* instead of *quantization method* (that's
+`benchmark.ps1`'s job). Unsupported combos — no NPU present, an Intel-only `GPU` plugin
+pointed at non-Intel silicon, etc. — are recorded as failures, not crashes, per the same
+backend-neutral contract as the quantization benchmark.
+
+Measured on this dev machine (AMD Threadripper PRO 7955WX, 16C/32T, NVIDIA T1000 — i.e.
+**zero Intel NPU/GPU hardware**), whisper-tiny.en fp16, 12 LibriSpeech clips:
+
+| Device | Status | Threads | Cold s | Warm s | Mean ms | xRT | tok/s | WER % |
+|---|---|---|---|---|---|---|---|---|
+| NPU | unsupported | - | - | - | - | - | - | - |
+| GPU | unsupported | - | - | - | - | - | - | - |
+| CPU | ok | 8/32 | 0.44 | 0.32 | 106.3 | 91.3 | 472.7 | 8.91 |
+
+NPU fails because there's no Intel NPU on this box (`NPU_VCL` can't find a device to
+compile for). GPU fails because OpenVINO's `GPU` plugin only targets **Intel**
+GPUs (Level Zero / oneAPI) — it doesn't drive the NVIDIA card, so kernel selection fails
+partway through compiling the model graph. Both are genuine `ok:false` results with a
+real error string, not a script bug — that's the graceful-degradation contract working
+as designed. **CPU's own number is real and unremarkable-in-a-good-way**: 91x real-time
+on a 32-thread workstation chip is plenty fast for whisper-tiny.en; it just isn't the
+point of this repo (an idle high-core-count CPU also isn't a fair power/latency
+comparison against a purpose-built NPU on a laptop's power budget — treat this table as
+"does it run and is it correct", not a verdict on NPU vs. CPU efficiency).
+
+To get real NPU/GPU rows, run `compare-devices.ps1` on actual Intel NPU/GPU hardware
+(Core Ultra / Meteor Lake or newer for NPU; Intel integrated or Arc/Flex for GPU) and
+drop the resulting `build\reports\device-compare.md` numbers in here.
+
 ## Adding a backend
 
 1. Implement `create()` / `available()` in `src/backends/<vendor>/...cpp` behind your
@@ -122,4 +174,17 @@ manifest is ready to hold them as extra methods once wired.
 - Only the **Intel** backend is verified. AMD/Qualcomm are structural scaffolds with
   clearly-marked TODOs; they compile as throwing stubs by default.
 - 16 kHz mono WAV only (no resampler).
+- OpenVINO's `GPU` device only drives **Intel** GPUs (integrated or Arc/Flex, via
+  Level Zero/oneAPI); it will not use an NVIDIA/AMD GPU even if one is present.
+  `CPU` runs on any AVX2 x86_64 chip, Intel or not — it's the universal fallback.
+- Exporting variants (`export-variants.ps1` / `get-model.ps1`) needs `optimum-intel`,
+  which currently breaks on **Python 3.14+** (`NormalizedConfig.__init__() got multiple
+  values for argument 'allow_new'` — a `functools.partial`-as-descriptor change in
+  3.14 trips up `optimum`'s `with_args()` config classes; see
+  [huggingface/optimum#2409](https://github.com/huggingface/optimum/pull/2409),
+  opened Feb 2026, stale-closed without merging). Use Python ≤3.13, or patch
+  `.venv\Lib\site-packages\optimum\exporters\base.py`: change
+  `self.NORMALIZED_CONFIG_CLASS(self._config)` to
+  `self.__class__.NORMALIZED_CONFIG_CLASS(self._config)`. `export-variants.ps1` detects
+  this on 3.14+ and prints the same hint on export failure.
 - See `../NPU-FINDINGS.md` and `../NPU-ECOSYSTEM-STATUS.md` for the underlying research.

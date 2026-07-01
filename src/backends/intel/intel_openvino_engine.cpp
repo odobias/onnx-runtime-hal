@@ -39,6 +39,11 @@ public:
         if (!options.cache_dir.empty()) {
             properties.insert(ov::cache_dir(options.cache_dir));
         }
+        // Thread pinning only makes sense on CPU; NPU/GPU ignore it anyway, but
+        // avoid surprising a discrete accelerator with a CPU-shaped hint.
+        if (options.cpu_threads > 0 && device_ == "CPU") {
+            properties.insert(ov::inference_num_threads(options.cpu_threads));
+        }
 
         const auto t0 = std::chrono::steady_clock::now();
         pipe_ = std::make_unique<ov::genai::WhisperPipeline>(options.model_dir, device_, properties);

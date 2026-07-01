@@ -1,12 +1,13 @@
 // whisper_hal CLI: backend-agnostic Whisper runner / benchmark built on the HAL.
 //
 // Usage: whisper_hal <model_dir> <audio.wav> [backend] [device] [runs]
-//                    [--cache <dir>] [--ref "<reference text>"] [--json]
+//                    [--cache <dir>] [--ref "<reference text>"] [--threads N] [--json]
 //   backend: auto | intel | amd | qualcomm     (default: auto)
 //   device : npu  | gpu | cpu                   (default: npu)
 //   runs   : timed iterations                   (default: 5)
 //   --cache <dir> : persist compiled model; loads twice (cold vs warm)
 //   --ref "<text>": reference transcript -> compute WER/CER
+//   --threads N   : CPU inference thread count (CPU device only; default: runtime default)
 //   --json        : emit one machine-readable JSON record (for the harness)
 #include <algorithm>
 #include <cctype>
@@ -17,6 +18,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "whisper_npu/audio.hpp"
@@ -108,6 +110,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> pos;
     std::string cache_dir, reference;
     bool json_out = false, have_ref = false;
+    int cpu_threads = 0;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--cache" && i + 1 < argc) {
@@ -115,6 +118,8 @@ int main(int argc, char* argv[]) {
         } else if (a == "--ref" && i + 1 < argc) {
             reference = argv[++i];
             have_ref = true;
+        } else if (a == "--threads" && i + 1 < argc) {
+            cpu_threads = std::max(0, std::atoi(argv[++i]));
         } else if (a == "--json") {
             json_out = true;
         } else {
@@ -125,7 +130,7 @@ int main(int argc, char* argv[]) {
     if (pos.size() < 2) {
         std::cerr << "Usage: " << argv[0]
                   << " <model_dir> <audio.wav> [backend] [device] [runs]"
-                     " [--cache <dir>] [--ref \"text\"] [--json]\n";
+                     " [--cache <dir>] [--ref \"text\"] [--threads N] [--json]\n";
         std::cerr << "Compiled-in backends:";
         for (Backend b : available_backends()) std::cerr << " " << to_string(b);
         if (available_backends().empty()) std::cerr << " (none!)";
@@ -137,6 +142,7 @@ int main(int argc, char* argv[]) {
     opt.model_dir = pos[0];
     const std::string audio_path = pos[1];
     opt.cache_dir = cache_dir;
+    opt.cpu_threads = cpu_threads;
 
     Backend backend = Backend::Auto;
     if (pos.size() > 2 && !parse_backend(pos[2], backend)) {
@@ -233,6 +239,8 @@ int main(int argc, char* argv[]) {
         js << "\"ok\":true";
         js << ",\"backend\":\"" << json_escape(engine->backend_name()) << "\"";
         js << ",\"device\":\"" << json_escape(engine->device_name()) << "\"";
+        js << ",\"cpu_threads_requested\":" << cpu_threads;
+        js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
         js << ",\"model_size_mb\":" << size_mb;
         js << ",\"audio\":\"" << json_escape(audio_path) << "\"";
@@ -265,7 +273,12 @@ int main(int argc, char* argv[]) {
         js << "}";
         std::cout << js.str() << "\n";
     } else {
-        std::cout << "Engine : " << engine->backend_name() << "  [" << engine->device_name() << "]\n";
+        std::cout << "Engine : " << engine->backend_name() << "  [" << engine->device_name() << "]";
+        if (opt.device == Device::CPU) {
+            std::cout << "  (threads " << (cpu_threads > 0 ? std::to_string(cpu_threads) : "default")
+                      << " / " << std::thread::hardware_concurrency() << " logical)";
+        }
+        std::cout << "\n";
         std::cout << std::setprecision(3);
         std::cout << "load (cold)  : " << cold_load << " s\n";
         if (warm_load >= 0.0) {

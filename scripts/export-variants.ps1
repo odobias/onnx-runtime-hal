@@ -63,6 +63,13 @@ foreach ($fmt in $Formats) {
             --task automatic-speech-recognition-with-past $outDir
         if ($LASTEXITCODE -ne 0) {
             Write-Host "[$fmt] export FAILED; skipping in manifest." -ForegroundColor Yellow
+            if ((& $vpy --version) -match "3\.1[4-9]") {
+                Write-Host ("  Hint: on Python 3.14+, huggingface/optimum has a known bug (`"NormalizedConfig." + `
+                        "__init__() got multiple values for argument 'allow_new'`", huggingface/optimum#2409, " + `
+                        "abandoned/never merged). Workaround: in .venv\Lib\site-packages\optimum\exporters\base.py, " + `
+                        "change `"self.NORMALIZED_CONFIG_CLASS(self._config)`" to " + `
+                        "`"self.__class__.NORMALIZED_CONFIG_CLASS(self._config)`". Or use Python <=3.13.") -ForegroundColor Yellow
+            }
             continue
         }
     }

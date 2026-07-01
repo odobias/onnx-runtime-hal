@@ -4,6 +4,7 @@
 #
 #   .\run.ps1                                   # NPU, exported model, cache demo
 #   .\run.ps1 -Device cpu -Backend intel
+#   .\run.ps1 -Device cpu -Threads 8            # pin OpenVINO CPU inference threads
 #   .\run.ps1 -Model <ov_dir> -Audio <wav> -NoCache
 
 [CmdletBinding()]
@@ -13,6 +14,7 @@ param(
     [ValidateSet("auto", "intel", "amd", "qualcomm")][string]$Backend = "intel",
     [ValidateSet("npu", "gpu", "cpu")][string]$Device = "npu",
     [int]$Runs = 5,
+    [int]$Threads = 0,
     [string]$Configuration = "Release",
     [switch]$NoCache
 )
@@ -30,10 +32,11 @@ if (-not (Test-Path $exe)) { Write-Host "Not built: $exe  (run .\scripts\build.p
 if (-not (Test-Path $Model)) { Write-Host "Model not found: $Model  (run .\scripts\get-model.ps1)" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Audio)) { Write-Host "Audio not found: $Audio  (run .\scripts\get-audio.ps1)" -ForegroundColor Red; exit 1 }
 
-$cacheArgs = @()
+$extraArgs = @()
 if (-not $NoCache) {
     $cacheDir = Join-Path $root "build\cache\$Device"
-    $cacheArgs = @("--cache", $cacheDir)
+    $extraArgs += @("--cache", $cacheDir)
 }
+if ($Threads -gt 0) { $extraArgs += @("--threads", "$Threads") }
 
-& $exe $Model $Audio $Backend $Device $Runs @cacheArgs
+& $exe $Model $Audio $Backend $Device $Runs @extraArgs

@@ -45,6 +45,11 @@ struct EngineOptions {
     // device-compiled blob here so subsequent loads skip the (slow) NPU compile
     // step. Empty = no on-disk caching. This is the key to a fast-loading runner.
     std::string cache_dir;
+
+    // CPU-only tuning: number of inference threads (maps to OpenVINO's
+    // ov::inference_num_threads on the Intel backend). 0 = backend/runtime default.
+    // Ignored by NPU/GPU devices, where the accelerator's own scheduler applies.
+    int cpu_threads = 0;
 };
 
 // Backend-neutral result + metrics. Every backend fills `text`/`infer_seconds`;
