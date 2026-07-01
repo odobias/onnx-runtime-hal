@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "openvino/genai/whisper_pipeline.hpp"
+#include "openvino/runtime/core.hpp"
 #include "openvino/runtime/properties.hpp"
 #endif
 
@@ -29,9 +30,31 @@ std::string ov_device(const EngineOptions& o) {
     return "CPU";
 }
 
+// Real hardware identity (e.g. "Intel(R) AI Boost", "13th Gen Intel(R) Core(TM)
+// i7-1370P", "AMD Ryzen Threadripper PRO 7955WX 16-Cores"), as opposed to the
+// logical device class in `device_`. Answers "which chip, specifically" instead of
+// just "NPU/GPU/CPU" -- the CSV/README previously had no way to tell two NPUs from
+// two different machines apart. A throwaway ov::Core is enough; this just reads a
+// plugin property, it doesn't compile anything.
+std::string query_full_device_name(const std::string& device) {
+    try {
+        ov::Core core;
+        std::string name = core.get_property(device, ov::device::full_name);
+        // The CPU plugin returns the raw CPUID brand string, which is
+        // space-padded to a fixed width (e.g. "...7955WX 16-Cores     ").
+        const auto end = name.find_last_not_of(' ');
+        if (end == std::string::npos) return "";
+        name.erase(end + 1);
+        return name;
+    } catch (...) {
+        return "";
+    }
+}
+
 class IntelOpenVinoEngine final : public IWhisperEngine {
 public:
-    explicit IntelOpenVinoEngine(const EngineOptions& options) : device_(ov_device(options)) {
+    explicit IntelOpenVinoEngine(const EngineOptions& options)
+        : device_(ov_device(options)), full_device_name_(query_full_device_name(device_)) {
         // Passing ov::cache_dir makes OpenVINO persist the device-compiled blob, so
         // the (slow) NPU compile only happens on the first cold load; warm loads
         // import the cached blob and are near-instant.
@@ -80,10 +103,12 @@ public:
 
     std::string backend_name() const override { return "Intel OpenVINO GenAI"; }
     std::string device_name() const override { return device_; }
+    std::string full_device_name() const override { return full_device_name_; }
     double load_seconds() const override { return load_seconds_; }
 
 private:
     std::string device_;
+    std::string full_device_name_;
     std::unique_ptr<ov::genai::WhisperPipeline> pipe_;
     double load_seconds_ = 0.0;
 };

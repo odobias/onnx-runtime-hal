@@ -177,6 +177,7 @@ void append_result_csv(const std::string& path,
 
     if (write_header) {
         out << "timestamp_utc,requested_backend,resolved_backend,device,device_name,"
+               "device_full_name,"
                "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
                "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
                "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
@@ -189,6 +190,7 @@ void append_result_csv(const std::string& path,
         << csv_escape(engine.backend_name()) << ','
         << csv_escape(to_string(device)) << ','
         << csv_escape(engine.device_name()) << ','
+        << csv_escape(engine.full_device_name()) << ','
         << csv_escape(model_dir) << ','
         << csv_escape(audio_path) << ','
         << std::setprecision(9) << audio_seconds << ','
@@ -373,6 +375,7 @@ int main(int argc, char* argv[]) {
         js << "\"ok\":true";
         js << ",\"backend\":\"" << json_escape(engine->backend_name()) << "\"";
         js << ",\"device\":\"" << json_escape(engine->device_name()) << "\"";
+        js << ",\"device_full_name\":\"" << json_escape(engine->full_device_name()) << "\"";
         js << ",\"cpu_threads_requested\":" << cpu_threads;
         js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
@@ -408,6 +411,9 @@ int main(int argc, char* argv[]) {
         std::cout << js.str() << "\n";
     } else {
         std::cout << "Engine : " << engine->backend_name() << "  [" << engine->device_name() << "]";
+        if (!engine->full_device_name().empty()) {
+            std::cout << "  (" << engine->full_device_name() << ")";
+        }
         if (opt.device == Device::CPU) {
             std::cout << "  (threads " << (cpu_threads > 0 ? std::to_string(cpu_threads) : "default")
                       << " / " << std::thread::hardware_concurrency() << " logical)";

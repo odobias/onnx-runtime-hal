@@ -86,6 +86,14 @@ public:
     virtual std::string backend_name() const = 0;
     virtual std::string device_name() const = 0;
 
+    // Specific hardware identity, when the backend can query it (e.g. the Intel
+    // backend reads OpenVINO's ov::device::full_name -> "Intel(R) AI Boost",
+    // "13th Gen Intel(R) Core(TM) i7-1370P", ...). Empty if unavailable/not
+    // queried. device_name() remains the logical class ("NPU"/"GPU"/"CPU") that's
+    // always populated; this fills in *which* NPU/GPU/CPU, for benchmark rows that
+    // get compared across machines.
+    virtual std::string full_device_name() const { return {}; }
+
     // Wall-clock time spent constructing/compiling this engine (model load +
     // device compile). With a warm cache this should drop dramatically.
     virtual double load_seconds() const = 0;

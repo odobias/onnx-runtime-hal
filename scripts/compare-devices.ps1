@@ -84,6 +84,7 @@ foreach ($dev in $Devices) {
     $clipResults = @()
     $status = "ok"; $errMsg = ""
     $coldLoad = $null; $warmLoad = $null; $threadsUsed = $null; $hwConcurrency = $null
+    $chip = $null
     $first = $true
 
     foreach ($c in $clips) {
@@ -99,6 +100,7 @@ foreach ($dev in $Devices) {
         if ($first) {
             $coldLoad = $r.load_cold_s; $warmLoad = $r.load_warm_s
             $threadsUsed = $r.cpu_threads_requested; $hwConcurrency = $r.hw_concurrency
+            $chip = $r.device_full_name
             $first = $false
         }
         $clipResults += $r
@@ -106,7 +108,7 @@ foreach ($dev in $Devices) {
 
     if ($clipResults.Count -eq 0) {
         $rows += [pscustomobject]@{
-            device = $dev; status = $status; clips = 0
+            device = $dev; chip = $null; status = $status; clips = 0
             cold_s = $null; warm_s = $null; mean_ms = $null; rtf = $null; xrt = $null
             tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null
             threads = $null; hw_concurrency = $null; error = $errMsg
@@ -124,7 +126,7 @@ foreach ($dev in $Devices) {
     $cRef = ($clipResults | Measure-Object ref_chars -Sum).Sum
 
     $rows += [pscustomobject]@{
-        device = $dev; status = "ok"; clips = $clipResults.Count
+        device = $dev; chip = $(if ($chip) { $chip } else { "-" }); status = "ok"; clips = $clipResults.Count
         cold_s = [math]::Round($coldLoad, 3); warm_s = [math]::Round($warmLoad, 3)
         mean_ms = [math]::Round($meanMs, 1); rtf = [math]::Round($meanRtf, 4)
         xrt = [math]::Round((1.0 / [math]::Max($meanRtf, 1e-9)), 1); tps = [math]::Round($meanTps, 1)
@@ -161,13 +163,13 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("- Speedup = slowest-successful-device / this device's mean latency (bigger = faster).")
 [void]$md.AppendLine("- Confidence = mean per-token log-prob (self-reported, not calibrated truth).")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("| Device | Status | Threads | Cold s | Warm s | Mean ms | xRT | Speedup | tok/s | Conf | WER % | CER % |")
-[void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|")
+[void]$md.AppendLine("| Device | Chip | Status | Threads | Cold s | Warm s | Mean ms | xRT | Speedup | tok/s | Conf | WER % | CER % |")
+[void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 foreach ($r in $rows) {
     $f = { param($x) if ($null -eq $x -or $x -eq "") { "-" } else { $x } }
     $threadsCol = if ($r.device -eq "CPU") { "$($r.threads)/$($r.hw_concurrency)" } else { "-" }
-    [void]$md.AppendLine(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} |" -f `
-                $r.device, $r.status, $threadsCol, (& $f $r.cold_s), (& $f $r.warm_s), (& $f $r.mean_ms),
+    [void]$md.AppendLine(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} |" -f `
+                $r.device, (& $f $r.chip), $r.status, $threadsCol, (& $f $r.cold_s), (& $f $r.warm_s), (& $f $r.mean_ms),
             (& $f $r.xrt), (& $f $r.speedup), (& $f $r.tps), (& $f $r.avg_logprob), (& $f $r.wer_pct), (& $f $r.cer_pct)))
 }
 [void]$md.AppendLine("")
@@ -182,4 +184,4 @@ Write-Host "`nReports written:" -ForegroundColor Green
 Write-Host "  $csvPath"
 Write-Host "  $mdPath"
 Write-Host ""
-$rows | Format-Table device, status, threads, cold_s, warm_s, mean_ms, xrt, speedup, wer_pct -AutoSize
+$rows | Format-Table device, chip, status, threads, cold_s, warm_s, mean_ms, xrt, speedup, wer_pct -AutoSize

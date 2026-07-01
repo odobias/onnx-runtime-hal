@@ -182,11 +182,11 @@ Measured on this dev machine (AMD Threadripper PRO 7955WX, 16C/32T, NVIDIA T1000
 **zero Intel NPU/GPU hardware**) with `compare-devices.ps1`, whisper-tiny.en fp16, 12
 LibriSpeech clips:
 
-| Device | Status | Threads | Cold s | Warm s | Mean ms | xRT | tok/s | WER % |
-|---|---|---|---|---|---|---|---|---|
-| NPU | unsupported | - | - | - | - | - | - | - |
-| GPU | unsupported | - | - | - | - | - | - | - |
-| CPU | ok | 8/32 | 0.44 | 0.32 | 106.3 | 91.3 | 472.7 | 8.91 |
+| Device | Chip | Status | Threads | Cold s | Warm s | Mean ms | xRT | tok/s | WER % |
+|---|---|---|---|---|---|---|---|---|---|
+| NPU | - | unsupported | - | - | - | - | - | - | - |
+| GPU | - | unsupported | - | - | - | - | - | - | - |
+| CPU | AMD Ryzen Threadripper PRO 7955WX 16-Cores | ok | 8/32 | 0.44 | 0.32 | 106.3 | 91.3 | 472.7 | 8.91 |
 
 NPU fails because there's no Intel NPU on this box (`NPU_VCL` can't find a device to
 compile for). GPU fails because OpenVINO's `GPU` plugin only targets **Intel**
@@ -204,7 +204,15 @@ NPU/GPU/CPU × fp32/fp16/int8/int4 sweep from a real Intel NPU/GPU laptop; this 
 added its own CPU-only rows on top (same clip `ls_000`, same `--ref`, `runs=2` — matched
 methodology, so the comparison below is apples-to-apples, not vibes):
 
-| Precision | Their CPU | Their GPU | Their NPU | **This CPU (32T Threadripper)** | Speedup vs their CPU |
+Every row now also self-identifies the exact chip (`device_full_name`), not just the
+logical `NPU`/`GPU`/`CPU` class — the Intel backend queries OpenVINO's
+`ov::device::full_name` for whatever device it just ran on (e.g. `Intel(R) AI Boost`,
+`13th Gen Intel(R) Core(TM) i7-1370P`), so "what NPU/CPU are we actually comparing
+against" is answered by the CSV itself instead of tribal knowledge. That query was
+added after the laptop sweep below was recorded, so those older rows predate it (empty
+`device_full_name`); new rows from any machine will have it populated.
+
+| Precision | Their CPU | Their GPU | Their NPU | **This CPU (AMD Ryzen Threadripper PRO 7955WX, 32T)** | Speedup vs their CPU |
 |---|---|---|---|---|---|
 | fp32 | 267.7 ms (21.9x) | 119.3 ms (49.1x) | 115.0 ms (50.9x) | **77.9 ms (75.2x)** | 3.44x |
 | fp16 | 227.8 ms (25.7x) | 105.2 ms (55.7x) | 109.6 ms (53.4x) | **68.5 ms (85.5x)** | 3.33x |

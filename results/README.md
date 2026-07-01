@@ -19,7 +19,8 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 - `requested_backend`: CLI backend selector, e.g. `AmdRyzenAI`, `IntelOpenVINO`, or `Auto`.
 - `resolved_backend`: concrete engine that actually ran.
 - `device`: logical device selector, e.g. `NPU`, `CPU`, `GPU`.
-- `device_name`: backend-specific device string.
+- `device_name`: backend-specific device string (`NPU`/`GPU`/`CPU` for Intel; an EP name like `CPUExecutionProvider` for AMD).
+- `device_full_name`: the actual hardware identity when the backend can query it, e.g. `Intel(R) AI Boost` or `13th Gen Intel(R) Core(TM) i7-1370P` on Intel (via `ov::device::full_name`). Empty when the backend doesn't expose one (AMD/Qualcomm currently don't) or for rows written before this column existed.
 - `model_dir`: model directory used by the backend.
 - `audio_path`: WAV file used for the benchmark.
 - `audio_seconds`: input audio duration.
