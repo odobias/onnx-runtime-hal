@@ -52,3 +52,13 @@ across `variant × device × clip` and writes an aggregate report to
 and latency). It also appends one canonical per-variant row to
 `benchmark-results.csv` via the shared CLI, so single-run and swept results live in
 the same schema.
+
+## Neutral ONNX portability
+
+`results\onnx-portability.{md,csv}` captures a separate experiment: running one
+**vendor-neutral ONNX** (not the Intel-specific OV-IR) across CPU/GPU/NPU to test
+whether a single model artifact is viable across runtimes. It uses a hand-rolled
+decode loop (`scripts\onnx_ov_decode.py`, `scripts\onnx_npu_static.py`) so quality
+is identical across runtimes and only load/latency vary. These are 12-clip
+aggregates, so they live in their own file rather than the per-clip
+`benchmark-results.csv` schema.

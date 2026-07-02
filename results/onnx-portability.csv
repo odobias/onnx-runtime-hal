@@ -1,0 +1,8 @@
+runtime,device,maxlen,cold_load_s,warm_load_s,hot_infer_ms_mean,hot_infer_ms_min,wer_pct,cer_pct,avg_logprob,notes
+optimum-generate,CPU(ORT),,1.16,,13910.2,8261.3,8.58,4.53,-0.164,optimum generate() python per-step overhead
+raw-ort-loop,CPU(ORT),,1.45,,2029.2,1488.4,8.58,4.53,-0.164,hand-rolled greedy KV-cache loop on raw ORT sessions
+ov-kvcache,CPU,,1.85,0.32,526.7,248.0,8.58,4.53,-0.164,neutral ONNX through OpenVINO dynamic KV cache
+ov-kvcache,GPU,,16.39,0.18,316.5,150.0,8.58,4.53,-0.164,neutral ONNX through OpenVINO dynamic KV cache
+ov-kvcache,NPU,,,,,,,,,COMPILE FAIL: NPU rejects dynamic (growing) KV-cache shapes
+ov-static,NPU,96,9.18,0.70,969.7,473.1,9.57,5.10,-0.1675,neutral ONNX static reshape no-KV recompute (NPU-compilable)
+ovir-genai,NPU,,10.02,0.70,137.3,,9.57,4.46,,BASELINE proprietary OV-IR stateful GenAI pipeline (not portable ONNX)
