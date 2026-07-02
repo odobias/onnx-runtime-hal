@@ -52,21 +52,30 @@ SDK, model, audio); none of it is committed.
 ```powershell
 git clone https://github.com/odobias/whisper-npu-hal
 cd whisper-npu-hal
-.\scripts\bootstrap.ps1       # installs prereqs + SDK + model + audio, then builds
+.\scripts\bootstrap.ps1       # auto-detects platform, installs its toolchain + model + audio, then builds
 .\scripts\run.ps1             # NPU, exported model, cold/warm cache demo
 ```
 
-`bootstrap.ps1` runs these steps (also usable individually):
+`bootstrap.ps1` **detects the platform** (NPU/CPU vendor) and bootstraps *that platform's*
+toolchain; override with `-Platform intel|amd|qualcomm`. It runs these steps (also usable
+individually):
 
-| Script | Fetches / does | Output (gitignored) |
-|---|---|---|
-| `setup-intel.ps1` | OpenVINO GenAI C++ SDK (download or link) | `third_party/` |
-| `get-model.ps1` | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper-tiny-en-ov/` |
-| `get-amd-model.ps1` | download AMD ONNX Tiny + OpenAI tokenizer/config sidecars | `models/whisper-tiny-amd/` |
-| `get-audio.ps1` | public-domain 16 kHz sample | `models/jfk.wav` |
-| `build.ps1` | MSBuild Release\|x64 (prefers VS 2026) | `build/` |
+| Script | Platform | Fetches / does | Output (gitignored) |
+|---|---|---|---|
+| `setup-intel.ps1` | intel | OpenVINO GenAI C++ SDK (download or link) | `third_party/` |
+| `setup-amd.ps1` | amd | Ryzen AI SDK + NPU driver (vendor installers, elevated) | `C:\Program Files\RyzenAI\...`, conda env |
+| `setup-qualcomm.ps1` | qualcomm | link an installed QNN SDK (scaffold) | `third_party/qnn` |
+| `get-model.ps1` | intel | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper-tiny-en-ov/` |
+| `get-amd-model.ps1` | amd | download AMD ONNX Tiny + OpenAI tokenizer/config sidecars | `models/whisper-tiny-amd/` |
+| `get-audio.ps1` | all | public-domain 16 kHz sample | `models/jfk.wav` |
+| `build.ps1` | all | MSBuild Release\|x64 (prefers VS 2026), right backend enabled | `build/` |
 
 If VS Build Tools is installed for the first time, reboot and re-run `bootstrap.ps1`.
+
+> **AMD note:** the Ryzen AI SDK and NPU driver ship no silent installer and need
+> elevation, so `setup-amd.ps1` downloads them, launches the vendor installers
+> (approve UAC + the wizard, keeping defaults), and polls for completion. Re-running
+> after success is a fast no-op. Pin versions/URLs via its params if AMD moves them.
 
 Run directly if you prefer:
 
@@ -127,11 +136,17 @@ them as extra methods once wired.
 AMD Ryzen AI / VitisAI:
 
 ```powershell
+.\scripts\setup-amd.ps1                       # Ryzen AI SDK + NPU driver (once)
 .\scripts\get-amd-model.ps1
 .\scripts\get-audio.ps1
 .\scripts\build.ps1 -EnableAmd -DisableIntel
 .\scripts\run.ps1 -Backend amd -Device npu
 ```
+
+`setup-amd.ps1` installs Ryzen AI (default `C:\Program Files\RyzenAI\1.8.0-beta`,
+conda env `ryzen-ai-1.8.0-beta`) and the matching NPU driver (min `32.0.20101.3760`),
+then sets `RYZEN_AI_INSTALLATION_PATH` so `msbuild/backend.amd.props` finds the ORT/VitisAI
+headers and libs. `.\scripts\bootstrap.ps1 -Platform amd` does all of the above in one shot.
 
 The AMD backend expects `model_dir` to contain `tiny_encoder.onnx`,
 `tiny_decoder.onnx`, `preprocessor_config.json`, `vocab.json`, and the VitisAI
