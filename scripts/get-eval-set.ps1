@@ -11,7 +11,9 @@ param([int]$Count = 20)
 
 $ErrorActionPreference = "Stop"
 chcp 65001 > $null
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
 $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path $PSScriptRoot -Parent
@@ -45,3 +47,5 @@ if (-not $ok) {
     ($rec | ConvertTo-Json -Compress) | Set-Content -Path (Join-Path $evalDir "eval.jsonl") -Encoding UTF8
     Write-Host "Wrote 1 utterance (jfk) to models\eval\eval.jsonl" -ForegroundColor Green
 }
+
+exit 0

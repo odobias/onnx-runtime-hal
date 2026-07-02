@@ -26,8 +26,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 chcp 65001 > $null
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Manifest) { $Manifest = Join-Path $root "models\manifest.json" }
@@ -59,19 +62,26 @@ if (-not (Test-Path $modelDir)) { Write-Host "model_dir missing: $modelDir" -For
 $clips = Get-Content $EvalSet | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json }
 if ($MaxClips -gt 0 -and $clips.Count -gt $MaxClips) { $clips = $clips[0..($MaxClips - 1)] }
 
-Write-Host ("Variant: {0} ({1}, {2} MB) | Devices: {3} | Eval clips: {4} | Runs/clip: {5}" -f `
-        $v.id, $v.precision, $v.size_mb, ($Devices -join ", "), $clips.Count, $Runs) -ForegroundColor Cyan
+Write-Host ("Variant: {0} ({1}, {2} MB, backend {3}) | Devices: {4} | Eval clips: {5} | Runs/clip: {6}" -f `
+        $v.id, $v.precision, $v.size_mb, $v.backend, ($Devices -join ", "), $clips.Count, $Runs) -ForegroundColor Cyan
 
 $reportsDir = Join-Path $root "build\reports"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 $cacheRoot = Join-Path $root "cache"
 
-function Invoke-Clip($modelDir, $audio, $device, $runs, $cacheDir, $ref, $threads) {
-    $args = @($modelDir, $audio, "intel", $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
+function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref, $threads) {
+    $args = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
     if ($threads -gt 0) { $args += @("--threads", "$threads") }
-    $raw = & $exe @args 2>$null
+    $oldEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $raw = & $exe @args 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldEap
+    }
     $line = ($raw | Where-Object { $_ -match '^\{"ok"' } | Select-Object -Last 1)
-    if (-not $line) { return [pscustomobject]@{ ok = $false; error = "no-json-output" } }
+    if (-not $line) { return [pscustomobject]@{ ok = $false; error = "no-json-output (exit $exitCode)" } }
     return $line | ConvertFrom-Json
 }
 
@@ -83,14 +93,14 @@ foreach ($dev in $Devices) {
 
     $clipResults = @()
     $status = "ok"; $errMsg = ""
-    $coldLoad = $null; $warmLoad = $null; $threadsUsed = $null; $hwConcurrency = $null
+    $coldLoad = $null; $hotLoad = $null; $threadsUsed = $null; $hwConcurrency = $null
     $chip = $null
     $first = $true
 
     foreach ($c in $clips) {
         $audio = Join-Path $root ($c.audio -replace '/', '\')
         if (-not (Test-Path $audio)) { continue }
-        $r = Invoke-Clip $modelDir $audio $dev $Runs $cacheDir $c.ref $Threads
+        $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref $Threads
         if (-not $r.ok) {
             $status = "unsupported/error"
             $errMsg = ($r.error -split "`n")[0]
@@ -98,7 +108,8 @@ foreach ($dev in $Devices) {
             break
         }
         if ($first) {
-            $coldLoad = $r.load_cold_s; $warmLoad = $r.load_warm_s
+            $coldLoad = $r.load_cold_s
+            $hotLoad = if ($r.PSObject.Properties.Name -contains "load_hot_s") { $r.load_hot_s } else { $r.load_warm_s }
             $threadsUsed = $r.cpu_threads_requested; $hwConcurrency = $r.hw_concurrency
             $chip = $r.device_full_name
             $first = $false
@@ -109,7 +120,7 @@ foreach ($dev in $Devices) {
     if ($clipResults.Count -eq 0) {
         $rows += [pscustomobject]@{
             device = $dev; chip = $null; status = $status; clips = 0
-            cold_s = $null; warm_s = $null; mean_ms = $null; rtf = $null; xrt = $null
+            cold_s = $null; hot_s = $null; mean_ms = $null; rtf = $null; xrt = $null
             tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null
             threads = $null; hw_concurrency = $null; error = $errMsg
         }
@@ -127,7 +138,7 @@ foreach ($dev in $Devices) {
 
     $rows += [pscustomobject]@{
         device = $dev; chip = $(if ($chip) { $chip } else { "-" }); status = "ok"; clips = $clipResults.Count
-        cold_s = [math]::Round($coldLoad, 3); warm_s = [math]::Round($warmLoad, 3)
+        cold_s = [math]::Round($coldLoad, 3); hot_s = [math]::Round($hotLoad, 3)
         mean_ms = [math]::Round($meanMs, 1); rtf = [math]::Round($meanRtf, 4)
         xrt = [math]::Round((1.0 / [math]::Max($meanRtf, 1e-9)), 1); tps = [math]::Round($meanTps, 1)
         avg_logprob = [math]::Round($meanLp, 4)
@@ -158,18 +169,19 @@ $rows | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
 $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("# Whisper NPU HAL - device comparison (NPU vs GPU vs CPU)")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("- Model: ``$($manifestObj.model)`` | Variant: ``$($v.id)`` ($($v.precision), $($v.size_mb) MB)")
+[void]$md.AppendLine("- Model: ``$($manifestObj.model)`` | Variant: ``$($v.id)`` ($($v.precision), $($v.size_mb) MB, backend ``$($v.backend)``)")
 [void]$md.AppendLine("- Eval clips: $($clips.Count) | Runs/clip: $Runs | Generated: $(Get-Date -Format s)")
 [void]$md.AppendLine("- Speedup = slowest-successful-device / this device's mean latency (bigger = faster).")
 [void]$md.AppendLine("- Confidence = mean per-token log-prob (self-reported, not calibrated truth).")
+[void]$md.AppendLine("- Cold start = first engine creation after cache deletion; hot start = second engine creation in the same process after cache population.")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("| Device | Chip | Status | Threads | Cold s | Warm s | Mean ms | xRT | Speedup | tok/s | Conf | WER % | CER % |")
+[void]$md.AppendLine("| Device | Chip | Status | Threads | Cold s | Hot s | Mean ms | xRT | Speedup | tok/s | Conf | WER % | CER % |")
 [void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 foreach ($r in $rows) {
     $f = { param($x) if ($null -eq $x -or $x -eq "") { "-" } else { $x } }
     $threadsCol = if ($r.device -eq "CPU") { "$($r.threads)/$($r.hw_concurrency)" } else { "-" }
     [void]$md.AppendLine(("| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} |" -f `
-                $r.device, (& $f $r.chip), $r.status, $threadsCol, (& $f $r.cold_s), (& $f $r.warm_s), (& $f $r.mean_ms),
+                $r.device, (& $f $r.chip), $r.status, $threadsCol, (& $f $r.cold_s), (& $f $r.hot_s), (& $f $r.mean_ms),
             (& $f $r.xrt), (& $f $r.speedup), (& $f $r.tps), (& $f $r.avg_logprob), (& $f $r.wer_pct), (& $f $r.cer_pct)))
 }
 [void]$md.AppendLine("")
@@ -184,4 +196,4 @@ Write-Host "`nReports written:" -ForegroundColor Green
 Write-Host "  $csvPath"
 Write-Host "  $mdPath"
 Write-Host ""
-$rows | Format-Table device, chip, status, threads, cold_s, warm_s, mean_ms, xrt, speedup, wer_pct -AutoSize
+$rows | Format-Table device, chip, status, threads, cold_s, hot_s, mean_ms, xrt, speedup, wer_pct -AutoSize
