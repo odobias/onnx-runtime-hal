@@ -6,7 +6,7 @@
 //   backend: auto | intel | amd | qualcomm     (default: auto)
 //   device : npu  | gpu | cpu                   (default: npu)
 //   runs   : timed iterations                   (default: 5)
-//   --cache <dir> : persist compiled model; loads twice (cold vs warm)
+//   --cache <dir> : persist compiled model; loads twice (cold vs hot)
 //   --ref "<text>": reference transcript -> compute WER/CER
 //   --threads N   : CPU inference thread count (CPU device only; default: runtime default)
 //   --json        : emit one machine-readable JSON record (for the harness)
@@ -172,6 +172,23 @@ void append_result_csv(const std::string& path,
     if (csv_path.has_parent_path()) fs::create_directories(csv_path.parent_path());
 
     const bool write_header = !fs::exists(csv_path) || fs::file_size(csv_path) == 0;
+    if (!write_header) {
+        std::ifstream in(csv_path);
+        std::string header;
+        std::getline(in, header);
+        if (header.find("cold_start_seconds") == std::string::npos) {
+            std::vector<std::string> rows;
+            std::string line;
+            while (std::getline(in, line)) rows.push_back(line);
+            in.close();
+
+            std::ofstream rewrite(csv_path, std::ios::trunc);
+            if (!rewrite) throw std::runtime_error("cannot upgrade results CSV schema: " + path);
+            rewrite << header << ",cold_start_seconds,hot_start_seconds\n";
+            for (const auto& row : rows) rewrite << row << ",,\n";
+        }
+    }
+
     std::ofstream out(csv_path, std::ios::app);
     if (!out) throw std::runtime_error("cannot open results CSV for append: " + path);
 
@@ -181,7 +198,9 @@ void append_result_csv(const std::string& path,
                "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
                "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
                "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
-               "throughput_tps,wer,cer,transcription\n";
+               "throughput_tps,wer,cer,transcription,"
+               "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
+               "cold_start_seconds,hot_start_seconds\n";
     }
 
     const bool tok = last.has_token_metrics;
@@ -210,7 +229,15 @@ void append_result_csv(const std::string& path,
         << opt_num(last.throughput_tps, tok, 6) << ','
         << opt_num(er.wer, have_ref, 6) << ','
         << opt_num(er.cer, have_ref, 6) << ','
-        << csv_escape(text) << '\n';
+        << csv_escape(text) << ','
+        << csv_escape(engine.backend_name()) << ','
+        << "" << ','
+        << "" << ','
+        << "" << ','
+        << 1 << ','
+        << "ok" << ','
+        << cold_load << ','
+        << warm_load << '\n';
 }
 
 }  // namespace
@@ -249,7 +276,7 @@ int main(int argc, char* argv[]) {
                   << "  backend: auto | intel | amd | qualcomm   (default auto)\n"
                   << "  device : npu | gpu | cpu                 (default npu)\n"
                   << "  runs   : timed iterations                (default 5)\n"
-                  << "  --cache <dir>: persist compiled model; loads twice (cold/warm)\n"
+                  << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"
                   << "  --ref \"text\": reference transcript -> compute WER/CER\n"
                   << "  --threads N: CPU inference thread count (CPU device only)\n"
                   << "  --json: emit one machine-readable JSON record\n"
@@ -310,7 +337,7 @@ int main(int argc, char* argv[]) {
                   << "\n\n";
     }
 
-    // Cold load (compiles; writes cache if enabled).
+    // Cold start (compiles; writes cache if enabled).
     std::unique_ptr<IWhisperEngine> engine;
     double cold_load = 0.0, warm_load = -1.0;
     try {
@@ -320,14 +347,14 @@ int main(int argc, char* argv[]) {
         return fail(3, std::string("Engine creation failed: ") + e.what());
     }
 
-    // Warm load (imports cached blob) to quantify the caching win.
+    // Hot start (imports cached blob) to quantify the caching win.
     if (!cache_dir.empty()) {
         try {
             auto warm = create_engine(backend, opt);
             warm_load = warm->load_seconds();
             engine = std::move(warm);
         } catch (const std::exception& e) {
-            if (!json_out) std::cerr << "Warm reload failed: " << e.what() << "\n";
+            if (!json_out) std::cerr << "Hot reload failed: " << e.what() << "\n";
         }
     }
 
@@ -383,8 +410,10 @@ int main(int argc, char* argv[]) {
         js << ",\"audio\":\"" << json_escape(audio_path) << "\"";
         js << ",\"audio_len_s\":" << audio_len;
         js << ",\"runs\":" << runs;
+        js << ",\"warmup\":" << warmup;
         js << ",\"load_cold_s\":" << cold_load;
         js << ",\"load_warm_s\":" << warm_load;
+        js << ",\"load_hot_s\":" << warm_load;
         js << ",\"mean_ms\":" << mean * 1000.0;
         js << ",\"median_ms\":" << median * 1000.0;
         js << ",\"p90_ms\":" << p90 * 1000.0;
@@ -422,7 +451,7 @@ int main(int argc, char* argv[]) {
         std::cout << std::setprecision(3);
         std::cout << "load (cold)  : " << cold_load << " s\n";
         if (warm_load >= 0.0) {
-            std::cout << "load (warm)  : " << warm_load << " s";
+            std::cout << "load (hot)   : " << warm_load << " s";
             if (warm_load > 0.0) std::cout << "   (" << std::setprecision(1) << (cold_load / warm_load)
                                            << "x faster)" << std::setprecision(3);
             std::cout << "\n";

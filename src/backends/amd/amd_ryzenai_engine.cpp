@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -49,6 +50,20 @@ constexpr int64_t kLangEn = 50259;
 constexpr int64_t kTranscribe = 50359;
 constexpr int64_t kNoTimestamps = 50363;
 constexpr int64_t kMaxTokens = 448;
+
+bool progress_enabled() {
+    const char* v = std::getenv("WHISPER_HAL_PROGRESS");
+    return v && *v && std::string(v) != "0";
+}
+
+double seconds_since(std::chrono::steady_clock::time_point t0) {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+}
+
+void progress(std::chrono::steady_clock::time_point t0, const std::string& msg) {
+    if (!progress_enabled()) return;
+    std::cerr << "[amd-progress +" << seconds_since(t0) << "s] " << msg << "\n";
+}
 
 std::string read_text(const fs::path& path) {
     std::ifstream file(path, std::ios::binary);
@@ -275,7 +290,10 @@ std::vector<std::string> output_names(Ort::Session& session) {
 }
 
 Ort::Session make_session(Ort::Env& env, const fs::path& model, const EngineOptions& options,
-                          const fs::path& config, const std::string& cache_key) {
+                          const fs::path& config, const std::string& cache_key,
+                          std::chrono::steady_clock::time_point t0) {
+    const auto step0 = std::chrono::steady_clock::now();
+    progress(t0, "session options begin: " + model.filename().string());
     Ort::SessionOptions so;
     so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
@@ -286,10 +304,20 @@ Ort::Session make_session(Ort::Env& env, const fs::path& model, const EngineOpti
             vitis_opts["cache_dir"] = options.cache_dir;
             vitis_opts["cache_key"] = cache_key;
         }
+        progress(t0, "append VitisAI EP begin: key=" + cache_key +
+                         " cache=" + (options.cache_dir.empty() ? std::string("(disabled)") : options.cache_dir));
         so.AppendExecutionProvider_VitisAI(vitis_opts);
+        progress(t0, "append VitisAI EP done: key=" + cache_key +
+                         " step=" + std::to_string(seconds_since(step0)) + "s");
+    } else {
+        progress(t0, "CPUExecutionProvider session path: " + model.filename().string());
     }
 
-    return Ort::Session(env, model.c_str(), so);
+    progress(t0, "Ort::Session create begin: " + model.filename().string());
+    Ort::Session session(env, model.c_str(), so);
+    progress(t0, "Ort::Session create done: " + model.filename().string() +
+                     " step=" + std::to_string(seconds_since(step0)) + "s");
+    return session;
 }
 
 class AmdRyzenAiEngine final : public IWhisperEngine {
@@ -320,14 +348,27 @@ public:
         }
 
         const auto t0 = std::chrono::steady_clock::now();
+        progress(t0, "AMD engine load begin: model_dir=" + model_dir.string() +
+                     " device=" + std::string(options.device == Device::NPU ? "NPU" : "CPU"));
+        const auto parse0 = std::chrono::steady_clock::now();
+        progress(t0, "parse mel filters begin");
         mel_filters_ = parse_mel_filters(model_dir / "preprocessor_config.json");
+        progress(t0, "parse mel filters done: step=" + std::to_string(seconds_since(parse0)) + "s");
+        const auto vocab0 = std::chrono::steady_clock::now();
+        progress(t0, "load vocab begin");
         vocab_ = load_vocab(model_dir / "vocab.json");
+        progress(t0, "load vocab done: step=" + std::to_string(seconds_since(vocab0)) + "s");
+        progress(t0, "encoder session begin");
         encoder_ = std::make_unique<Ort::Session>(
-            make_session(env_, encoder_path_, options_, encoder_config_, "whisper_tiny_amd_encoder"));
+            make_session(env_, encoder_path_, options_, encoder_config_, "whisper_tiny_amd_encoder", t0));
+        progress(t0, "encoder session done");
+        progress(t0, "decoder session begin");
         decoder_ = std::make_unique<Ort::Session>(
-            make_session(env_, decoder_path_, options_, decoder_config_, "whisper_tiny_amd_decoder"));
+            make_session(env_, decoder_path_, options_, decoder_config_, "whisper_tiny_amd_decoder", t0));
+        progress(t0, "decoder session done");
         load_seconds_ =
             std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        progress(t0, "AMD engine load done: total=" + std::to_string(load_seconds_) + "s");
     }
 
     TranscribeResult transcribe(const AudioSamples& audio) override {

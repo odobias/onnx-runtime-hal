@@ -5,11 +5,12 @@ Benchmark runs append rows to `benchmark-results.csv` by default:
 ```powershell
 .\scripts\run.ps1 -Backend amd -Device npu
 .\scripts\run.ps1 -Backend intel -Device npu
+.\scripts\benchmark.ps1 -Runs 3
 ```
 
-Each platform should execute only the tests it can run locally. The shared CLI
-records the same CSV schema for every backend, so result files from different
-machines can be concatenated or imported later.
+Each platform should execute only the manifest entries it can run locally. The shared CLI
+and manifest benchmark record the same CSV schema for every backend, so result files from
+different machines can be concatenated or imported later.
 
 Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 
@@ -25,10 +26,10 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 - `audio_path`: WAV file used for the benchmark.
 - `audio_seconds`: input audio duration.
 - `runs`: measured inference iterations.
-- `warmup`: warmup iterations before measurement.
+- `warmup`: inference warmup iterations before latency measurement; it is not a startup metric.
 - `cache_dir`: compiled-model cache directory, if enabled.
-- `cold_load_seconds`: first engine load time.
-- `warm_load_seconds`: second engine load time, or `-1` when no cache/warm reload was used.
+- `cold_load_seconds`: legacy name for first engine load time.
+- `warm_load_seconds`: legacy name for second engine load time, or `-1` when no cache/hot reload was used.
 - `mean_infer_seconds`: mean measured transcription latency.
 - `rtf`: real-time factor, `mean_infer_seconds / audio_seconds`.
 - `realtime_factor`: inverse RTF.
@@ -38,30 +39,39 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 - `ttft_ms` / `tpot_ms` / `throughput_tps`: time-to-first-token, time-per-output-token, tokens/sec. Empty when unavailable.
 - `wer` / `cer`: word/char error rate vs. `--ref` (fraction, 0..1). Empty when no reference was given.
 - `transcription`: final transcription text from the last measured run.
+- `cold_start_seconds`: first engine creation after the harness deletes that variant/device cache.
+- `hot_start_seconds`: second engine creation in the same process after the compiled cache has been populated.
+- `eval_clips`: number of clips aggregated into this row. C++ single-clip runs = `1`; `benchmark.ps1` aggregate rows use the number of eval clips that completed.
+- `status`: `ok`, or a short failure reason for unsupported/missing configurations.
 - `runtime`: execution stack that actually ran the model, e.g. `OpenVINO`, `OpenVINO GenAI`, `ONNX Runtime`, `ONNX Runtime + VitisAI EP`.
 - `model_format`: `onnx` (vendor-neutral) or `ov-ir` (Intel OpenVINO IR).
 - `decode_strategy`: how the autoregressive loop runs — `stateful-kv` (OV GenAI), `dynamic-kv` (growing KV cache), `static-no-kv` (fixed-context recompute, NPU-compilable), `raw-loop` (hand-rolled ORT), `optimum-generate` (optimum's Python loop).
 - `max_context`: static decoder context length for `static-no-kv`; blank when the shape is dynamic or N/A.
-- `eval_clips`: number of clips aggregated into this row. C++ single-clip runs = `1`; the neutral-ONNX sweep aggregates = `12`.
-- `status`: `ok`, or a short `fail (...)` reason (e.g. NPU rejecting dynamic KV shapes) for rows that record an unsupported configuration.
 
-These trailing columns are appended after `transcription`, so tools that read the
-original schema by position are unaffected. Rows written before these columns
-existed are back-filled (`eval_clips=1`, `status=ok`, inferred `runtime`).
+The `cold_load_seconds`/`warm_load_seconds` columns are retained for compatibility, but new
+analysis should use `cold_start_seconds`/`hot_start_seconds`. Do not mix startup time with
+inference warmup; those are different measurements and pretending otherwise is how bogus
+benchmarks are born.
 
-The trailing metric columns are backend-neutral and optional: each backend fills
-only what it can measure (e.g. the Intel OpenVINO backend reports confidence and
-token perf; the AMD scaffold currently leaves them empty). This keeps one schema
-across machines so files concatenate cleanly.
+These trailing columns are appended after `transcription`, so tools that read the original
+schema by position are unaffected. `benchmark.ps1` upgrades an older local CSV header before
+appending aggregate rows.
+
+The trailing metric columns are backend-neutral and optional: each backend fills only what
+it can measure. This keeps one schema across machines so files concatenate cleanly.
 
 ## Quantization sweep
 
-`scripts\benchmark.ps1` compares quantization variants from `models\manifest.json`
-across `variant × device × clip` and writes an aggregate report to
-`results\quantization-benchmark.{md,csv}` (micro-averaged WER/CER, confidence, load
-and latency). It also appends one canonical per-variant row to
-`benchmark-results.csv` via the shared CLI, so single-run and swept results live in
-the same schema.
+`scripts\benchmark.ps1` compares entries from `models\manifest.json` across
+`variant × device × clip` and writes an aggregate report to
+`results\quantization-benchmark.{md,csv}` (micro-averaged WER/CER, confidence, startup,
+and latency). It also appends one canonical aggregate row per `variant × device` to
+`benchmark-results.csv`, so single-run and swept results live in the same schema.
+
+`models\manifest.json` is the platform contract. Each variant entry must include:
+`id`, `backend`, `precision`, `method`, `model_dir`, `devices`, and `size_mb`.
+Intel export scripts and AMD model download scripts merge their own entries into this file
+instead of overwriting other platforms.
 
 ## Neutral ONNX portability
 

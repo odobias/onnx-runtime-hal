@@ -22,7 +22,7 @@ src/backends/intel/                      OpenVINO GenAI backend (real)
 src/backends/amd/                        Ryzen AI / VitisAI backend
 src/backends/qualcomm/                   QNN backend (scaffold)
 include/whisper_npu/metrics.hpp          Backend-neutral WER/CER + text normalization
-app/main.cpp                             CLI runner: cold/warm load, inference bench,
+app/main.cpp                             CLI runner: cold/hot start, inference bench,
                                          confidence, WER/CER, --json for the harness
 msbuild/*.props                          Shared + per-backend build settings
 projects/*/*.vcxproj, WhisperNpuHal.sln  MSBuild projects (Core static lib + App exe)
@@ -39,8 +39,8 @@ compiled with their SDK still link (as throwing stubs) so the repo always builds
 
 The first NPU load compiles the model to a device blob (slow, ~seconds). Set a cache
 directory (`EngineOptions::cache_dir`, CLI `--cache <dir>`) and OpenVINO persists that
-blob, so subsequent **warm** loads import it and are near-instant. The CLI loads the
-engine twice (cold then warm) and prints both times plus the speedup. AMD/Qualcomm
+blob, so subsequent **hot** starts import it and are near-instant. The CLI loads the
+engine twice (cold then hot) and prints both times plus the speedup. AMD/Qualcomm
 backends have matching cache hooks stubbed (VitisAI EP context cache / QNN context
 binary) for when they're implemented.
 
@@ -53,7 +53,7 @@ SDK, model, audio); none of it is committed.
 git clone https://github.com/odobias/whisper-npu-hal
 cd whisper-npu-hal
 .\scripts\bootstrap.ps1       # auto-detects platform, installs its toolchain + model + audio, then builds
-.\scripts\run.ps1             # NPU, exported model, cold/warm cache demo
+.\scripts\run.ps1             # NPU, exported model, cold/hot cache demo
 ```
 
 `bootstrap.ps1` **detects the platform** (NPU/CPU vendor) and bootstraps *that platform's*
@@ -109,32 +109,34 @@ artifacts instead of re-running the export toolchain.
 The runner reports three axes per run, all backend-neutral (any backend fills what it
 can; missing values are simply omitted):
 
-- **Performance** — cold/warm load, mean/median/p90 latency, RTF, TTFT/TPOT, tok/s, model size.
+- **Performance** — cold/hot start, mean/median/p90 latency, RTF, TTFT/TPOT, tok/s, model size.
 - **Confidence** — mean per-token log-prob the model self-reports (`WhisperDecodedResults.scores`).
   Honest caveat: for whisper-tiny.en this barely moves across precisions, so treat it as
   weakly informative — **WER is the real discriminator.**
 - **Accuracy** — WER/CER (`--ref "<text>"`) via the common `metrics.hpp`, computed identically
   regardless of backend.
 
-Compare quantization *methods* across `variant × device × clip`:
+Compare every manifest entry across its declared `variant × device × clip` matrix:
 
 ```powershell
 .\scripts\export-variants.ps1     # fp32, fp16, int8, int4 OpenVINO variants + models/manifest.json
+.\scripts\get-amd-model.ps1       # AMD ONNX variant + merged models/manifest.json (on AMD machines)
 .\scripts\get-eval-set.ps1        # small labeled LibriSpeech sample -> models/eval/eval.jsonl
-.\scripts\benchmark.ps1 -Devices NPU -Runs 3   # -> build/reports/benchmark.{md,csv}
+.\scripts\benchmark.ps1 -Runs 3   # -> results/quantization-benchmark.{md,csv}
 ```
 
 `manifest.json` is the backend-neutral contract: each entry has `backend`, `precision`,
-`method`, `model_dir`, `devices`. Adding AMD/Qualcomm means **appending entries with
-`backend=amd|qualcomm`** (and their own model dirs/devices) — the harness, metrics, and
-report need no changes.
+`method`, `model_dir`, `devices`, and `size_mb`. Each platform script appends or updates
+its own entries (`backend=amd|intel|qualcomm`) — the harness, metrics, and reports do not
+need platform-specific changes.
 
 Reports land in `results/` (tracked): `quantization-benchmark.{md,csv}` (aggregate sweep)
-plus one canonical per-variant row appended to `results/benchmark-results.csv` (the shared
-cross-backend file — AMD/Intel rows share the same schema). Example NPU result
+plus one canonical aggregate row per `variant × device` appended to
+`results/benchmark-results.csv` (the shared cross-backend file — AMD/Intel rows share the
+same schema). Example NPU result
 (whisper-tiny.en, 12 LibriSpeech clips):
 
-| Variant | Prec | Size MB | Cold s | Warm s | Mean ms | xRT | WER % |
+| Variant | Prec | Size MB | Cold s | Hot s | Mean ms | xRT | WER % |
 |---|---|---|---|---|---|---|---|
 | fp32 | fp32 | 150.7 | 10.0 | 0.70 | 137.3 | 71.3 | 9.57 |
 | fp16 | fp16 | 78.8 | 9.4 | 0.62 | 139.3 | 71.1 | 9.57 |
@@ -144,7 +146,7 @@ cross-backend file — AMD/Intel rows share the same schema). Example NPU result
 Takeaways (this NPU): **fp16 is a free win** — half the size, identical WER. **int8** trades
 +0.7% WER for 3.3× smaller. **int4** is the smallest and, on these kernels, not slower at
 inference — but it costs ~5 pts of WER and the longest cold compile (~22 s), so it's an
-accuracy-poor trade for a tiny model. Warm cache makes every NPU load ~0.7 s regardless of
+accuracy-poor trade for a tiny model. Hot cache makes every NPU load ~0.7 s regardless of
 precision. (GPU/CPU land at slightly lower WER on fp32/fp16 — 8.6% vs the NPU's 9.6% —
 purely from kernel numerics; see the full table in `results/`.)
 
@@ -158,7 +160,7 @@ AMD Ryzen AI / VitisAI:
 
 ```powershell
 .\scripts\setup-amd.ps1                       # Ryzen AI SDK + NPU driver (once)
-.\scripts\get-amd-model.ps1
+.\scripts\get-amd-model.ps1                   # also creates/merges models\manifest.json
 .\scripts\get-audio.ps1
 .\scripts\build.ps1 -EnableAmd -DisableIntel
 .\scripts\run.ps1 -Backend amd -Device npu
@@ -181,19 +183,19 @@ Python; the app copies the RyzenAI ONNX Runtime / VitisAI DLLs next to the exe.
 ```powershell
 .\scripts\run.ps1 -Backend amd -Device npu
 .\scripts\run.ps1 -Backend intel -Device npu
+.\scripts\benchmark.ps1 -Runs 3               # manifest-driven all-clip sweep
 ```
 
-Each platform should run only its own backend/device tests locally. The CSV schema
-is documented in `results\README.md`; use `-Results <path>` to write to another
-CSV or `-NoResults` for scratch runs.
+Each platform should run only its own manifest entries locally. The CSV schema is
+documented in `results\README.md`; use `-Results <path>` to write benchmark sweeps to
+another CSV, or `-NoResults` on `run.ps1` for scratch single-clip runs.
 
 ## Device comparison (NPU vs GPU vs CPU)
 
-CPU is not a separate backend or code path — it's the same Intel OpenVINO backend, just
-targeting `Device::CPU` instead of `NPU`/`GPU` (`ov_device()` in
-`intel_openvino_engine.cpp` maps all three to plain OpenVINO device strings). It's also
-the one device guaranteed to exist on *any* x86_64 machine, making it the natural
-baseline: "is the NPU actually worth it, or is CPU good enough?"
+CPU is not a separate backend — it's the same manifest-selected backend targeting
+`Device::CPU` instead of `NPU`/`GPU`. It's also the one device likely to exist on any
+x86_64 machine, making it the natural baseline: "is the NPU actually worth it, or is CPU
+good enough?"
 
 ```powershell
 .\scripts\run.ps1 -Device cpu                    # single run on CPU
@@ -210,15 +212,15 @@ count is not a cosmetic knob, it's the main lever you have.
 
 `compare-devices.ps1` runs a single variant (fp16 by default) across every requested
 device and pivots the report on *device* instead of *quantization method* (that's
-`benchmark.ps1`'s job). Unsupported combos — no NPU present, an Intel-only `GPU` plugin
-pointed at non-Intel silicon, etc. — are recorded as failures, not crashes, per the same
-backend-neutral contract as the quantization benchmark.
+`benchmark.ps1`'s job). It reads `backend` from the same manifest entry as the canonical
+benchmark. Unsupported combos — no NPU present, GPU not wired for a backend, etc. — are
+recorded as failures, not crashes, per the same backend-neutral contract.
 
 Measured on this dev machine (AMD Threadripper PRO 7955WX, 16C/32T, NVIDIA T1000 — i.e.
 **zero Intel NPU/GPU hardware**) with `compare-devices.ps1`, whisper-tiny.en fp16, 12
 LibriSpeech clips:
 
-| Device | Chip | Status | Threads | Cold s | Warm s | Mean ms | xRT | tok/s | WER % |
+| Device | Chip | Status | Threads | Cold s | Hot s | Mean ms | xRT | tok/s | WER % |
 |---|---|---|---|---|---|---|---|---|---|
 | NPU | - | unsupported | - | - | - | - | - | - | - |
 | GPU | - | unsupported | - | - | - | - | - | - | - |

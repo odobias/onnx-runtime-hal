@@ -18,6 +18,30 @@ $models = Join-Path $root "models"
 $outDir = Join-Path $models $Out
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
+function Merge-ManifestEntry {
+    param(
+        [Parameter(Mandatory)][string]$ManifestPath,
+        [Parameter(Mandatory)][object]$Entry
+    )
+
+    if (Test-Path $ManifestPath) {
+        $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
+        $variants = @($manifest.variants | Where-Object { $_.id -ne $Entry.id })
+    } else {
+        $manifest = [pscustomobject]@{
+            model    = "openai/whisper-tiny"
+            created  = ""
+            note     = "Backend-neutral variant manifest. Each platform appends entries with its own backend/model_dir/devices."
+            variants = @()
+        }
+        $variants = @()
+    }
+
+    $manifest.created = (Get-Date).ToString("s")
+    $manifest.variants = @($variants + $Entry)
+    $manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $ManifestPath -Encoding UTF8
+}
+
 function Get-File {
     param(
         [Parameter(Mandatory)][string]$Uri,
@@ -111,4 +135,16 @@ foreach ($file in $tokenizerFiles) {
 }
 '@ | Set-Content -Encoding ASCII (Join-Path $outDir "vitisai_config_whisper_decoder.json")
 
+$sizeMb = [math]::Round(((Get-ChildItem $outDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB), 1)
+$entry = [ordered]@{
+    id        = $Out
+    backend   = "amd"
+    precision = "fp32-static"
+    method    = "AMD Whisper Tiny ONNX NPU export (static decoder context)"
+    model_dir = "models/$Out"
+    devices   = @("NPU", "GPU", "CPU")
+    size_mb   = $sizeMb
+}
+Merge-ManifestEntry (Join-Path $models "manifest.json") $entry
+Write-Host "Updated manifest: $(Join-Path $models "manifest.json")" -ForegroundColor Green
 Write-Host "AMD model ready: $outDir" -ForegroundColor Green

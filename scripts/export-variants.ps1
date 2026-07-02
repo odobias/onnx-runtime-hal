@@ -26,6 +26,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $models = Join-Path $root "models"
 $variants = Join-Path $models "variants"
 New-Item -ItemType Directory -Force -Path $variants | Out-Null
+$manifestPath = Join-Path $models "manifest.json"
 
 # Resolve venv python (shared with get-model.ps1).
 $venv = Join-Path $root ".venv"
@@ -86,14 +87,24 @@ foreach ($fmt in $Formats) {
     }
 }
 
-$manifest = [ordered]@{
-    model    = $Model
-    created  = (Get-Date).ToString("s")
-    note     = "Backend-neutral variant manifest. Add AMD/Qualcomm variants by appending entries with backend=amd|qualcomm."
-    variants = $entries
+$existing = $null
+$preserved = @()
+if (Test-Path $manifestPath) {
+    $existing = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $newIds = @($entries | ForEach-Object { $_.id })
+    $preserved = @($existing.variants | Where-Object { $newIds -notcontains $_.id })
 }
 
-$manifestPath = Join-Path $models "manifest.json"
+$manifest = [ordered]@{
+    model    = $(if ($existing -and $existing.model) { $existing.model } else { $Model })
+    created  = (Get-Date).ToString("s")
+    note     = "Backend-neutral variant manifest. Each platform appends entries with its own backend/model_dir/devices."
+    variants = @($preserved + $entries)
+}
+
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $manifestPath -Encoding UTF8
 Write-Host "`nWrote $manifestPath with $($entries.Count) variant(s):" -ForegroundColor Green
 $entries | ForEach-Object { Write-Host ("  {0,-14} {1,-5} {2} MB" -f $_.id, $_.precision, $_.size_mb) }
+if ($preserved.Count -gt 0) {
+    Write-Host "Preserved $($preserved.Count) existing non-overwritten manifest entr$(if ($preserved.Count -eq 1) { 'y' } else { 'ies' })." -ForegroundColor DarkGray
+}
