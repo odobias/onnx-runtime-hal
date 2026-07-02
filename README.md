@@ -83,6 +83,27 @@ Run directly if you prefer:
 .\build\x64\Release\WhisperNpuHal.App.exe <model_dir> <audio.wav> intel npu 5 --cache .\build\cache\npu
 ```
 
+## Model store (Hugging Face)
+
+`models/` is gitignored (~1.5 GB of ONNX + OpenVINO variants) — committing it to GitHub
+LFS would blow past the 1 GB free tier and its bandwidth cap immediately. Instead the
+whole tree is snapshotted to the **private Hugging Face model repo
+[`odobias/npu-hal-over-9000`](https://huggingface.co/odobias/npu-hal-over-9000)**, which
+gives 100 GB free private storage and no LFS bandwidth throttling. Both scripts are wired
+to that repo by default (override with `-Repo <user>/<name>`).
+
+```powershell
+hf auth login                    # once; token needs Write permission
+.\scripts\get-models.ps1         # pull the model snapshot into models/ (after clone)
+.\scripts\push-models.ps1        # re-snapshot models/ to HF after re-exporting
+```
+
+The repo is **private**, so pulling requires an HF account that's been granted read access
+to it (a token in `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN`, or `hf auth login`); pushing
+requires **write** access (owner). This is an alternative to reproducing models locally via
+`get-model.ps1` / `get-amd-model.ps1` / `export-variants.ps1` — pull the exact pinned
+artifacts instead of re-running the export toolchain.
+
 ## Quantization benchmark (confidence + performance + accuracy)
 
 The runner reports three axes per run, all backend-neutral (any backend fills what it

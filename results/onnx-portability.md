@@ -20,6 +20,9 @@ load time, latency and quality.
 | **OpenVINO, dyn KV-cache** | CPU | 1.85 s | **0.32 s** | **527 ms** | 8.58% | 4.53% | -0.164 |
 | **OpenVINO, dyn KV-cache** | GPU | 16.39 s | **0.18 s** | **316 ms** | 8.58% | 4.53% | -0.164 |
 | OpenVINO, dyn KV-cache | NPU | ❌ compile fail | — | — | — | — | — |
+| **OpenVINO, stateful KV** | CPU | 0.82 s | 0.79 s | **347 ms** | 8.58% | 4.53% | -0.164 |
+| OpenVINO, stateful KV | GPU | 7.11 s | 0.68 s | 653 ms | 8.58% | 4.53% | -0.164 |
+| OpenVINO, stateful KV | NPU | ❌ compile fail | — | — | — | — | — |
 | **OpenVINO, static no-KV** | NPU | 9.18 s | **0.70 s** | 970 ms | 9.57% | 5.10% | -0.168 |
 | _baseline_ OV-IR GenAI (not ONNX) | NPU | 10.02 s | 0.70 s | 137 ms | 9.57% | 4.46% | — |
 
@@ -42,6 +45,19 @@ load time, latency and quality.
    works and is NPU-compilable, but pays O(n*maxlen): 970 ms vs the 137 ms
    stateful IR pipeline. Closing that gap needs a **static KV-cache export**
    (fixed max context + attention mask), which the stock `optimum` export lacks.
+
+5. **Fixing "no KV cache" with a stateful transform: CPU yes, NPU no.**
+   `apply_make_stateful_transformation` pairs the neutral ONNX's decoder KV
+   (past<->present) into internal OpenVINO state, so we stop copying KV tensors
+   through Python each step. On **CPU this cut 527 -> 347 ms** (near the 282 ms
+   GenAI IR), quality unchanged. On **GPU it didn't help** (OpenVINO already
+   handled the dynamic KV efficiently; stateful added sync overhead). On the
+   **NPU it still fails**: plain MakeStateful produces an *unbounded* KV state,
+   and the NPU compiler needs a *bounded max-context* state (fixed cache size +
+   masking). That bounded-state path is exactly what OpenVINO GenAI's NPU LLM
+   pipeline implements to reach 137 ms. Net: the portable ONNX can be made
+   stateful for CPU/GPU with a one-line transform, but a fast NPU KV cache
+   requires the vendor's bounded-KV runtime, not a generic ONNX.
 
 See `onnx-portability.csv` for the raw numbers. Scripts:
 `scripts/onnx_ov_decode.py` (dyn KV-cache CPU/GPU), `scripts/onnx_npu_static.py`
