@@ -38,6 +38,16 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 - `ttft_ms` / `tpot_ms` / `throughput_tps`: time-to-first-token, time-per-output-token, tokens/sec. Empty when unavailable.
 - `wer` / `cer`: word/char error rate vs. `--ref` (fraction, 0..1). Empty when no reference was given.
 - `transcription`: final transcription text from the last measured run.
+- `runtime`: execution stack that actually ran the model, e.g. `OpenVINO`, `OpenVINO GenAI`, `ONNX Runtime`, `ONNX Runtime + VitisAI EP`.
+- `model_format`: `onnx` (vendor-neutral) or `ov-ir` (Intel OpenVINO IR).
+- `decode_strategy`: how the autoregressive loop runs — `stateful-kv` (OV GenAI), `dynamic-kv` (growing KV cache), `static-no-kv` (fixed-context recompute, NPU-compilable), `raw-loop` (hand-rolled ORT), `optimum-generate` (optimum's Python loop).
+- `max_context`: static decoder context length for `static-no-kv`; blank when the shape is dynamic or N/A.
+- `eval_clips`: number of clips aggregated into this row. C++ single-clip runs = `1`; the neutral-ONNX sweep aggregates = `12`.
+- `status`: `ok`, or a short `fail (...)` reason (e.g. NPU rejecting dynamic KV shapes) for rows that record an unsupported configuration.
+
+These trailing columns are appended after `transcription`, so tools that read the
+original schema by position are unaffected. Rows written before these columns
+existed are back-filled (`eval_clips=1`, `status=ok`, inferred `runtime`).
 
 The trailing metric columns are backend-neutral and optional: each backend fills
 only what it can measure (e.g. the Intel OpenVINO backend reports confidence and
