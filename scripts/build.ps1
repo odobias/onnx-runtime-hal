@@ -2,15 +2,17 @@
 # back to the newest installed VS if 2026 is not present. PlatformToolset is
 # $(DefaultPlatformToolset), so the build tracks whichever VS is used.
 #
-#   .\build.ps1                       # Release|x64, Intel backend
+#   .\build.ps1                       # Release, host platform, Intel backend
 #   .\build.ps1 -Configuration Debug
 #   .\build.ps1 -EnableAmd -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel -OrtDir C:\onnxruntime
+#   .\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel  # native Snapdragon
 
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")][string]$Configuration = "Release",
+    [ValidateSet("x64", "ARM64")][string]$Platform = "",
     [switch]$EnableAmd,
     [switch]$EnableOrt,
     [switch]$DisableIntel,
@@ -23,6 +25,12 @@ param(
 $ErrorActionPreference = "Stop"
 chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+
+# Default the target platform to the host architecture so a native ARM64
+# (Snapdragon) machine builds native ARM64 instead of x64-emulated.
+if (-not $Platform) {
+    $Platform = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq "Arm64") { "ARM64" } else { "x64" }
+}
 
 $root = Split-Path $PSScriptRoot -Parent
 $sln = Join-Path $root "WhisperNpuHal.sln"
@@ -56,7 +64,7 @@ $args = @(
     $sln,
     "/t:$target",
     "/p:Configuration=$Configuration",
-    "/p:Platform=x64",
+    "/p:Platform=$Platform",
     "/p:EnableIntel=$([bool]$enableIntel)".ToLower(),
     "/p:EnableOrt=$([bool]$enableOrt)".ToLower(),
     "/p:EnableAmd=$([bool]$EnableAmd)".ToLower(),
@@ -74,7 +82,7 @@ if ($OrtDir) {
 & $found.msbuild @args
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit 1 }
 
-$exe = Join-Path $root "build\x64\$Configuration\WhisperNpuHal.App.exe"
+$exe = Join-Path $root "build\$Platform\$Configuration\WhisperNpuHal.App.exe"
 Write-Host ""
 Write-Host "Built: $exe" -ForegroundColor Green
 Write-Host "Run  : .\scripts\run.ps1" -ForegroundColor Cyan

@@ -15,5 +15,11 @@
     <EnableIntel Condition="'$(EnableIntel)'==''">true</EnableIntel>
     <EnableAmd Condition="'$(EnableAmd)'==''">false</EnableAmd>
     <EnableQualcomm Condition="'$(EnableQualcomm)'==''">false</EnableQualcomm>
+
+    <!-- Bundle the portable static ONNX model next to the exe so the build output
+         is a self-contained package. Set /p:BundleModel=false to skip the (large)
+         copy during iterative dev builds. -->
+    <BundleModel Condition="'$(BundleModel)'==''">true</BundleModel>
+    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(WhisperHalRoot)models\whisper-tiny-en-static-onnx</BundledModelDir>
   </PropertyGroup>
 </Project>

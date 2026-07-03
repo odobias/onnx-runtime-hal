@@ -20,6 +20,9 @@ bool available();
 namespace ort_static {
 std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
 bool available();
+// Runtime probe of the ORT execution-provider device list: best logical device
+// this build can run on now (NPU if a QNN accelerator is present, else CPU).
+Device best_available_device();
 }  // namespace ort_static
 
 namespace amd {

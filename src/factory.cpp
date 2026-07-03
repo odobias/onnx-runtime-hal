@@ -53,6 +53,18 @@ std::vector<Backend> available_backends() {
 
 std::unique_ptr<IWhisperEngine> create_engine(Backend backend, const EngineOptions& options) {
     if (backend == Backend::Auto) {
+        // Prefer the unified ONNX Runtime backend: one engine that self-selects
+        // its execution provider at runtime (QNN NPU -> DirectML GPU -> CPU) from
+        // the real EP device list, so a single binary adapts to whatever hardware
+        // and drivers are present. Only fall back to a vendor-specific backend if
+        // ORT was not compiled in.
+        if (ort_static::available()) {
+            EngineOptions o = options;
+            if (o.device_override.empty()) {
+                o.device = ort_static::best_available_device();
+            }
+            return ort_static::create(o);
+        }
         for (Backend b : available_backends()) {
             return create_engine(b, options);
         }
@@ -66,7 +78,12 @@ std::unique_ptr<IWhisperEngine> create_engine(Backend backend, const EngineOptio
         case Backend::IntelOnnx:     return intel_onnx::create(options);
         case Backend::OnnxRuntimeStatic: return ort_static::create(options);
         case Backend::AmdRyzenAI:    return amd::create(options);
-        case Backend::QualcommQNN:   return qualcomm::create(options);
+        // Qualcomm QNN is now served by the unified ONNX Runtime backend (it
+        // registers the QNN plugin EP internally). The standalone qualcomm engine
+        // remains compiled for reference but is no longer on the active path when
+        // ORT is available.
+        case Backend::QualcommQNN:
+            return ort_static::available() ? ort_static::create(options) : qualcomm::create(options);
         default: break;
     }
     throw std::runtime_error(std::string("unknown backend: ") + to_string(backend));
