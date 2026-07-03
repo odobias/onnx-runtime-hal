@@ -21,7 +21,19 @@ param(
     # NPU vendor filter: auto (detect this host), all (try everything), or a forced
     # vendor. A machine has one NPU brand, so by default we skip other vendors' variants.
     [ValidateSet("auto", "all", "intel", "amd", "qualcomm")][string]$NpuVendor = "auto",
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+    # Skip the self-contained bootstrap (build + fetch models/eval/audio). Use when
+    # you have already prepared the environment and want the sweep to start faster.
+    [switch]$SkipBootstrap,
+    # Reuse any persisted compiled-model cache under cache/<variant>-<device> instead
+    # of wiping it before each variant. This skips the ~215s NPU compile on reruns, but
+    # cold_start_seconds then measures a load from the populated cache, NOT a true cold
+    # compile. Default (off) keeps the honest cold-compile measurement.
+    [switch]$ReuseCache,
+    # Hot-only: skip the cold compile entirely and load each engine once from the
+    # persisted cache (implies -ReuseCache). cold_start is reported as N/A. If a
+    # variant/device has no cache yet, it is warmed once (one compile) before measuring.
+    [switch]$HotOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,8 +46,23 @@ if (-not $Manifest) { $Manifest = Join-Path $root "models\manifest.json" }
 if (-not $EvalSet) { $EvalSet = Join-Path $root "models\eval\eval.jsonl" }
 $exe = Join-Path $root "build\x64\$Configuration\WhisperNpuHal.App.exe"
 
+# Detect the host once, up front: bootstrap needs it to pick build flags + models,
+# and the sweep reuses it for the vendor filter and the hardware banner.
+$platform = Get-BenchmarkPlatform
+
+# Self-contained bootstrap: build the app for this host's backends and fetch any
+# missing models/eval/audio so the benchmark runs from a fresh checkout. Idempotent
+# (present artifacts are skipped) and opt-out via -SkipBootstrap.
+if (-not $SkipBootstrap) {
+    Initialize-BenchmarkEnvironment -Root $root -Exe $exe -Manifest $Manifest -EvalSet $EvalSet `
+        -Configuration $Configuration -Platform $platform
+}
+
 foreach ($p in @($Manifest, $EvalSet, $exe)) {
-    if (-not (Test-Path $p)) { Write-Host "Missing: $p" -ForegroundColor Red; exit 1 }
+    if (-not (Test-Path $p)) {
+        Write-Host "Missing: $p (run without -SkipBootstrap, or .\scripts\bootstrap.ps1)" -ForegroundColor Red
+        exit 1
+    }
 }
 
 $manifestObj = Get-Content $Manifest -Raw | ConvertFrom-Json
@@ -53,7 +80,6 @@ $cacheRoot = Join-Path $root "cache"
 # target a different vendor's NPU. -NpuVendor all disables the filter; -NpuVendor
 # <intel|amd|qualcomm> forces it. Shared harness helpers (CSV schema, power source,
 # app invocation, aggregation, detection) live in benchmark.lib.ps1.
-$platform = Get-BenchmarkPlatform
 $hostVendor = Resolve-BenchmarkHostVendor $NpuVendor $platform
 
 # Detailed CPU/GPU/NPU inventory of the machine these results were produced on.
@@ -84,7 +110,12 @@ foreach ($v in $manifestObj.variants) {
         $tag = "$($v.id)-$dev"
         Write-Host "== $tag ==" -ForegroundColor White
         $cacheDir = Join-Path $cacheRoot $tag
-        if (Test-Path $cacheDir) { Remove-Item $cacheDir -Recurse -Force }  # force a true cold compile
+        if ($ReuseCache -or $HotOnly) {
+            if (Test-Path $cacheDir) {
+                Write-Host "   (reusing persisted cache; cold_start reflects cached load, not a true compile)" -ForegroundColor DarkYellow
+            }
+        }
+        elseif (Test-Path $cacheDir) { Remove-Item $cacheDir -Recurse -Force }  # force a true cold compile
 
         $rows = @()
         $status = "ok"
@@ -97,17 +128,31 @@ foreach ($v in $manifestObj.variants) {
             $errMsg = "model_dir missing ($modelDir)"
             Write-Host "   ! $errMsg" -ForegroundColor Yellow
         } else {
+            # Hot-only needs a populated cache; warm it with one compile if it is empty.
+            if ($HotOnly) {
+                $populated = (Test-Path $cacheDir) -and `
+                    ((Get-ChildItem -Path $cacheDir -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1) -ne $null)
+                if (-not $populated) {
+                    $warm = $clips | Where-Object { Test-Path (Join-Path $root ($_.audio -replace '/', '\')) } | Select-Object -First 1
+                    if ($warm) {
+                        Write-Host "   (hot-only: cache empty -> warming with one cold compile)" -ForegroundColor DarkYellow
+                        $warmAudio = Join-Path $root ($warm.audio -replace '/', '\')
+                        $null = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $warmAudio -Backend $v.backend -Device $dev -Runs 1 -CacheDir $cacheDir -Ref $warm.ref
+                    }
+                }
+            }
             foreach ($c in $clips) {
                 $audio = Join-Path $root ($c.audio -replace '/', '\')
                 if (-not (Test-Path $audio)) { continue }
-                $r = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $audio -Backend $v.backend -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref $c.ref
+                $r = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $audio -Backend $v.backend -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref $c.ref -HotOnly:$HotOnly
                 if (-not $r.ok) {
                     $status = "unsupported/error"; $errMsg = $r.error
                     Write-Host ("   {0}: {1}" -f $c.id, $r.error) -ForegroundColor Yellow
                     break
                 }
                 if ($first) {
-                    $coldLoad = $r.load_cold_s
+                    # Negative cold load = N/A (hot-only did not compile).
+                    $coldLoad = if ($r.load_cold_s -lt 0) { $null } else { $r.load_cold_s }
                     $hotLoad = if ($r.PSObject.Properties.Name -contains "load_hot_s") { $r.load_hot_s } else { $r.load_warm_s }
                     $first = $false
                 }
@@ -153,7 +198,8 @@ foreach ($v in $manifestObj.variants) {
         $summary += [pscustomobject]@{
             variant = $v.id; precision = $v.precision; backend = $v.backend; device = $dev
             status = "ok"; clips = $rows.Count; size_mb = $v.size_mb
-            cold_s = [math]::Round($coldLoad, 2); hot_s = [math]::Round($hotLoad, 2)
+            cold_s = if ($null -eq $coldLoad) { $null } else { [math]::Round($coldLoad, 2) }
+            hot_s = if ($null -eq $hotLoad) { $null } else { [math]::Round($hotLoad, 2) }
             mean_ms = [math]::Round($meanMs, 1); rtf = [math]::Round($meanRtf, 4)
             xrt = [math]::Round((1.0 / [math]::Max($meanRtf, 1e-9)), 1); tps = [math]::Round($meanTps, 1)
             avg_logprob = [math]::Round($meanLp, 4)
