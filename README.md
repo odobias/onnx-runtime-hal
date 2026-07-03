@@ -4,13 +4,39 @@ A C++ **hardware-abstraction layer** for running `whisper-tiny(.en)` speech-to-t
 different vendor NPUs behind one stable API. Proof-of-concept for a
 hardware-independent runner with swappable per-platform backends.
 
-- **Intel** — OpenVINO GenAI (NPU / GPU / CPU). **Working reference implementation.**
-- **AMD** — Ryzen AI / XDNA via ONNX Runtime + VitisAI EP. **Working ONNX implementation**
-  for AMD's `whisper-tiny-onnx-npu` model.
-- **ONNX Runtime static** — unchanged `whisper-tiny-en-static-onnx` via ORT providers.
-  **Working on CPU, DirectML GPU, and AMD VitisAI NPU.**
-- **Qualcomm** — Snapdragon Hexagon via ONNX Runtime Plugin QNN EP. **Working on
-  `whisper-tiny-en-static-onnx` (same static ONNX as `onnx-static`).**
+## Build once, self-select everywhere
+
+The headline path is the **unified ONNX Runtime backend** (`src/backends/ort_static`): a
+single C++ source that runs the one portable `whisper-tiny-en-static-onnx` model and
+**self-selects its execution provider at runtime**. Every vendor EP is compiled into the
+same binary — their `Append*` calls resolve through the ORT API table at runtime, so they
+cost nothing until tried and fail gracefully on the wrong host. The constructor walks a
+fallback chain and keeps the first EP that actually builds a session:
+
+```
+NPU request:  QNN (Qualcomm) -> VitisAI (AMD) -> OpenVINO NPU (Intel) -> DirectML -> CPU
+GPU request:  DirectML (any DX12 GPU) -> OpenVINO GPU -> CPU
+CPU request:  CPU
+```
+
+So one build **per ISA** covers every vendor on that ISA, and `device auto` picks the best
+available accelerator with no per-vendor code path:
+
+| Binary | ISA | EPs compiled in | Validated |
+|---|---|---|---|
+| ARM64 | `build/ARM64` | CPU + QNN NPU (DirectML dormant — see caveat) | **Yes, on Snapdragon X Elite** |
+| x64   | `build/x64`, `build/x64-ovep` | CPU + DirectML + VitisAI NPU + OpenVINO NPU/GPU | AMD VitisAI + CPU validated; Intel OVEP code-complete |
+
+The **only** per-host variable is the runtime DLL pack colocated with the exe — and that is
+unavoidable: each vendor ships its own ONNX Runtime build (QNN plugin against ORT 1.27,
+Intel `onnxruntime-openvino` 1.24.1, AMD's Ryzen AI ORT) at **different, mutually
+incompatible ORT versions**, so a literally-single fat binary across all vendors is not
+possible today. `bootstrap.ps1`/`setup-*.ps1` stage the correct pack per host; the C++ is
+built from one source and one command per ISA.
+
+Per-vendor backends still exist for their native paths: **Intel** OpenVINO GenAI (for the
+OpenVINO-IR precision variants) and **AMD** Ryzen AI. The unified `onnx-static` backend is
+the cross-vendor "one model everywhere" path.
 
 Build system: **MSBuild / Visual Studio 2026** (`WhisperNpuHal.sln`).
 `PlatformToolset=$(DefaultPlatformToolset)`, so it also builds on older VS if needed.
@@ -20,11 +46,14 @@ Build system: **MSBuild / Visual Studio 2026** (`WhisperNpuHal.sln`).
 ```
 include/whisper_npu/whisper_engine.hpp   Public API: IWhisperEngine, Backend, factory
 include/whisper_npu/audio.hpp            Dependency-free 16 kHz mono WAV loader
-src/factory.cpp                          create_engine() + backend availability
-src/backends/intel/                      OpenVINO GenAI backend (real)
-src/backends/ort_static/                 Unchanged static ONNX via ONNX Runtime
-src/backends/amd/                        Ryzen AI / VitisAI backend
-src/backends/qualcomm/                   QNN backend (scaffold)
+src/factory.cpp                          create_engine() + backend availability; routes
+                                         auto/QNN through the unified ort_static backend
+src/backends/ort_static/                 Unified static-ONNX backend: runtime EP self-select
+                                         (QNN/VitisAI/OpenVINO/DirectML/CPU) + fallback chain
+src/backends/intel/                      OpenVINO GenAI backend (OV-IR precision variants)
+src/backends/amd/                        Ryzen AI / VitisAI native backend
+src/backends/qualcomm/                   Legacy standalone QNN backend (superseded on ARM64
+                                         by ort_static; kept for x64-emulated fallback)
 include/whisper_npu/metrics.hpp          Backend-neutral WER/CER + text normalization
 app/main.cpp                             CLI runner: cold/hot start, inference bench,
                                          confidence, WER/CER, --json for the harness
@@ -35,9 +64,11 @@ scripts/compare-devices.ps1              NPU vs GPU vs CPU comparison for one va
 ```
 
 The application depends only on `whisper_npu/whisper_engine.hpp`. Backends are selected
-at runtime via `create_engine(Backend, EngineOptions)`; which backends exist depends on
-the compile-time toggles `EnableIntel` / `EnableAmd` / `EnableQualcomm`. Backends not
-compiled with their SDK still link (as throwing stubs) so the repo always builds.
+at runtime via `create_engine(Backend, EngineOptions)`; `Backend::Auto` prefers the
+unified `ort_static` backend and lets it self-select the EP. Which backends compile in
+depends on the toggles `EnableOrt` / `EnableOvep` / `EnableAmd` / `EnableQualcomm` /
+`EnableIntel`. Backends not compiled with their SDK still link (as throwing stubs) so the
+repo always builds.
 
 ## Model caching (the fast-load story)
 
@@ -97,12 +128,15 @@ Run the unchanged static ONNX export through ONNX Runtime:
 .\scripts\run.ps1 -Backend onnx-static -Device npu -Provider VitisAIExecutionProvider -Runs 1
 ```
 
-`onnx-static` defaults to CPUExecutionProvider for CPU, DirectML for GPU, and VitisAI
-for NPU. Override the selected ONNX Runtime provider with `--provider` on the app or
-`-Provider` on `run.ps1` (for example `CPUExecutionProvider`, `DmlExecutionProvider`,
-or `VitisAIExecutionProvider`). Provider cache keys are derived from the model directory
-and split by session (`*_encoder`, `*_decoder`), so encoder and decoder compiled blobs
-do not collide when a backend such as VitisAI persists artifacts.
+`onnx-static` self-selects the EP: an NPU request walks QNN -> VitisAI -> OpenVINO NPU ->
+DirectML -> CPU, a GPU request walks DirectML -> OpenVINO GPU -> CPU, and each attempt that
+can't build a session logs a `[whisper-hal] EP '<x>' unavailable ...; falling back to '<y>'`
+line so the actually-selected provider is visible. Force a specific ONNX Runtime provider
+with `--provider` on the app or `-Provider` on `run.ps1` (for example `CPUExecutionProvider`,
+`DmlExecutionProvider`, `VitisAIExecutionProvider`, or `OpenVINOExecutionProvider`); an
+explicit override is honored verbatim with no fallback. Provider cache keys are derived from
+the model directory and split by session (`*_encoder`, `*_decoder`), so encoder and decoder
+compiled blobs do not collide when a backend such as VitisAI persists artifacts.
 
 Point `OrtDir` at a platform ONNX Runtime SDK if the default Ryzen AI ORT location is
 not present. On this AMD Ryzen AI machine, the unchanged static ONNX NPU path
@@ -110,17 +144,19 @@ cold-compiles encoder and decoder into separate VitisAI cache entries (~214 s co
 load), then hot-loads from cache in ~2.6 s and runs the JFK sample at ~0.053 RTF with
 0% WER.
 
-Qualcomm Snapdragon X (Plugin QNN EP on HTP):
+Qualcomm Snapdragon X (native ARM64, Plugin QNN EP on HTP). This produces the unified
+ARM64 binary that self-selects QNN NPU -> (GPU) -> CPU:
 
 ```powershell
-.\scripts\setup-qualcomm.ps1
-.\scripts\build.ps1 -EnableQualcomm -DisableIntel
-.\scripts\run.ps1 -Backend qualcomm -Device npu -Runs 1
+.\scripts\setup-qualcomm.ps1 -Platform ARM64        # stages native win-arm64 ORT + QNN
+.\scripts\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel   # -> build/ARM64/Release
+.\build\ARM64\Release\WhisperNpuHal.App.exe models\whisper-tiny-en-static-onnx models\jfk.wav onnx-static npu 5
 ```
 
 Uses the same `models/whisper-tiny-en-static-onnx` package as `onnx-static`. First load
-compiles graphs to the Hexagon NPU (~20 s); inference on the JFK sample is ~0.5 s
-(~22x real time) on Snapdragon X Elite.
+compiles graphs to the Hexagon NPU (~15 s); inference on the JFK sample is ~0.5 s
+(~22x real time) on Snapdragon X Elite. Requesting `gpu` falls back to CPU (DirectML is
+dormant on ARM64 — see caveats).
 
 ## Model store (Hugging Face)
 
@@ -294,10 +330,10 @@ as designed.
 
 `results/benchmark-results.csv` is the cross-machine ledger (see `results/README.md`):
 every machine appends its own canonical rows with the same schema, so results from
-different hardware concatenate without any code changes. It already had one full
-NPU/GPU/CPU × fp32/fp16/int8/int4 sweep from a real Intel NPU/GPU laptop; this machine
-added its own CPU-only rows on top (same clip `ls_000`, same `--ref`, `runs=2` — matched
-methodology, so the comparison below is apples-to-apples, not vibes):
+different hardware concatenate without any code changes. **The ledger has been reset to a
+blank slate** (header only) to start fresh on the unified self-selecting binary — rerun the
+loop below on each machine to repopulate it. The tables in this section are **prior
+measurements retained as analysis**, not the current ledger contents:
 
 Every row now also self-identifies the exact chip (`device_full_name`), not just the
 logical `NPU`/`GPU`/`CPU` class — the Intel backend queries OpenVINO's
@@ -357,13 +393,23 @@ appended to by multiple machines.
 
 ## Status / caveats
 
-- **Intel** and **AMD** backends are implemented. Qualcomm remains a structural
-  scaffold with clearly-marked TODOs and compiles as a throwing stub by default.
-- AMD currently supports CPU and NPU. GPU is not wired.
+- **Intel**, **AMD**, and **Qualcomm** are all implemented. Qualcomm QNN runs through the
+  unified `ort_static` backend on **native ARM64** and is validated end-to-end on Snapdragon
+  X Elite (QNN NPU, GPU->CPU fallback). The standalone `qualcomm` backend is retained only
+  for x64-emulated scenarios.
+- **DirectML is dormant on ARM64.** `Microsoft.ML.OnnxRuntime.DirectML` is capped at 1.24.x,
+  which is ABI-incompatible with the ORT 1.27 base the QNN plugin needs, so the ARM64 binary
+  ships CPU + QNN only (GPU falls back to CPU). The DirectML code path is compiled in and
+  activates automatically once a compatible ARM64 DML/WinML build exists.
+- **x64 vendor validation is pending hardware.** The unified selection is validated on ARM64;
+  the Intel (OpenVINO EP) and AMD (VitisAI) x64 paths are code-complete and share the same
+  source, but the OVEP-vs-VitisAI runtime packs live at different ORT versions and are
+  validated on their own machines, not merged into one x64 runtime.
 - 16 kHz mono WAV only (no resampler).
 - OpenVINO's `GPU` device only drives **Intel** GPUs (integrated or Arc/Flex, via
-  Level Zero/oneAPI); it will not use an NVIDIA/AMD GPU even if one is present.
-  `CPU` runs on any AVX2 x86_64 chip, Intel or not — it's the universal fallback.
+  Level Zero/oneAPI); it will not use an NVIDIA/AMD GPU even if one is present. DirectML is
+  the portable GPU path (any DX12 GPU). `CPU` runs on any AVX2 x86_64 (or ARM64) chip — it's
+  the universal fallback.
 - Exporting variants (`export-variants.ps1` / `get-model.ps1`) needs `optimum-intel`,
   which currently breaks on **Python 3.14+** (`NormalizedConfig.__init__() got multiple
   values for argument 'allow_new'` — a `functools.partial`-as-descriptor change in

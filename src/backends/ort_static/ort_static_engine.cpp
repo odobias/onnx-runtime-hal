@@ -74,34 +74,35 @@ std::string lower(std::string s) {
     return s;
 }
 
-// Logical device -> preferred ORT execution provider. Vendor-aware and
-// compile-gated:
-//  * WHISPER_HAL_OPENVINO (Intel): NPU/GPU/CPU all route through the OpenVINO EP.
-//    The concrete OpenVINO device_type is carried in the token ("openvino:NPU")
-//    so the NPU->GPU->CPU fallback chain steps devices, not just providers.
-//  * WHISPER_HAL_QUALCOMM (Snapdragon): NPU -> QNN.
-//  * otherwise (AMD): NPU -> VitisAI bridge EP.
-std::string provider_for(Device device) {
-#ifdef WHISPER_HAL_OPENVINO
+// Ordered EP candidates for a logical device. Every vendor EP is compiled into
+// the same binary (their Append* calls resolve through the ORT API table at
+// runtime, so they cost nothing until tried and simply throw "provider not
+// available" on the wrong host). That is what makes ONE build self-select across
+// Intel / AMD / Qualcomm / any-DX12-GPU: the constructor walks these candidates
+// and keeps the first that actually builds a session. Only the QNN plugin path
+// is compile-gated, because it needs the newer plugin-EP API that ships in the
+// ARM64/1.27 ORT and is not present in the older x64 vendor ORT builds.
+std::vector<std::string> providers_for(Device device) {
     switch (device) {
-        case Device::CPU: return "openvino:CPU";
-        case Device::GPU: return "openvino:GPU";
-        case Device::NPU: return "openvino:NPU";
-    }
-    return "openvino:CPU";
-#else
-    switch (device) {
-        case Device::CPU: return "CPUExecutionProvider";
-        case Device::GPU: return "DmlExecutionProvider";
-        case Device::NPU:
+        case Device::NPU: {
+            std::vector<std::string> v;
 #ifdef WHISPER_HAL_QUALCOMM
-            return kQnnEpName;
-#else
-            return "VitisAIExecutionProvider";
+            v.push_back(kQnnEpName);              // Qualcomm Hexagon (Snapdragon)
 #endif
+            v.push_back("VitisAIExecutionProvider");  // AMD XDNA (Ryzen AI)
+            v.push_back("openvino:NPU");              // Intel AI Boost
+            return v;
+        }
+        case Device::GPU:
+            // Portable GPU: DirectML drives any DX12 GPU (Intel/AMD/NVIDIA/Adreno);
+            // OpenVINO GPU is the Intel-specific alternative when DML is absent.
+            return {"DmlExecutionProvider", "openvino:GPU"};
+        case Device::CPU:
+        default:
+            // Portable CPU baseline: the same EP on every vendor keeps CPU numbers
+            // directly comparable across machines.
+            return {"CPUExecutionProvider"};
     }
-    return "CPUExecutionProvider";
-#endif
 }
 
 // Human-facing runtime tag for the shared benchmark schema, derived from the EP
@@ -136,15 +137,26 @@ std::string cache_safe(std::string s) {
 // always produces a result on whatever hardware/drivers are actually present.
 std::vector<std::string> fallback_chain(const EngineOptions& options) {
     if (!options.device_override.empty()) return {options.device_override};
+    std::vector<std::string> chain;
+    const auto add = [&](Device d) {
+        for (auto& p : providers_for(d)) chain.push_back(p);
+    };
     switch (options.device) {
         case Device::NPU:
-            return {provider_for(Device::NPU), provider_for(Device::GPU), provider_for(Device::CPU)};
+            add(Device::NPU);
+            add(Device::GPU);
+            add(Device::CPU);
+            break;
         case Device::GPU:
-            return {provider_for(Device::GPU), provider_for(Device::CPU)};
+            add(Device::GPU);
+            add(Device::CPU);
+            break;
         case Device::CPU:
         default:
-            return {provider_for(Device::CPU)};
+            add(Device::CPU);
+            break;
     }
+    return chain;
 }
 
 #ifdef WHISPER_HAL_QUALCOMM

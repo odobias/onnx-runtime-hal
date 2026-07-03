@@ -13,18 +13,10 @@ load time, latency and quality.
 
 ## Results
 
+_Blank slate — rerun the experiments to repopulate. Raw numbers land in `onnx-portability.csv`._
+
 | Runtime | Device | Cold load | Warm load (cache) | Hot infer (mean) | WER | CER | Conf |
 |---|---|---|---|---|---|---|---|
-| optimum `generate()` (ORT) | CPU | 1.16 s | — | 13910 ms | 8.58% | 4.53% | -0.164 |
-| raw ORT KV-cache loop | CPU | 1.45 s | — | 2029 ms | 8.58% | 4.53% | -0.164 |
-| **OpenVINO, dyn KV-cache** | CPU | 1.85 s | **0.32 s** | **527 ms** | 8.58% | 4.53% | -0.164 |
-| **OpenVINO, dyn KV-cache** | GPU | 16.39 s | **0.18 s** | **316 ms** | 8.58% | 4.53% | -0.164 |
-| OpenVINO, dyn KV-cache | NPU | ❌ compile fail | — | — | — | — | — |
-| **OpenVINO, stateful KV** | CPU | 0.82 s | 0.79 s | **347 ms** | 8.58% | 4.53% | -0.164 |
-| OpenVINO, stateful KV | GPU | 7.11 s | 0.68 s | 653 ms | 8.58% | 4.53% | -0.164 |
-| OpenVINO, stateful KV | NPU | ❌ compile fail | — | — | — | — | — |
-| **OpenVINO, static no-KV** | NPU | 9.18 s | **0.70 s** | 970 ms | 9.57% | 5.10% | -0.168 |
-| _baseline_ OV-IR GenAI (not ONNX) | NPU | 10.02 s | 0.70 s | 137 ms | 9.57% | 4.46% | — |
 
 ## Findings
 
@@ -74,14 +66,10 @@ the mel filterbank is computed in-process (librosa Slaney bank) so the neutral
 export needs no baked-in `mel_filters`. Single clip = `jfk.wav` (11 s, 25 tokens),
 `maxlen=128`, greedy + suppress. Rows land in `benchmark-results.csv`.
 
+_Blank slate — rerun to repopulate._
+
 | Device | mel | Hot infer (mean) | xRT | WER | Conf |
 |---|---|---|---|---|---|
-| **NPU** | fft | **234 ms** | **47x** | 0.0% | -0.133 |
-| NPU | naive | 452 ms | 24x | 0.0% | -0.133 |
-| **GPU** | fft | **166 ms** | **66x** | 0.0% | -0.133 |
-| GPU | naive | 334 ms | 33x | 0.0% | -0.133 |
-| CPU | fft | 1616 ms | 6.8x | 0.0% | -0.133 |
-| CPU | naive | 1549 ms | 7.1x | 0.0% | -0.133 |
 
 WER 0.0% on `jfk.wav` (vs 9.57% micro-averaged over the 12-clip LibriSpeech set
 above — single clean clip, not a contradiction). Confidence -0.133 matches the
@@ -92,11 +80,10 @@ mel bank and the Bluestein FFT reproduce whisper's front-end exactly.
 
 Per-stage split of the naive-mel run (maxlen=128, 25 tokens):
 
+_Blank slate — rerun with `WHISPER_ONNX_PROFILE=1` to repopulate._
+
 | stage | time | note |
 |---|---|---|
-| **mel spectrogram** | ~180 ms | naive scalar DFT — the *dominant* cost |
-| encoder | ~19 ms | cheap |
-| decode loop (25 tok) | ~170 ms | ~7 ms/tok, fixed-cost bound (see below) |
 
 Two findings that overturned the intuitive "the KV cache is the problem":
 
