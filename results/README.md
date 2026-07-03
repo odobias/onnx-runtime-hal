@@ -72,10 +72,13 @@ Each benchmark run emits a detailed inventory of the chips it ran on to
 `host-info.json` (next to the report: `results/` for `benchmark.ps1`,
 `build/reports/` for `compare-devices.ps1`) and a **Host hardware** section in the
 Markdown report. It captures CPU (name, vendor, cores/threads, clock), every display
-adapter (name, driver, approximate VRAM), and the NPU (name, manufacturer, driver
-version, PnP instance id), plus RAM and OS. Caveats: `Win32_Processor.MaxClockSpeed`
-is the nominal/base clock, not turbo; `AdapterRAM` is a uint32 that saturates around
-4 GB, so `vram_mb_approx` is a lower bound for large GPUs.
+adapter (name, driver, approximate VRAM), and the NPU (name, architecture, PCI id,
+manufacturer, driver version, PnP instance id), plus RAM and OS. Caveats:
+`Win32_Processor.MaxClockSpeed` is the nominal/base clock, not turbo; `AdapterRAM` is
+a uint32 that saturates around 4 GB, so `vram_mb_approx` is a lower bound for large
+GPUs. The NPU `architecture` (e.g. "AMD XDNA 2") is **derived** from a PCI
+vendor:device lookup, not reported by Windows — the driver only exposes a generic
+name like "NPU Compute Accelerator Device" — so verify it against the raw `pci_id`.
 
 ## Quantization sweep
 
