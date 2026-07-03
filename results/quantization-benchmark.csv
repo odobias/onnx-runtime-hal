@@ -1,4 +1,0 @@
-﻿"variant","precision","backend","device","status","clips","size_mb","cold_s","hot_s","mean_ms","rtf","xrt","tps","avg_logprob","wer_pct","cer_pct","error"
-"whisper-tiny-amd","fp32-static","amd","NPU","ok","1","151.8","223.31","1.82","1014.7","0.1733","5.8","-1","0","5.88","4.49",""
-"whisper-tiny-amd","fp32-static","amd","GPU","unsupported/error","0","151.8",,,,,,,,,,"Engine creation failed: AMD backend currently supports CPU and NPU; GPU is not wired"
-"whisper-tiny-amd","fp32-static","amd","CPU","ok","1","151.8","0.26","0.29","2483.6","0.4242","2.4","-1","0","5.88","4.49",""

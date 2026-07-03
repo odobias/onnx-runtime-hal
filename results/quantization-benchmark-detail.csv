@@ -1,3 +1,0 @@
-﻿"variant","precision","backend","device","clip","mean_ms","rtf","avg_logprob","wer","cer"
-"whisper-tiny-amd","fp32-static","amd","NPU","ls_000","1014.7","0.1733","0.0000","5.88","4.49"
-"whisper-tiny-amd","fp32-static","amd","CPU","ls_000","2483.6","0.4242","0.0000","5.88","4.49"
