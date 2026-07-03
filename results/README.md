@@ -47,6 +47,7 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 - `model_format`: `onnx` (vendor-neutral) or `ov-ir` (Intel OpenVINO IR).
 - `decode_strategy`: how the autoregressive loop runs — `stateful-kv` (OV GenAI), `dynamic-kv` (growing KV cache), `static-no-kv` (fixed-context recompute, NPU-compilable), `raw-loop` (hand-rolled ORT), `optimum-generate` (optimum's Python loop).
 - `max_context`: static decoder context length for `static-no-kv`; blank when the shape is dynamic or N/A.
+- `power_source`: whether the machine was on wall power or battery when the run was recorded — `ac`, `battery`, or `unknown`. Read from `GetSystemPowerStatus` (C++) / `SystemInformation.PowerStatus` (PowerShell) at run time. Battery means throttled CPU/NPU clocks, so **do not compare an `ac` row against a `battery` row and pretend the delta is architectural.** Rows written before this column existed are blank (state unknown).
 
 The `cold_load_seconds`/`warm_load_seconds` columns are retained for compatibility, but new
 analysis should use `cold_start_seconds`/`hot_start_seconds`. Do not mix startup time with

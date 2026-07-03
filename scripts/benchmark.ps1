@@ -59,6 +59,19 @@ function Get-Optional($Object, [string]$Name, $Default = $null) {
     return $Default
 }
 
+# Best-effort AC vs battery detection (battery => throttled clocks, so a run on
+# battery can silently skew comparisons). "ac" / "battery" / "unknown".
+function Get-PowerSource {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        switch ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus) {
+            'Online' { return 'ac' }
+            'Offline' { return 'battery' }
+            default { return 'unknown' }
+        }
+    } catch { return 'unknown' }
+}
+
 function Write-SharedResultRow($Path, [object]$Row) {
     $columns = @(
         "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name", "device_full_name",
@@ -67,7 +80,7 @@ function Write-SharedResultRow($Path, [object]$Row) {
         "label", "model_size_mb", "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps",
         "wer", "cer", "transcription",
         "runtime", "model_format", "decode_strategy", "max_context", "eval_clips", "status",
-        "cold_start_seconds", "hot_start_seconds"
+        "cold_start_seconds", "hot_start_seconds", "power_source"
     )
 
     $parent = Split-Path $Path -Parent
@@ -169,7 +182,7 @@ foreach ($v in $manifestObj.variants) {
                 label = $v.id; model_size_mb = $v.size_mb; avg_logprob = ""; ttft_ms = ""; tpot_ms = ""; throughput_tps = ""
                 wer = ""; cer = ""; transcription = ""; cold_start_seconds = ""; hot_start_seconds = ""; eval_clips = 0
                 status = "$(if ($status -eq 'ok') { 'fail' } else { $status })$(if ($errMsg) { " ($errMsg)" })"
-                runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""
+                runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""; power_source = (Get-PowerSource)
             })
             continue
         }
@@ -213,6 +226,7 @@ foreach ($v in $manifestObj.variants) {
             throughput_tps = $meanTps; wer = $wer; cer = $cer; transcription = $lastRow.text
             cold_start_seconds = $coldLoad; hot_start_seconds = $hotLoad; eval_clips = $rows.Count; status = "ok"
             runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""
+            power_source = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-PowerSource })
         })
         Write-Host ("   ok: {0} clips | {1} ms | WER {2}% | conf {3}" -f `
                 $rows.Count, [math]::Round($meanMs, 1),
