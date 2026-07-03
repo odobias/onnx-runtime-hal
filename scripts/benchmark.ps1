@@ -22,6 +22,7 @@ param(
     # vendor. A machine has one NPU brand, so by default we skip other vendors' variants.
     [ValidateSet("auto", "all", "intel", "amd", "qualcomm")][string]$NpuVendor = "auto",
     [string]$Configuration = "Release",
+    [ValidateSet("x64", "ARM64")][string]$BuildPlatform = "",
     # Skip the self-contained bootstrap (build + fetch models/eval/audio). Use when
     # you have already prepared the environment and want the sweep to start faster.
     [switch]$SkipBootstrap,
@@ -44,7 +45,10 @@ Initialize-BenchmarkConsole
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Manifest) { $Manifest = Join-Path $root "models\manifest.json" }
 if (-not $EvalSet) { $EvalSet = Join-Path $root "models\eval\eval.jsonl" }
-$exe = Join-Path $root "build\x64\$Configuration\WhisperNpuHal.App.exe"
+if (-not $BuildPlatform) {
+    $BuildPlatform = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq "Arm64") { "ARM64" } else { "x64" }
+}
+$exe = Join-Path $root "build\$BuildPlatform\$Configuration\WhisperNpuHal.App.exe"
 
 # Detect the host once, up front: bootstrap needs it to pick build flags + models,
 # and the sweep reuses it for the vendor filter and the hardware banner.

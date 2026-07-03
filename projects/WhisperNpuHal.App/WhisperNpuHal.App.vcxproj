@@ -9,6 +9,14 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
 
   <PropertyGroup Label="Globals">
@@ -74,54 +82,49 @@
     <Message Importance="high" Text="Copied Intel OpenVINO runtime to $(OutDir)" />
   </Target>
 
-  <!-- Copy generic ONNX Runtime DLLs for the static ONNX backend. Extra provider DLLs
-       are copied when present; plain CPU ORT installs may only have onnxruntime.dll. -->
-  <Target Name="CopyOrtRuntime" AfterTargets="Build" Condition="'$(EnableOrt)'=='true'">
+  <!-- One unified runtime-staging step for the ONNX Runtime backend and every
+       execution provider bundled into this build. All entries are Exists()-gated,
+       so a given build (e.g. ARM64 CPU+QNN) copies exactly the DLLs it has and
+       silently skips EPs it wasn't built with. This is what makes the output
+       folder a self-contained, one-binary-carries-everything package. -->
+  <Target Name="CopyUnifiedRuntime" AfterTargets="Build"
+          Condition="'$(EnableOrt)'=='true' or '$(EnableQualcomm)'=='true' or '$(EnableAmd)'=='true'">
     <ItemGroup>
-      <OrtRuntime Include="$(OrtBinDir)\onnxruntime*.dll" />
-      <OrtRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
+      <!-- Core ONNX Runtime + DirectML (GPU) -->
+      <UnifiedRuntime Include="$(OrtBinDir)\onnxruntime*.dll" Condition="'$(OrtBinDir)'!=''" />
+      <UnifiedRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
+      <!-- Qualcomm QNN plugin EP (Hexagon NPU). Wildcards capture the provider,
+           every Qnn* backend/stub, the Hexagon DSP skeletons and their catalogs. -->
+      <UnifiedRuntime Include="$(QnnEpDir)\onnxruntime_providers_qnn.dll" Condition="Exists('$(QnnEpDir)\onnxruntime_providers_qnn.dll')" />
+      <UnifiedRuntime Include="$(QnnEpDir)\Qnn*.dll" Condition="Exists('$(QnnEpDir)')" />
+      <UnifiedRuntime Include="$(QnnEpDir)\Genie.dll" Condition="Exists('$(QnnEpDir)\Genie.dll')" />
+      <UnifiedRuntime Include="$(QnnEpDir)\*Skel.so" Condition="Exists('$(QnnEpDir)')" />
+      <UnifiedRuntime Include="$(QnnEpDir)\*.cat" Condition="Exists('$(QnnEpDir)')" />
+      <!-- AMD Ryzen AI VitisAI EP (XDNA NPU) -->
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\onnxruntime*.dll" Condition="'$(EnableAmd)'=='true' and '$(OrtAmdBinDir)'!=''" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\dyn_dispatch_core.dll" Condition="Exists('$(OrtAmdBinDir)\dyn_dispatch_core.dll')" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\dyn_bins.dll" Condition="Exists('$(OrtAmdBinDir)\dyn_bins.dll')" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\vaiml.dll" Condition="Exists('$(OrtAmdBinDir)\vaiml.dll')" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\aiecompiler_client.dll" Condition="Exists('$(OrtAmdBinDir)\aiecompiler_client.dll')" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\DirectML.dll" Condition="Exists('$(OrtAmdBinDir)\DirectML.dll')" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\z.dll" Condition="Exists('$(OrtAmdBinDir)\z.dll')" />
+      <UnifiedRuntime Include="$(OrtAmdBinDir)\zstd.dll" Condition="Exists('$(OrtAmdBinDir)\zstd.dll')" />
     </ItemGroup>
-    <Copy SourceFiles="@(OrtRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(OrtRuntime)' != ''" />
-    <Message Importance="high" Text="Copied ONNX Runtime to $(OutDir)" Condition="'@(OrtRuntime)' != ''" />
+    <Copy SourceFiles="@(UnifiedRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(UnifiedRuntime)' != ''" />
+    <Message Importance="high" Text="Staged unified ONNX Runtime + EP runtime (%(UnifiedRuntime.Filename)%(UnifiedRuntime.Extension)) to $(OutDir)" Condition="'@(UnifiedRuntime)' != ''" />
   </Target>
 
-  <!-- Copy RyzenAI / ONNX Runtime VitisAI EP runtime DLLs next to the exe so the
-       AMD backend runs without an activated Python or conda environment. -->
-  <!-- Copy ONNX Runtime + Plugin QNN EP runtime for the Qualcomm backend. -->
-  <Target Name="CopyQualcommRuntime" AfterTargets="Build" Condition="'$(EnableQualcomm)'=='true'">
+  <!-- Bundle the one portable static ONNX model into models/ next to the exe so
+       the build output is a self-contained package that runs from its own folder.
+       Gated on the model being present; disable with /p:BundleModel=false. -->
+  <Target Name="BundleModel" AfterTargets="Build"
+          Condition="'$(BundleModel)'=='true' and Exists('$(BundledModelDir)')">
     <ItemGroup>
-      <QualcommRuntime Include="$(OrtBinDir)\onnxruntime.dll" Condition="Exists('$(OrtBinDir)\onnxruntime.dll')" />
-      <QualcommRuntime Include="$(OrtBinDir)\onnxruntime_providers_shared.dll" Condition="Exists('$(OrtBinDir)\onnxruntime_providers_shared.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\onnxruntime_providers_qnn.dll" Condition="Exists('$(QnnEpDir)\onnxruntime_providers_qnn.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\QnnHtp.dll" Condition="Exists('$(QnnEpDir)\QnnHtp.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\QnnHtpNetRunExtensions.dll" Condition="Exists('$(QnnEpDir)\QnnHtpNetRunExtensions.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\QnnSystem.dll" Condition="Exists('$(QnnEpDir)\QnnSystem.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\QnnIr.dll" Condition="Exists('$(QnnEpDir)\QnnIr.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\QnnCpu.dll" Condition="Exists('$(QnnEpDir)\QnnCpu.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\QnnGpu.dll" Condition="Exists('$(QnnEpDir)\QnnGpu.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\HtpPrepare.dll" Condition="Exists('$(QnnEpDir)\HtpPrepare.dll')" />
-      <QualcommRuntime Include="$(QnnEpDir)\Genie.dll" Condition="Exists('$(QnnEpDir)\Genie.dll')" />
+      <ModelPayload Include="$(BundledModelDir)\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(QualcommRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(QualcommRuntime)' != ''" />
-    <Message Importance="high" Text="Copied Qualcomm QNN runtime to $(OutDir)" Condition="'@(QualcommRuntime)' != ''" />
-  </Target>
-
-  <Target Name="CopyAmdRuntime" AfterTargets="Build" Condition="'$(EnableAmd)'=='true'">
-    <ItemGroup>
-      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_providers_shared.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_providers_vitisai.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_vitisai_ep.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime_vitis_ai_custom_ops.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\dyn_dispatch_core.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\dyn_bins.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\vaiml.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\aiecompiler_client.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\DirectML.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\z.dll" />
-      <AmdRuntime Include="$(OrtAmdBinDir)\zstd.dll" />
-    </ItemGroup>
-    <Copy SourceFiles="@(AmdRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="Copied AMD RyzenAI runtime to $(OutDir)" />
+    <Copy SourceFiles="@(ModelPayload)"
+          DestinationFiles="@(ModelPayload->'$(OutDir)models\whisper-tiny-en-static-onnx\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" Condition="'@(ModelPayload)' != ''" />
+    <Message Importance="high" Text="Bundled static ONNX model -> $(OutDir)models\whisper-tiny-en-static-onnx" Condition="'@(ModelPayload)' != ''" />
   </Target>
 </Project>
