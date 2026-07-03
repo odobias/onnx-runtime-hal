@@ -7,6 +7,8 @@ hardware-independent runner with swappable per-platform backends.
 - **Intel** — OpenVINO GenAI (NPU / GPU / CPU). **Working reference implementation.**
 - **AMD** — Ryzen AI / XDNA via ONNX Runtime + VitisAI EP. **Working ONNX implementation**
   for AMD's `whisper-tiny-onnx-npu` model.
+- **ONNX Runtime static** — unchanged `whisper-tiny-en-static-onnx` via ORT providers.
+  **Working on CPU and DirectML GPU; VitisAI NPU currently fails in the provider.**
 - **Qualcomm** — Snapdragon Hexagon via ONNX Runtime + QNN EP. **Prepared scaffold.**
 
 Build system: **MSBuild / Visual Studio 2026** (`WhisperNpuHal.sln`).
@@ -19,6 +21,7 @@ include/whisper_npu/whisper_engine.hpp   Public API: IWhisperEngine, Backend, fa
 include/whisper_npu/audio.hpp            Dependency-free 16 kHz mono WAV loader
 src/factory.cpp                          create_engine() + backend availability
 src/backends/intel/                      OpenVINO GenAI backend (real)
+src/backends/ort_static/                 Unchanged static ONNX via ONNX Runtime
 src/backends/amd/                        Ryzen AI / VitisAI backend
 src/backends/qualcomm/                   QNN backend (scaffold)
 include/whisper_npu/metrics.hpp          Backend-neutral WER/CER + text normalization
@@ -40,9 +43,9 @@ compiled with their SDK still link (as throwing stubs) so the repo always builds
 The first NPU load compiles the model to a device blob (slow, ~seconds). Set a cache
 directory (`EngineOptions::cache_dir`, CLI `--cache <dir>`) and OpenVINO persists that
 blob, so subsequent **hot** starts import it and are near-instant. The CLI loads the
-engine twice (cold then hot) and prints both times plus the speedup. AMD/Qualcomm
-backends have matching cache hooks stubbed (VitisAI EP context cache / QNN context
-binary) for when they're implemented.
+engine twice (cold then hot) and prints both times plus the speedup. AMD/VitisAI uses
+the ORT provider cache when available; Qualcomm has matching QNN context-binary hooks
+for when the real backend lands.
 
 ## Build & run (PowerShell 7)
 
@@ -82,6 +85,22 @@ Run directly if you prefer:
 ```powershell
 .\build\x64\Release\WhisperNpuHal.App.exe <model_dir> <audio.wav> intel npu 5 --cache .\build\cache\npu
 ```
+
+Run the unchanged static ONNX export through ONNX Runtime:
+
+```powershell
+.\scripts\build.ps1 -EnableOrt -DisableIntel
+.\scripts\run.ps1 -Backend onnx-static -Device cpu -Runs 1
+.\scripts\run.ps1 -Backend onnx-static -Device gpu -Runs 1
+```
+
+`onnx-static` uses CPUExecutionProvider for CPU and DirectML for GPU. Point `OrtDir`
+at a platform ONNX Runtime SDK if the default Ryzen AI ORT location is not present.
+On this AMD
+Ryzen AI machine, the VitisAI NPU path compiles for about two minutes and then hard-crashes
+inside the provider with `cannot find producer ... last_hidden_state`; the backend now
+fails that device cleanly by default. Set `WHISPER_HAL_ORT_EXPERIMENTAL_NPU=1` only if
+you intentionally want to reproduce the provider failure.
 
 ## Model store (Hugging Face)
 
