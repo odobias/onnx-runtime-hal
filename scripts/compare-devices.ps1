@@ -52,6 +52,8 @@ if (-not $manifestObj.variants -or $manifestObj.variants.Count -eq 0) {
 # machine can actually run (one NPU brand per host).
 $platform = Get-BenchmarkPlatform
 $hostVendor = Resolve-BenchmarkHostVendor $NpuVendor $platform
+$hardware = Get-BenchmarkHardware
+Write-BenchmarkHardwareBanner $hardware
 $supported = @($manifestObj.variants | Where-Object { Test-BenchmarkVariantSupported -Backend $_.backend -HostVendor $hostVendor })
 
 $v = $null
@@ -172,6 +174,12 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("- Confidence = mean per-token log-prob (self-reported, not calibrated truth).")
 [void]$md.AppendLine("- Cold start = first engine creation after cache deletion; hot start = second engine creation in the same process after cache population.")
 [void]$md.AppendLine("")
+[void]$md.AppendLine("## Host hardware")
+[void]$md.AppendLine("")
+foreach ($line in (Get-BenchmarkHardwareMarkdown $hardware)) { [void]$md.AppendLine($line) }
+[void]$md.AppendLine("")
+[void]$md.AppendLine("_Full machine-readable inventory: ``build/reports/host-info.json``._")
+[void]$md.AppendLine("")
 [void]$md.AppendLine("| Device | Chip | Status | Threads | Cold s | Hot s | Mean ms | xRT | Speedup | tok/s | Conf | WER % | CER % |")
 [void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 foreach ($r in $rows) {
@@ -188,9 +196,12 @@ foreach ($r in $rows) {
     }
 }
 Set-Content -Path $mdPath -Value $md.ToString() -Encoding UTF8
+$hostInfoPath = Join-Path $reportsDir "host-info.json"
+Write-BenchmarkHostInfo $hostInfoPath $hardware
 
 Write-Host "`nReports written:" -ForegroundColor Green
 Write-Host "  $csvPath"
 Write-Host "  $mdPath"
+Write-Host "  $hostInfoPath"
 Write-Host ""
 $rows | Format-Table device, chip, status, threads, cold_s, hot_s, mean_ms, xrt, speedup, wer_pct -AutoSize

@@ -56,6 +56,10 @@ $cacheRoot = Join-Path $root "cache"
 $platform = Get-BenchmarkPlatform
 $hostVendor = Resolve-BenchmarkHostVendor $NpuVendor $platform
 
+# Detailed CPU/GPU/NPU inventory of the machine these results were produced on.
+$hardware = Get-BenchmarkHardware
+Write-BenchmarkHardwareBanner $hardware
+
 $summary = @()
 $detail = @()
 
@@ -194,6 +198,12 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("- WER/CER micro-averaged over clips after normalization.")
 [void]$md.AppendLine("- Cold start = first engine creation after cache deletion; hot start = second engine creation in the same process after cache population.")
 [void]$md.AppendLine("")
+[void]$md.AppendLine("## Host hardware")
+[void]$md.AppendLine("")
+foreach ($line in (Get-BenchmarkHardwareMarkdown $hardware)) { [void]$md.AppendLine($line) }
+[void]$md.AppendLine("")
+[void]$md.AppendLine("_Full machine-readable inventory: ``results/host-info.json``._")
+[void]$md.AppendLine("")
 [void]$md.AppendLine("| Variant | Prec | Backend | Device | Status | Size MB | Cold s | Hot s | Mean ms | xRT | tok/s | Conf | WER % | CER % |")
 [void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
 foreach ($s in $summary) {
@@ -206,10 +216,13 @@ foreach ($s in $summary) {
 [void]$md.AppendLine("")
 [void]$md.AppendLine("_Caching: cold = first compile, hot = same-process reload from populated cache. See ``cache/`` and backend-specific compiled-model cache hooks._")
 Set-Content -Path $mdPath -Value $md.ToString() -Encoding UTF8
+$hostInfoPath = Join-Path $reportsDir "host-info.json"
+Write-BenchmarkHostInfo $hostInfoPath $hardware
 
 Write-Host "`nReports written:" -ForegroundColor Green
 Write-Host "  $csvPath"
 Write-Host "  $detailCsv"
 Write-Host "  $mdPath"
+Write-Host "  $hostInfoPath"
 Write-Host ""
 $summary | Format-Table variant, precision, device, status, size_mb, cold_s, hot_s, mean_ms, xrt, avg_logprob, wer_pct -AutoSize

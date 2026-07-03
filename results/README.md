@@ -66,6 +66,17 @@ appending aggregate rows.
 The trailing metric columns are backend-neutral and optional: each backend fills only what
 it can measure. This keeps one schema across machines so files concatenate cleanly.
 
+## Host hardware
+
+Each benchmark run emits a detailed inventory of the chips it ran on to
+`host-info.json` (next to the report: `results/` for `benchmark.ps1`,
+`build/reports/` for `compare-devices.ps1`) and a **Host hardware** section in the
+Markdown report. It captures CPU (name, vendor, cores/threads, clock), every display
+adapter (name, driver, approximate VRAM), and the NPU (name, manufacturer, driver
+version, PnP instance id), plus RAM and OS. Caveats: `Win32_Processor.MaxClockSpeed`
+is the nominal/base clock, not turbo; `AdapterRAM` is a uint32 that saturates around
+4 GB, so `vram_mb_approx` is a lower bound for large GPUs.
+
 ## Quantization sweep
 
 `scripts\benchmark.ps1` compares entries from `models\manifest.json` across
