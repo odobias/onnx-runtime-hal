@@ -134,14 +134,13 @@
     <Message Importance="high" Text="Bundled static ONNX model -> $(OutDir)models\whisper-tiny-en-static-onnx" Condition="'@(ModelPayload)' != ''" />
   </Target>
 
-  <!-- Bundle the AMD Ryzen AI (VitisAI) model into the package so an EnableAmd build
-       runs the full AMD benchmark (the amd-native variant plus the unified `auto`
-       path) from its own folder. The static ONNX model is already bundled by
-       BundleModel; this adds the vendor model (with its vitisai_config_*.json). Gated
-       on EnableAmd + presence; a checkout without it fetched simply skips (run
-       .\scripts\get-amd-model.ps1 once before publishing). Disable with /p:BundleModel=false. -->
+  <!-- Optionally bundle the AMD Ryzen AI (VitisAI) model so an EnableAmd build can
+       also run the amd-native benchmark variant offline. The unified auto/onnx-static
+       path does NOT need this (it runs the portable static model), so it is opt-in:
+       off by default, enable with /p:BundleAmdModel=true. Also Exists-gated on the
+       model being fetched (run .\scripts\get-amd-model.ps1 once before publishing). -->
   <Target Name="BundleAmdModel" AfterTargets="Build"
-          Condition="'$(BundleModel)'=='true' and '$(EnableAmd)'=='true' and Exists('$(WhisperHalRoot)models\whisper-tiny-amd')">
+          Condition="'$(BundleAmdModel)'=='true' and '$(EnableAmd)'=='true' and Exists('$(WhisperHalRoot)models\whisper-tiny-amd')">
     <ItemGroup>
       <AmdModelPayload Include="$(WhisperHalRoot)models\whisper-tiny-amd\**\*" />
     </ItemGroup>
