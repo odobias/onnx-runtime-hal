@@ -16,6 +16,16 @@
     <EnableAmd Condition="'$(EnableAmd)'==''">false</EnableAmd>
     <EnableQualcomm Condition="'$(EnableQualcomm)'==''">false</EnableQualcomm>
 
+    <!-- Intel native path through ONNX Runtime's OpenVINO EP (OVEP). This makes the
+         unified ORT binary cover Intel NPU/GPU/CPU too, alongside AMD (VitisAI) and
+         Qualcomm (QNN). It requires the vendored ORT+OVEP package (ORT 1.24.1 built
+         against OpenVINO 2025.4.1) under third_party (see scripts\setup-ovep.ps1).
+         EnableOvep implies EnableOrt and is mutually exclusive with the OpenVINO
+         GenAI backend (EnableIntel): both drag in openvino.dll at incompatible
+         versions, so a single process can host only one. -->
+    <EnableOvep Condition="'$(EnableOvep)'==''">false</EnableOvep>
+    <EnableOrt Condition="'$(EnableOrt)'=='' and '$(EnableOvep)'=='true'">true</EnableOrt>
+
     <!-- Bundle the portable static ONNX model next to the exe so the build output
          is a self-contained package. Set /p:BundleModel=false to skip the (large)
          copy during iterative dev builds. -->

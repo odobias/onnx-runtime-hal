@@ -15,6 +15,10 @@ param(
     [ValidateSet("x64", "ARM64")][string]$Platform = "",
     [switch]$EnableAmd,
     [switch]$EnableOrt,
+    # Intel native path via ONNX Runtime's OpenVINO EP. Makes the unified ORT binary
+    # cover Intel NPU/GPU/CPU. Implies -EnableOrt and forces the OpenVINO GenAI
+    # backend OFF (they need incompatible openvino.dll versions in one process).
+    [switch]$EnableOvep,
     [switch]$DisableIntel,
     [switch]$EnableQualcomm,
     [string]$RyzenAiDir = "",
@@ -58,8 +62,14 @@ Write-Host "Using MSBuild: $($found.msbuild)" -ForegroundColor Cyan
 Write-Host ("VS install   : {0}  {1}" -f $found.vs, ($(if ($isVs2026) { '(VS 2026)' } else { '(NOT VS 2026 -- fallback)' }))) -ForegroundColor $(if ($isVs2026) { 'Green' } else { 'Yellow' })
 
 $target = if ($Rebuild) { "Rebuild" } else { "Build" }
+# OVEP and the OpenVINO GenAI backend both load openvino.dll, at versions that
+# cannot coexist in one process. Selecting OVEP therefore disables Intel-GenAI.
+if ($EnableOvep -and -not $DisableIntel) {
+    Write-Host "EnableOvep: forcing Intel (OpenVINO GenAI) backend OFF -- OVEP replaces it (openvino.dll version conflict)." -ForegroundColor Yellow
+    $DisableIntel = $true
+}
 $enableIntel = -not $DisableIntel
-$enableOrt = $EnableOrt -or $EnableAmd -or $EnableQualcomm
+$enableOrt = $EnableOrt -or $EnableOvep -or $EnableAmd -or $EnableQualcomm
 $args = @(
     $sln,
     "/t:$target",
@@ -67,6 +77,7 @@ $args = @(
     "/p:Platform=$Platform",
     "/p:EnableIntel=$([bool]$enableIntel)".ToLower(),
     "/p:EnableOrt=$([bool]$enableOrt)".ToLower(),
+    "/p:EnableOvep=$([bool]$EnableOvep)".ToLower(),
     "/p:EnableAmd=$([bool]$EnableAmd)".ToLower(),
     "/p:EnableQualcomm=$([bool]$EnableQualcomm)".ToLower(),
     "/m",
@@ -82,7 +93,8 @@ if ($OrtDir) {
 & $found.msbuild @args
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit 1 }
 
-$exe = Join-Path $root "build\$Platform\$Configuration\WhisperNpuHal.App.exe"
+$platformOutTag = if ($EnableOvep) { "$Platform-ovep" } else { $Platform }
+$exe = Join-Path $root "build\$platformOutTag\$Configuration\WhisperNpuHal.App.exe"
 Write-Host ""
 Write-Host "Built: $exe" -ForegroundColor Green
 Write-Host "Run  : .\scripts\run.ps1" -ForegroundColor Cyan

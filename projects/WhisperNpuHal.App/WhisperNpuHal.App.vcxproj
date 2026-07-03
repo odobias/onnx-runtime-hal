@@ -93,6 +93,12 @@
       <!-- Core ONNX Runtime + DirectML (GPU) -->
       <UnifiedRuntime Include="$(OrtBinDir)\onnxruntime*.dll" Condition="'$(OrtBinDir)'!=''" />
       <UnifiedRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
+      <!-- Intel OpenVINO EP (NPU/GPU/CPU). The provider DLL loads openvino.dll +
+           its plugins by colocation, so every openvino_*/tbb DLL and the plugin
+           catalog must land next to the exe. Gated on EnableOvep. -->
+      <UnifiedRuntime Include="$(OrtBinDir)\openvino*.dll" Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
+      <UnifiedRuntime Include="$(OrtBinDir)\tbb*.dll" Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
+      <UnifiedRuntime Include="$(OrtBinDir)\*.xml" Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
       <!-- Qualcomm QNN plugin EP (Hexagon NPU). Wildcards capture the provider,
            every Qnn* backend/stub, the Hexagon DSP skeletons and their catalogs. -->
       <UnifiedRuntime Include="$(QnnEpDir)\onnxruntime_providers_qnn.dll" Condition="Exists('$(QnnEpDir)\onnxruntime_providers_qnn.dll')" />
