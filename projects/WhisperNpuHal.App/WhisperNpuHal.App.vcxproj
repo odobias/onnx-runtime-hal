@@ -133,4 +133,38 @@
           SkipUnchangedFiles="true" Condition="'@(ModelPayload)' != ''" />
     <Message Importance="high" Text="Bundled static ONNX model -> $(OutDir)models\whisper-tiny-en-static-onnx" Condition="'@(ModelPayload)' != ''" />
   </Target>
+
+  <!-- Bundle the labeled eval set + sample audio next to the exe so the build output
+       can run the CPU/GPU/NPU benchmark fully offline (no fetch step). Exists-gated
+       and shares the BundleModel switch; a fresh checkout with no eval set yet simply
+       skips it (run .\scripts\get-eval-set.ps1 once before publishing). -->
+  <Target Name="BundleBenchmarkData" AfterTargets="Build" Condition="'$(BundleModel)'=='true'">
+    <ItemGroup>
+      <EvalPayload Include="$(WhisperHalRoot)models\eval\**\*" Condition="Exists('$(WhisperHalRoot)models\eval')" />
+      <SampleAudio Include="$(WhisperHalRoot)models\jfk.wav" Condition="Exists('$(WhisperHalRoot)models\jfk.wav')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(EvalPayload)"
+          DestinationFiles="@(EvalPayload->'$(OutDir)models\eval\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" Condition="'@(EvalPayload)' != ''" />
+    <Copy SourceFiles="@(SampleAudio)" DestinationFolder="$(OutDir)models" SkipUnchangedFiles="true" Condition="'@(SampleAudio)' != ''" />
+    <Message Importance="high" Text="Bundled eval set + sample audio -> $(OutDir)models" Condition="'@(EvalPayload)' != '' or '@(SampleAudio)' != ''" />
+  </Target>
+
+  <!-- App-local MSVC runtime (vcruntime140*, msvcp140*, concrt140) so the package runs
+       on a machine without the VC++ redistributable installed. The Universal CRT
+       (ucrtbase / api-ms-win-crt-*) is part of Windows 10+ and serviced by Windows
+       Update, so it is never shipped. The VC++ runtime is NOT an OS component and is
+       NOT serviced by Windows Update, hence we bake it in for a self-contained build.
+       Sources the redist from $(VCToolsRedistDir) when set, else globs the desktop
+       x64 CRT out of $(VCInstallDir)Redist (the numeric version folder; onecore and
+       the empty v14x marker folder are excluded by the single-level wildcard). -->
+  <Target Name="StageVcRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <VcCrt Include="$(VCToolsRedistDir)$(Platform)\Microsoft.VC*.CRT\*.dll" Condition="'$(VCToolsRedistDir)'!=''" />
+      <VcCrt Include="$(VCInstallDir)Redist\MSVC\*\$(Platform)\Microsoft.VC*.CRT\*.dll" Condition="'$(VCToolsRedistDir)'=='' and '$(VCInstallDir)'!=''" />
+    </ItemGroup>
+    <Copy SourceFiles="@(VcCrt)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(VcCrt)' != ''" />
+    <Message Importance="high" Text="Staged app-local MSVC runtime (%(VcCrt.Filename)%(VcCrt.Extension)) -> $(OutDir)" Condition="'@(VcCrt)' != ''" />
+    <Warning Text="StageVcRuntime: no VC++ redist DLLs found; package will rely on a system-installed VC++ runtime." Condition="'@(VcCrt)' == ''" />
+  </Target>
 </Project>
