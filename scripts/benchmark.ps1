@@ -128,9 +128,12 @@ foreach ($v in $manifestObj.variants) {
                 cold_s = $null; hot_s = $null; mean_ms = $null; rtf = $null; xrt = $null
                 tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null; error = $errMsg
             }
+            $meta = Get-BenchmarkMeta $v $v.model_dir $null $manifestObj.model
             Write-BenchmarkResultRow $Results ([pscustomobject]@{
                 timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
                 requested_backend = $v.backend; resolved_backend = ""; device = $dev; device_name = ""; device_full_name = ""
+                model_package = $meta.model_package; variant_id = $meta.variant_id; base_model = $meta.base_model
+                precision = $meta.precision; quant_method = $meta.quant_method; execution_provider = ""
                 model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = ""; runs = $Runs; warmup = 1; cache_dir = $cacheDir
                 cold_load_seconds = ""; warm_load_seconds = ""; mean_infer_seconds = ""; rtf = ""; realtime_factor = ""
                 label = $v.id; model_size_mb = $v.size_mb; avg_logprob = ""; ttft_ms = ""; tpot_ms = ""; throughput_tps = ""
@@ -158,20 +161,24 @@ foreach ($v in $manifestObj.variants) {
             cer_pct = if ($cRef) { [math]::Round(100.0 * $cer, 2) } else { $null }
             error = ""
         }
+        $meta = Get-BenchmarkMeta $v $v.model_dir $firstRow $manifestObj.model
         Write-BenchmarkResultRow $Results ([pscustomobject]@{
             timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             requested_backend = $v.backend; resolved_backend = $firstRow.backend; device = $dev
             device_name = $firstRow.device; device_full_name = $firstRow.device_full_name
+            model_package = $meta.model_package; variant_id = $meta.variant_id; base_model = $meta.base_model
+            precision = $meta.precision; quant_method = $meta.quant_method; execution_provider = $meta.execution_provider
             model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = $audioSeconds; runs = $Runs; warmup = 1; cache_dir = $cacheDir
             cold_load_seconds = $coldLoad; warm_load_seconds = $hotLoad
             mean_infer_seconds = ($meanMs / 1000.0); rtf = $meanRtf
             realtime_factor = if ($meanRtf -gt 0) { 1.0 / $meanRtf } else { "" }
-            label = $v.id; model_size_mb = $v.size_mb; avg_logprob = $meanLp
+            label = $meta.variant_id; model_size_mb = $v.size_mb; avg_logprob = $meanLp
             ttft_ms = $agg.mean_ttft_ms
             tpot_ms = $agg.mean_tpot_ms
             throughput_tps = $meanTps; wer = $wer; cer = $cer; transcription = $lastRow.text
             cold_start_seconds = $coldLoad; hot_start_seconds = $hotLoad; eval_clips = $rows.Count; status = "ok"
-            runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""
+            runtime = $meta.runtime; model_format = $meta.model_format; decode_strategy = $meta.decode_strategy
+            max_context = $meta.max_context
             power_source = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-BenchmarkPowerSource })
         })
         Write-Host ("   ok: {0} clips | {1} ms | WER {2}% | conf {3}" -f `

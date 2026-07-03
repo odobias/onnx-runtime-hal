@@ -158,11 +158,19 @@ can; missing values are simply omitted):
 Compare every manifest entry across its declared `variant × device × clip` matrix:
 
 ```powershell
-.\scripts\export-variants.ps1     # fp32, fp16, int8, int4 OpenVINO variants + models/manifest.json
+.\scripts\export-variants.ps1     # fp32 OV-IR baseline -> models/manifest.json
 .\scripts\get-amd-model.ps1       # AMD ONNX variant + merged models/manifest.json (on AMD machines)
 .\scripts\get-eval-set.ps1        # small labeled LibriSpeech sample -> models/eval/eval.jsonl
 .\scripts\benchmark.ps1 -Runs 3   # -> results/quantization-benchmark.{md,csv}
 ```
+
+> **Quantized models are research-only.** The product targets one portable static ONNX
+> model on every platform, so the OpenVINO precision sweep (fp16/int8/int4) is no longer a
+> product path. `export-variants.ps1 -Formats fp16,int8,int4` still exports them, but writes
+> to `models/manifest.research.json` (not the product `manifest.json`), so they never enter
+> the default benchmark. Sweep them deliberately with
+> `benchmark.ps1 -Manifest models\manifest.research.json`. The historical quantization
+> tables below are kept as prior measurements, not as a supported configuration.
 
 `manifest.json` is the backend-neutral contract: each entry has `backend`, `precision`,
 `method`, `model_dir`, `devices`, and `size_mb`. Each platform script appends or updates

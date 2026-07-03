@@ -1,11 +1,11 @@
-# Exports a Whisper model to several OpenVINO quantization variants and writes a
-# backend-neutral manifest.json describing each. The manifest is what the benchmark
-# harness consumes; adding a non-Intel backend later means appending entries with a
-# different "backend" (e.g. "amd"/"qualcomm") and their own model_dir/devices --
-# no harness changes required.
+# Exports a Whisper model to OpenVINO IR. The product ships a single portable static ONNX
+# model across all platforms, so only the FP32 OV-IR baseline is a product variant; the
+# quantized precisions (fp16/int8/int4) are kept for RESEARCH ONLY. To avoid the quant
+# models leaking into the product benchmark, non-fp32 entries are written to a separate
+# research manifest (models/manifest.research.json) and never to the product manifest.json.
 #
-#   .\export-variants.ps1                          # fp32,fp16,int8,int4 of whisper-tiny.en
-#   .\export-variants.ps1 -Formats fp16,int8       # subset
+#   .\export-variants.ps1                          # fp32 OV-IR baseline -> manifest.json
+#   .\export-variants.ps1 -Formats fp16,int8,int4  # research quant sweep -> manifest.research.json
 #   .\export-variants.ps1 -Model openai/whisper-tiny -Prefix wt
 
 [CmdletBinding()]
@@ -13,7 +13,7 @@ param(
     [string]$Model = "openai/whisper-tiny.en",
     [string]$Prefix = "wten",
     [ValidateSet("fp32", "fp16", "int8", "int4")]
-    [string[]]$Formats = @("fp32", "fp16", "int8", "int4"),
+    [string[]]$Formats = @("fp32"),
     [string[]]$Devices = @("NPU", "GPU", "CPU")
 )
 
@@ -40,15 +40,19 @@ if (-not (Test-Path $vpy)) {
 }
 Write-Host "Ensuring export toolchain..." -ForegroundColor Cyan
 & $vpy -m pip install --upgrade pip --quiet
-& $vpy -m pip install --quiet "optimum-intel[openvino]" openvino-tokenizers nncf
+# nncf is only needed for the research quant precisions; install it only when requested.
+$needNncf = @($Formats | Where-Object { $_ -ne "fp32" }).Count -gt 0
+$pkgs = @("optimum-intel[openvino]", "openvino-tokenizers")
+if ($needNncf) { $pkgs += "nncf" }
+& $vpy -m pip install --quiet @pkgs
 $optimum = Join-Path $venv "Scripts\optimum-cli.exe"
 
 # Human-readable description of what each weight-format actually does.
 $methodOf = @{
     fp32 = "FP32 baseline (no compression)"
-    fp16 = "FP16 weights (optimum-intel)"
-    int8 = "INT8 weight-only compression (NNCF)"
-    int4 = "INT4 weight-only compression (NNCF)"
+    fp16 = "FP16 weights (optimum-intel) [research only]"
+    int8 = "INT8 weight-only compression (NNCF) [research only]"
+    int4 = "INT4 weight-only compression (NNCF) [research only]"
 }
 
 $entries = @()
@@ -87,24 +91,42 @@ foreach ($fmt in $Formats) {
     }
 }
 
-$existing = $null
-$preserved = @()
-if (Test-Path $manifestPath) {
-    $existing = Get-Content $manifestPath -Raw | ConvertFrom-Json
-    $newIds = @($entries | ForEach-Object { $_.id })
-    $preserved = @($existing.variants | Where-Object { $newIds -notcontains $_.id })
+# Split entries: fp32 is a product variant (manifest.json); quantized precisions are
+# research-only and go to manifest.research.json so they never enter the product benchmark.
+$researchPath = Join-Path $models "manifest.research.json"
+
+function Write-Manifest($path, $newEntries, $noteText) {
+    if ($newEntries.Count -eq 0) { return }
+    $existing = $null
+    $preserved = @()
+    if (Test-Path $path) {
+        $existing = Get-Content $path -Raw | ConvertFrom-Json
+        $newIds = @($newEntries | ForEach-Object { $_.id })
+        $preserved = @($existing.variants | Where-Object { $newIds -notcontains $_.id })
+    }
+    $manifest = [ordered]@{
+        model    = $(if ($existing -and $existing.model) { $existing.model } else { $Model })
+        created  = (Get-Date).ToString("s")
+        note     = $noteText
+        variants = @($preserved + $newEntries)
+    }
+    $manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $path -Encoding UTF8
+    Write-Host "`nWrote $path with $($newEntries.Count) variant(s):" -ForegroundColor Green
+    $newEntries | ForEach-Object { Write-Host ("  {0,-14} {1,-5} {2} MB" -f $_.id, $_.precision, $_.size_mb) }
+    if ($preserved.Count -gt 0) {
+        Write-Host "Preserved $($preserved.Count) existing non-overwritten entr$(if ($preserved.Count -eq 1) { 'y' } else { 'ies' })." -ForegroundColor DarkGray
+    }
 }
 
-$manifest = [ordered]@{
-    model    = $(if ($existing -and $existing.model) { $existing.model } else { $Model })
-    created  = (Get-Date).ToString("s")
-    note     = "Backend-neutral variant manifest. Each platform appends entries with its own backend/model_dir/devices."
-    variants = @($preserved + $entries)
-}
+$productEntries = @($entries | Where-Object { $_.precision -eq "fp32" })
+$researchEntries = @($entries | Where-Object { $_.precision -ne "fp32" })
 
-$manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $manifestPath -Encoding UTF8
-Write-Host "`nWrote $manifestPath with $($entries.Count) variant(s):" -ForegroundColor Green
-$entries | ForEach-Object { Write-Host ("  {0,-14} {1,-5} {2} MB" -f $_.id, $_.precision, $_.size_mb) }
-if ($preserved.Count -gt 0) {
-    Write-Host "Preserved $($preserved.Count) existing non-overwritten manifest entr$(if ($preserved.Count -eq 1) { 'y' } else { 'ies' })." -ForegroundColor DarkGray
+Write-Manifest $manifestPath $productEntries `
+    "Backend-neutral variant manifest. Each platform appends entries with its own backend/model_dir/devices."
+Write-Manifest $researchPath $researchEntries `
+    "RESEARCH-ONLY quantized OV-IR variants. Not part of the product; not run by the default benchmark. Point benchmark.ps1 -Manifest here to sweep them."
+
+if ($researchEntries.Count -gt 0) {
+    Write-Host "`nNote: quantized variants are research-only (manifest.research.json)." -ForegroundColor Yellow
+    Write-Host "      Benchmark them explicitly: .\scripts\benchmark.ps1 -Manifest models\manifest.research.json" -ForegroundColor DarkGray
 }

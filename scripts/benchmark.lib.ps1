@@ -29,8 +29,11 @@ function Initialize-BenchmarkConsole {
 # list for the PowerShell harness; the C++ app (app/main.cpp) writes the same schema
 # for its single-run rows and MUST be kept in sync with this list. See results/README.md.
 function Get-BenchmarkResultColumns {
+    # AUTHORITATIVE column order. Must stay byte-identical to kBenchmarkCsvHeader in
+    # app/main.cpp (the other writer of this ledger). Change both + results/README.md.
     return @(
         "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name", "device_full_name",
+        "model_package", "variant_id", "base_model", "precision", "quant_method", "execution_provider",
         "model_dir", "audio_path", "audio_seconds", "runs", "warmup", "cache_dir",
         "cold_load_seconds", "warm_load_seconds", "mean_infer_seconds", "rtf", "realtime_factor",
         "label", "model_size_mb", "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps",
@@ -38,6 +41,61 @@ function Get-BenchmarkResultColumns {
         "runtime", "model_format", "decode_strategy", "max_context", "eval_clips", "status",
         "cold_start_seconds", "hot_start_seconds", "power_source"
     )
+}
+
+# Resolve the forced, filterable metadata for a benchmark row. Mirrors
+# benchmark_meta.hpp: derive model_package from model_dir, prefer manifest fields
+# (precision/method/id), then overlay whatever the run's JSON already reported.
+function Get-BenchmarkModelPackage([string]$ModelDir) {
+    if (-not $ModelDir) { return "" }
+    return [System.IO.Path]::GetFileName(($ModelDir -replace '\\', '/').TrimEnd('/'))
+}
+
+function Get-BenchmarkInferredPrecision([string]$Package) {
+    $p = $Package.ToLowerInvariant()
+    if ($p -match 'int4') { return 'int4' }
+    if ($p -match 'int8') { return 'int8' }
+    if ($p -match 'fp16' -or $p -match '-f16') { return 'fp16' }
+    if ($p -match 'static') { return 'fp32-static' }
+    return 'fp32'
+}
+
+function Get-BenchmarkMeta($Variant, $ModelDir, $JsonRow, $BaseModel) {
+    $modelPackage = Get-BenchmarkModelPackage $ModelDir
+    $variantId = if ($Variant -and $Variant.id) { $Variant.id } else { "" }
+    if (-not $variantId -and $JsonRow) { $variantId = Get-BenchmarkOptional $JsonRow "variant_id" "" }
+    if (-not $variantId) { $variantId = $modelPackage }
+
+    $baseModel = if ($BaseModel) { $BaseModel } else { "openai/whisper-tiny.en" }
+    $precision = if ($Variant -and $Variant.precision) { $Variant.precision } else { Get-BenchmarkInferredPrecision $modelPackage }
+    $quantMethod = if ($Variant -and $Variant.method) { $Variant.method } else { "FP32 baseline (inferred from package name)" }
+
+    # Backend-derived fields always come from the run's JSON. Manifest ($Variant) stays
+    # authoritative for id/precision/method: several entries can share one model_dir
+    # (e.g. the static ONNX run through ORT vs QNN vs OpenVINO), so trusting the exe's
+    # by-model_dir manifest guess would mislabel them.
+    $executionProvider = ""; $runtime = ""; $modelFormat = ""; $decodeStrategy = ""; $maxContext = ""
+    $hasVariant = [bool]($Variant -and $Variant.id)
+    if ($JsonRow) {
+        $executionProvider = Get-BenchmarkOptional $JsonRow "execution_provider" (Get-BenchmarkOptional $JsonRow "device" "")
+        $runtime = Get-BenchmarkOptional $JsonRow "runtime" (Get-BenchmarkOptional $JsonRow "backend" "")
+        $modelFormat = Get-BenchmarkOptional $JsonRow "model_format" ""
+        $decodeStrategy = Get-BenchmarkOptional $JsonRow "decode_strategy" ""
+        $maxContext = Get-BenchmarkOptional $JsonRow "max_context" ""
+        if (Get-BenchmarkOptional $JsonRow "base_model" "") { $baseModel = $JsonRow.base_model }
+        if (-not $modelPackage -and (Get-BenchmarkOptional $JsonRow "model_package" "")) { $modelPackage = $JsonRow.model_package }
+        if (-not $hasVariant) {
+            if (Get-BenchmarkOptional $JsonRow "variant_id" "") { $variantId = $JsonRow.variant_id }
+            if (Get-BenchmarkOptional $JsonRow "precision" "") { $precision = $JsonRow.precision }
+            if (Get-BenchmarkOptional $JsonRow "quant_method" "") { $quantMethod = $JsonRow.quant_method }
+        }
+    }
+
+    return [pscustomobject]@{
+        model_package = $modelPackage; variant_id = $variantId; base_model = $baseModel
+        precision = $precision; quant_method = $quantMethod; execution_provider = $executionProvider
+        runtime = $runtime; model_format = $modelFormat; decode_strategy = $decodeStrategy; max_context = $maxContext
+    }
 }
 
 function ConvertTo-BenchmarkCsvCell($Value) {

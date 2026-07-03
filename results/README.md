@@ -27,6 +27,12 @@ all three in sync when adding or reordering columns.
 - `device`: logical device selector, e.g. `NPU`, `CPU`, `GPU`.
 - `device_name`: backend-specific device string (`NPU`/`GPU`/`CPU` for Intel; an EP name like `CPUExecutionProvider` for AMD).
 - `device_full_name`: the actual hardware identity when the backend can query it, e.g. `Intel(R) AI Boost` or `13th Gen Intel(R) Core(TM) i7-1370P` on Intel (via `ov::device::full_name`). Empty when the backend doesn't expose one (AMD/Qualcomm currently don't) or for rows written before this column existed.
+- `model_package`: basename of `model_dir`, e.g. `whisper-tiny-en-static-onnx`. Always populated.
+- `variant_id`: manifest `id` or `--label`; falls back to `model_package`. Always populated.
+- `base_model`: Hugging Face model id from `models/manifest.json` (default `openai/whisper-tiny.en`).
+- `precision`: `fp32`, `fp16`, `int8`, `int4`, `fp32-static`, etc. From manifest when available, else inferred from the package name.
+- `quant_method`: human-readable compression/export method from the manifest `method` field.
+- `execution_provider`: backend-specific runtime device string (ORT EP name, OpenVINO device, QNN backend). Mirrors `device_name` but kept explicit for filtering alongside stack metadata.
 - `model_dir`: model directory used by the backend.
 - `audio_path`: WAV file used for the benchmark.
 - `audio_seconds`: input audio duration.
@@ -38,7 +44,7 @@ all three in sync when adding or reordering columns.
 - `mean_infer_seconds`: mean measured transcription latency.
 - `rtf`: real-time factor, `mean_infer_seconds / audio_seconds`.
 - `realtime_factor`: inverse RTF.
-- `label`: free-form tag for the row, e.g. the quantization variant (`wten-ov-int8`). Empty if unset.
+- `label`: free-form tag for the row; defaults to `variant_id` when unset.
 - `model_size_mb`: on-disk size of `model_dir`. Empty if unavailable.
 - `avg_logprob`: mean per-token log-prob the model self-reports (confidence proxy). Empty when the backend can't provide token metrics.
 - `ttft_ms` / `tpot_ms` / `throughput_tps`: time-to-first-token, time-per-output-token, tokens/sec. Empty when unavailable.
@@ -48,9 +54,9 @@ all three in sync when adding or reordering columns.
 - `hot_start_seconds`: second engine creation in the same process after the compiled cache has been populated.
 - `eval_clips`: number of clips aggregated into this row. C++ single-clip runs = `1`; `benchmark.ps1` aggregate rows use the number of eval clips that completed.
 - `status`: `ok`, or a short failure reason for unsupported/missing configurations.
-- `runtime`: execution stack that actually ran the model, e.g. `OpenVINO`, `OpenVINO GenAI`, `ONNX Runtime`, `ONNX Runtime + VitisAI EP`.
-- `model_format`: `onnx` (vendor-neutral) or `ov-ir` (Intel OpenVINO IR).
-- `decode_strategy`: how the autoregressive loop runs — `stateful-kv` (OV GenAI), `dynamic-kv` (growing KV cache), `static-no-kv` (fixed-context recompute, NPU-compilable), `raw-loop` (hand-rolled ORT), `optimum-generate` (optimum's Python loop).
+- `runtime`: execution stack that actually ran the model, e.g. `openvino-genai`, `onnxruntime`, `onnxruntime-qnn`, `onnxruntime-vitisai`. Always populated (from the backend or manifest lookup).
+- `model_format`: `onnx` (vendor-neutral) or `ov-ir` (Intel OpenVINO IR). Always populated when inferable.
+- `decode_strategy`: how the autoregressive loop runs — `genai-bounded-kv` (OV GenAI), `static-no-kv` (fixed-context recompute, NPU-compilable), etc. Always populated for ONNX static backends.
 - `max_context`: static decoder context length for `static-no-kv`; blank when the shape is dynamic or N/A.
 - `power_source`: whether the machine was on wall power or battery when the run was recorded — `ac`, `battery`, or `unknown`. Read from `GetSystemPowerStatus` (C++) / `SystemInformation.PowerStatus` (PowerShell) at run time. Battery means throttled CPU/NPU clocks, so **do not compare an `ac` row against a `battery` row and pretend the delta is architectural.** Rows written before this column existed are blank (state unknown).
 
@@ -80,7 +86,7 @@ GPUs. The NPU `architecture` (e.g. "AMD XDNA 2") is **derived** from a PCI
 vendor:device lookup, not reported by Windows — the driver only exposes a generic
 name like "NPU Compute Accelerator Device" — so verify it against the raw `pci_id`.
 
-## Quantization sweep
+## Manifest sweep
 
 `scripts\benchmark.ps1` compares entries from `models\manifest.json` across
 `variant × device × clip` and writes an aggregate report to
@@ -92,6 +98,11 @@ and latency). It also appends one canonical aggregate row per `variant × device
 `id`, `backend`, `precision`, `method`, `model_dir`, `devices`, and `size_mb`.
 Intel export scripts and AMD model download scripts merge their own entries into this file
 instead of overwriting other platforms.
+
+**Quantized OV-IR variants (fp16/int8/int4) are research-only** and live in
+`models\manifest.research.json`, not the product `manifest.json`. The default benchmark
+never touches them. To sweep them for research, point the harness at that manifest:
+`benchmark.ps1 -Manifest models\manifest.research.json`.
 
 ## Neutral ONNX portability
 
