@@ -330,10 +330,10 @@ as designed.
 
 `results/benchmark-results.csv` is the cross-machine ledger (see `results/README.md`):
 every machine appends its own canonical rows with the same schema, so results from
-different hardware concatenate without any code changes. It already had one full
-NPU/GPU/CPU × fp32/fp16/int8/int4 sweep from a real Intel NPU/GPU laptop; this machine
-added its own CPU-only rows on top (same clip `ls_000`, same `--ref`, `runs=2` — matched
-methodology, so the comparison below is apples-to-apples, not vibes):
+different hardware concatenate without any code changes. **The ledger has been reset to a
+blank slate** (header only) to start fresh on the unified self-selecting binary — rerun the
+loop below on each machine to repopulate it. The tables in this section are **prior
+measurements retained as analysis**, not the current ledger contents:
 
 Every row now also self-identifies the exact chip (`device_full_name`), not just the
 logical `NPU`/`GPU`/`CPU` class — the Intel backend queries OpenVINO's
