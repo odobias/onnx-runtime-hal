@@ -134,6 +134,23 @@
     <Message Importance="high" Text="Bundled static ONNX model -> $(OutDir)models\whisper-tiny-en-static-onnx" Condition="'@(ModelPayload)' != ''" />
   </Target>
 
+  <!-- Bundle the AMD Ryzen AI (VitisAI) model into the package so an EnableAmd build
+       runs the full AMD benchmark (the amd-native variant plus the unified `auto`
+       path) from its own folder. The static ONNX model is already bundled by
+       BundleModel; this adds the vendor model (with its vitisai_config_*.json). Gated
+       on EnableAmd + presence; a checkout without it fetched simply skips (run
+       .\scripts\get-amd-model.ps1 once before publishing). Disable with /p:BundleModel=false. -->
+  <Target Name="BundleAmdModel" AfterTargets="Build"
+          Condition="'$(BundleModel)'=='true' and '$(EnableAmd)'=='true' and Exists('$(WhisperHalRoot)models\whisper-tiny-amd')">
+    <ItemGroup>
+      <AmdModelPayload Include="$(WhisperHalRoot)models\whisper-tiny-amd\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AmdModelPayload)"
+          DestinationFiles="@(AmdModelPayload->'$(OutDir)models\whisper-tiny-amd\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" Condition="'@(AmdModelPayload)' != ''" />
+    <Message Importance="high" Text="Bundled AMD VitisAI model -> $(OutDir)models\whisper-tiny-amd" Condition="'@(AmdModelPayload)' != ''" />
+  </Target>
+
   <!-- Bundle the labeled eval set + sample audio next to the exe so the build output
        can run the CPU/GPU/NPU benchmark fully offline (no fetch step). Exists-gated
        and shares the BundleModel switch; a fresh checkout with no eval set yet simply
