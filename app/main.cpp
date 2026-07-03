@@ -300,6 +300,11 @@ void migrate_benchmark_csv_schema(const std::filesystem::path& csv_path) {
 
 // Shared, backend-neutral results schema. Filter columns (model_package, variant_id,
 // precision, runtime, ...) are always populated so rows concatenate and filter cleanly.
+//
+// AUTHORITATIVE COLUMN ORDER lives in scripts/benchmark.lib.ps1
+// (Get-BenchmarkResultColumns). The header emitted below (kBenchmarkCsvHeader) MUST
+// match that list; the harness and this executor are the two writers of the same
+// ledger. If you add/reorder a column, change it in both places (and results/README.md).
 void append_result_csv(const std::string& path,
                        const std::string& requested_backend,
                        const whisper_npu::IWhisperEngine& engine,

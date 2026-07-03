@@ -29,8 +29,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-chcp 65001 > $null
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+. (Join-Path $PSScriptRoot "benchmark.lib.ps1")
+Initialize-BenchmarkConsole
 
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Model) {

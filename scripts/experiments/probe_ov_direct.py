@@ -3,7 +3,7 @@
 to the Intel NPU (and GPU/CPU). This mirrors how our C++ Intel backend runs
 (OpenVINO), bypassing the ORT OpenVINO-EP pip ABI mess.
 
-  .venv-ovep\Scripts\python.exe scripts\probe_ov_direct.py models\whisper-tiny-en-onnx-static
+  .venv-ovep\Scripts\python.exe scripts\experiments\probe_ov_direct.py models\whisper-tiny-en-onnx-static
 """
 import sys
 import time

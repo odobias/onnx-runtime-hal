@@ -18,15 +18,16 @@ param(
     [int]$Runs = 3,
     [int]$MaxClips = 0,            # 0 = all clips in the eval set
     [string]$Results = "",
+    # NPU vendor filter: auto (detect this host), all (try everything), or a forced
+    # vendor. A machine has one NPU brand, so by default we skip other vendors' variants.
+    [ValidateSet("auto", "all", "intel", "amd", "qualcomm")][string]$NpuVendor = "auto",
     [string]$Configuration = "Release"
 )
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
-chcp 65001 > $null
-[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
-$OutputEncoding = [System.Text.UTF8Encoding]::new()
+. (Join-Path $PSScriptRoot "benchmark.lib.ps1")
+Initialize-BenchmarkConsole
 
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Manifest) { $Manifest = Join-Path $root "models\manifest.json" }
@@ -48,138 +49,34 @@ New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 if (-not $Results) { $Results = Join-Path $reportsDir "benchmark-results.csv" }
 $cacheRoot = Join-Path $root "cache"
 
-function ConvertTo-CsvCell($Value) {
-    $s = if ($null -eq $Value) { "" } else { [string]$Value }
-    if ($s.IndexOfAny([char[]]",`"`r`n") -lt 0) { return $s }
-    return '"' + ($s -replace '"', '""') + '"'
-}
+# Autodetect the host NPU vendor (one brand per machine) and skip variants that
+# target a different vendor's NPU. -NpuVendor all disables the filter; -NpuVendor
+# <intel|amd|qualcomm> forces it. Shared harness helpers (CSV schema, power source,
+# app invocation, aggregation, detection) live in benchmark.lib.ps1.
+$platform = Get-BenchmarkPlatform
+$hostVendor = Resolve-BenchmarkHostVendor $NpuVendor $platform
 
-function Get-Optional($Object, [string]$Name, $Default = $null) {
-    if ($null -ne $Object -and $Object.PSObject.Properties.Name -contains $Name) { return $Object.$Name }
-    return $Default
-}
-
-# Best-effort AC vs battery detection (battery => throttled clocks, so a run on
-# battery can silently skew comparisons). "ac" / "battery" / "unknown".
-function Get-PowerSource {
-    try {
-        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-        switch ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus) {
-            'Online' { return 'ac' }
-            'Offline' { return 'battery' }
-            default { return 'unknown' }
-        }
-    } catch { return 'unknown' }
-}
-
-function Get-ModelPackage([string]$ModelDir) {
-    if (-not $ModelDir) { return "" }
-    return [System.IO.Path]::GetFileName(($ModelDir -replace '\\', '/').TrimEnd('/'))
-}
-
-function Get-InferredPrecision([string]$Package) {
-    $p = $Package.ToLowerInvariant()
-    if ($p -match 'int4') { return 'int4' }
-    if ($p -match 'int8') { return 'int8' }
-    if ($p -match 'fp16' -or $p -match '-f16') { return 'fp16' }
-    if ($p -match 'static') { return 'fp32-static' }
-    return 'fp32'
-}
-
-function Get-BenchmarkMeta($Variant, $ModelDir, $JsonRow) {
-    $modelPackage = Get-ModelPackage $ModelDir
-    $variantId = if ($Variant -and $Variant.id) { $Variant.id } else { "" }
-    if (-not $variantId -and $JsonRow -and $JsonRow.variant_id) { $variantId = $JsonRow.variant_id }
-    if (-not $variantId) { $variantId = $modelPackage }
-
-    $baseModel = if ($manifestObj.model) { $manifestObj.model } else { "openai/whisper-tiny.en" }
-    $precision = if ($Variant -and $Variant.precision) { $Variant.precision } else { Get-InferredPrecision $modelPackage }
-    $quantMethod = if ($Variant -and $Variant.method) { $Variant.method } else { "FP32 baseline (inferred from package name)" }
-
-    $executionProvider = ""
-    $runtime = ""
-    $modelFormat = ""
-    $decodeStrategy = ""
-    $maxContext = ""
-    if ($JsonRow) {
-        $executionProvider = Get-Optional $JsonRow "execution_provider" (Get-Optional $JsonRow "device" "")
-        $runtime = Get-Optional $JsonRow "runtime" (Get-Optional $JsonRow "backend" "")
-        $modelFormat = Get-Optional $JsonRow "model_format" ""
-        $decodeStrategy = Get-Optional $JsonRow "decode_strategy" ""
-        $maxContext = Get-Optional $JsonRow "max_context" ""
-        if ($JsonRow.model_package) { $modelPackage = $JsonRow.model_package }
-        if ($JsonRow.variant_id) { $variantId = $JsonRow.variant_id }
-        if ($JsonRow.base_model) { $baseModel = $JsonRow.base_model }
-        if ($JsonRow.precision) { $precision = $JsonRow.precision }
-        if ($JsonRow.quant_method) { $quantMethod = $JsonRow.quant_method }
-    }
-
-    return [pscustomobject]@{
-        model_package = $modelPackage
-        variant_id = $variantId
-        base_model = $baseModel
-        precision = $precision
-        quant_method = $quantMethod
-        execution_provider = $executionProvider
-        runtime = $runtime
-        model_format = $modelFormat
-        decode_strategy = $decodeStrategy
-        max_context = $maxContext
-    }
-}
-
-function Write-SharedResultRow($Path, [object]$Row) {
-    $columns = @(
-        "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name", "device_full_name",
-        "model_package", "variant_id", "base_model", "precision", "quant_method", "execution_provider",
-        "model_dir", "audio_path", "audio_seconds", "runs", "warmup", "cache_dir",
-        "cold_load_seconds", "warm_load_seconds", "mean_infer_seconds", "rtf", "realtime_factor",
-        "label", "model_size_mb", "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps",
-        "wer", "cer", "transcription",
-        "runtime", "model_format", "decode_strategy", "max_context", "eval_clips", "status",
-        "cold_start_seconds", "hot_start_seconds", "power_source"
-    )
-
-    $parent = Split-Path $Path -Parent
-    if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-    $header = $columns -join ","
-    if (-not (Test-Path $Path) -or (Get-Item $Path).Length -eq 0) {
-        $header | Set-Content -Path $Path -Encoding UTF8
-    } else {
-        $existingHeader = Get-Content -Path $Path -TotalCount 1
-        if ($existingHeader -ne $header) {
-            $oldRows = @(Import-Csv -Path $Path)
-            $header | Set-Content -Path $Path -Encoding UTF8
-            foreach ($old in $oldRows) {
-                $oldLine = ($columns | ForEach-Object { ConvertTo-CsvCell (Get-Optional $old $_ "") }) -join ","
-                Add-Content -Path $Path -Value $oldLine -Encoding UTF8
-            }
-        }
-    }
-
-    $line = ($columns | ForEach-Object { ConvertTo-CsvCell (Get-Optional $Row $_ "") }) -join ","
-    Add-Content -Path $Path -Value $line -Encoding UTF8
-}
-
-function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref, $label) {
-    $a = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--label", $label, "--json")
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        $raw = & $exe @a 2>&1
-        $exitCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $oldEap
-    }
-    $line = ($raw | Where-Object { $_ -match '^\{"ok"' } | Select-Object -Last 1)
-    if (-not $line) { return [pscustomobject]@{ ok = $false; error = "no-json-output (exit $exitCode)" } }
-    return $line | ConvertFrom-Json
-}
+# Detailed CPU/GPU/NPU inventory of the machine these results were produced on.
+$hardware = Get-BenchmarkHardware
+Write-BenchmarkHardwareBanner $hardware
 
 $summary = @()
 $detail = @()
 
 foreach ($v in $manifestObj.variants) {
+    if (-not (Test-BenchmarkVariantSupported -Backend $v.backend -HostVendor $hostVendor)) {
+        $vend = Get-BenchmarkBackendVendor $v.backend
+        Write-Host ("-- skip {0} (backend {1} targets {2} NPU; host is {3}) --" -f `
+                $v.id, $v.backend, $vend, $hostVendor) -ForegroundColor DarkGray
+        $summary += [pscustomobject]@{
+            variant = $v.id; precision = $v.precision; backend = $v.backend; device = "-"
+            status = "skip:other-npu"; clips = 0; size_mb = $v.size_mb
+            cold_s = $null; hot_s = $null; mean_ms = $null; rtf = $null; xrt = $null
+            tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null
+            error = "$vend variant on $hostVendor host"
+        }
+        continue
+    }
     $modelDir = Join-Path $root ($v.model_dir -replace '/', '\')
     $devList = if ($Devices.Count) { $Devices } else { $v.devices }
 
@@ -203,7 +100,7 @@ foreach ($v in $manifestObj.variants) {
             foreach ($c in $clips) {
                 $audio = Join-Path $root ($c.audio -replace '/', '\')
                 if (-not (Test-Path $audio)) { continue }
-                $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref $v.id
+                $r = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $audio -Backend $v.backend -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref $c.ref
                 if (-not $r.ok) {
                     $status = "unsupported/error"; $errMsg = $r.error
                     Write-Host ("   {0}: {1}" -f $c.id, $r.error) -ForegroundColor Yellow
@@ -231,35 +128,27 @@ foreach ($v in $manifestObj.variants) {
                 cold_s = $null; hot_s = $null; mean_ms = $null; rtf = $null; xrt = $null
                 tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null; error = $errMsg
             }
-            Write-SharedResultRow $Results ([pscustomobject]@{
+            $meta = Get-BenchmarkMeta $v $v.model_dir $null $manifestObj.model
+            Write-BenchmarkResultRow $Results ([pscustomobject]@{
                 timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
                 requested_backend = $v.backend; resolved_backend = ""; device = $dev; device_name = ""; device_full_name = ""
-                model_package = (Get-BenchmarkMeta $v $v.model_dir $null).model_package
-                variant_id = $v.id; base_model = $manifestObj.model; precision = $v.precision; quant_method = $v.method
-                execution_provider = ""
+                model_package = $meta.model_package; variant_id = $meta.variant_id; base_model = $meta.base_model
+                precision = $meta.precision; quant_method = $meta.quant_method; execution_provider = ""
                 model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = ""; runs = $Runs; warmup = 1; cache_dir = $cacheDir
                 cold_load_seconds = ""; warm_load_seconds = ""; mean_infer_seconds = ""; rtf = ""; realtime_factor = ""
                 label = $v.id; model_size_mb = $v.size_mb; avg_logprob = ""; ttft_ms = ""; tpot_ms = ""; throughput_tps = ""
                 wer = ""; cer = ""; transcription = ""; cold_start_seconds = ""; hot_start_seconds = ""; eval_clips = 0
                 status = "$(if ($status -eq 'ok') { 'fail' } else { $status })$(if ($errMsg) { " ($errMsg)" })"
-                runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""; power_source = (Get-PowerSource)
+                runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""; power_source = (Get-BenchmarkPowerSource)
             })
             continue
         }
 
-        $meanMs = ($rows | Measure-Object mean_ms -Average).Average
-        $meanRtf = ($rows | Measure-Object rtf -Average).Average
-        $meanTps = ($rows | Measure-Object throughput_tps -Average).Average
-        $meanLp = ($rows | Measure-Object avg_logprob -Average).Average
-        $wEdits = ($rows | Measure-Object word_edits -Sum).Sum
-        $wRef = ($rows | Measure-Object ref_words -Sum).Sum
-        $cEdits = ($rows | Measure-Object char_edits -Sum).Sum
-        $cRef = ($rows | Measure-Object ref_chars -Sum).Sum
-        $audioSeconds = ($rows | Measure-Object audio_len_s -Sum).Sum
-        $firstRow = $rows | Select-Object -First 1
-        $lastRow = $rows | Select-Object -Last 1
-        $wer = if ($wRef) { $wEdits / $wRef } else { $null }
-        $cer = if ($cRef) { $cEdits / $cRef } else { $null }
+        $agg = Measure-BenchmarkClips $rows
+        $meanMs = $agg.mean_ms; $meanRtf = $agg.mean_rtf; $meanTps = $agg.mean_tps; $meanLp = $agg.mean_logprob
+        $wEdits = $agg.word_edits; $wRef = $agg.ref_words; $cEdits = $agg.char_edits; $cRef = $agg.ref_chars
+        $audioSeconds = $agg.audio_seconds; $firstRow = $agg.first_row; $lastRow = $agg.last_row
+        $wer = $agg.wer; $cer = $agg.cer
 
         $summary += [pscustomobject]@{
             variant = $v.id; precision = $v.precision; backend = $v.backend; device = $dev
@@ -272,8 +161,8 @@ foreach ($v in $manifestObj.variants) {
             cer_pct = if ($cRef) { [math]::Round(100.0 * $cer, 2) } else { $null }
             error = ""
         }
-        $meta = Get-BenchmarkMeta $v $v.model_dir $firstRow
-        Write-SharedResultRow $Results ([pscustomobject]@{
+        $meta = Get-BenchmarkMeta $v $v.model_dir $firstRow $manifestObj.model
+        Write-BenchmarkResultRow $Results ([pscustomobject]@{
             timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             requested_backend = $v.backend; resolved_backend = $firstRow.backend; device = $dev
             device_name = $firstRow.device; device_full_name = $firstRow.device_full_name
@@ -284,13 +173,13 @@ foreach ($v in $manifestObj.variants) {
             mean_infer_seconds = ($meanMs / 1000.0); rtf = $meanRtf
             realtime_factor = if ($meanRtf -gt 0) { 1.0 / $meanRtf } else { "" }
             label = $meta.variant_id; model_size_mb = $v.size_mb; avg_logprob = $meanLp
-            ttft_ms = ($rows | Measure-Object ttft_ms -Average).Average
-            tpot_ms = ($rows | Measure-Object tpot_ms -Average).Average
+            ttft_ms = $agg.mean_ttft_ms
+            tpot_ms = $agg.mean_tpot_ms
             throughput_tps = $meanTps; wer = $wer; cer = $cer; transcription = $lastRow.text
             cold_start_seconds = $coldLoad; hot_start_seconds = $hotLoad; eval_clips = $rows.Count; status = "ok"
             runtime = $meta.runtime; model_format = $meta.model_format; decode_strategy = $meta.decode_strategy
             max_context = $meta.max_context
-            power_source = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-PowerSource })
+            power_source = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-BenchmarkPowerSource })
         })
         Write-Host ("   ok: {0} clips | {1} ms | WER {2}% | conf {3}" -f `
                 $rows.Count, [math]::Round($meanMs, 1),
@@ -310,10 +199,17 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("# Whisper NPU HAL - quantization benchmark")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("- Model: ``$($manifestObj.model)``")
+[void]$md.AppendLine("- Host: ``$($platform.cpu_name)`` | NPU vendor ``$($platform.npu_vendor)``$(if ($platform.npu_device) { " ($($platform.npu_device))" }) | filter ``$hostVendor``")
 [void]$md.AppendLine("- Eval clips: $($clips.Count) | Runs/clip: $Runs | Generated: $(Get-Date -Format s)")
 [void]$md.AppendLine("- Confidence = mean per-token log-prob (self-reported; higher = more confident, not calibrated truth).")
 [void]$md.AppendLine("- WER/CER micro-averaged over clips after normalization.")
 [void]$md.AppendLine("- Cold start = first engine creation after cache deletion; hot start = second engine creation in the same process after cache population.")
+[void]$md.AppendLine("")
+[void]$md.AppendLine("## Host hardware")
+[void]$md.AppendLine("")
+foreach ($line in (Get-BenchmarkHardwareMarkdown $hardware)) { [void]$md.AppendLine($line) }
+[void]$md.AppendLine("")
+[void]$md.AppendLine("_Full machine-readable inventory: ``results/host-info.json``._")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("| Variant | Prec | Backend | Device | Status | Size MB | Cold s | Hot s | Mean ms | xRT | tok/s | Conf | WER % | CER % |")
 [void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
@@ -327,10 +223,13 @@ foreach ($s in $summary) {
 [void]$md.AppendLine("")
 [void]$md.AppendLine("_Caching: cold = first compile, hot = same-process reload from populated cache. See ``cache/`` and backend-specific compiled-model cache hooks._")
 Set-Content -Path $mdPath -Value $md.ToString() -Encoding UTF8
+$hostInfoPath = Join-Path $reportsDir "host-info.json"
+Write-BenchmarkHostInfo $hostInfoPath $hardware
 
 Write-Host "`nReports written:" -ForegroundColor Green
 Write-Host "  $csvPath"
 Write-Host "  $detailCsv"
 Write-Host "  $mdPath"
+Write-Host "  $hostInfoPath"
 Write-Host ""
 $summary | Format-Table variant, precision, device, status, size_mb, cold_s, hot_s, mean_ms, xrt, avg_logprob, wer_pct -AutoSize
