@@ -317,4 +317,6 @@ appended to by multiple machines.
   `self.NORMALIZED_CONFIG_CLASS(self._config)` to
   `self.__class__.NORMALIZED_CONFIG_CLASS(self._config)`. `export-variants.ps1` detects
   this on 3.14+ and prints the same hint on export failure.
-- See `../NPU-FINDINGS.md` and `../NPU-ECOSYSTEM-STATUS.md` for the underlying research.
+- See `../NPU-FINDINGS.md` and `../NPU-ECOSYSTEM-STATUS.md` for the underlying research,
+  and `results/cpp-onnx-npu-findings.md` for the C++ ONNX-on-NPU key findings (decode
+  strategy, the `maxlen` dud, the mel-FFT win, and GenAI-parity verdict).

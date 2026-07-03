@@ -12,6 +12,11 @@ std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
 bool available();
 }  // namespace intel
 
+namespace intel_onnx {
+std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
+bool available();
+}  // namespace intel_onnx
+
 namespace amd {
 std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
 bool available();

@@ -98,6 +98,9 @@ public:
         out.tpot_ms = pm.get_tpot().mean;
         out.throughput_tps = pm.get_throughput().mean;
         out.has_token_metrics = true;
+        out.runtime = "openvino-genai";
+        out.model_format = "ov-ir";
+        out.decode_strategy = "genai-bounded-kv";
         return out;
     }
 

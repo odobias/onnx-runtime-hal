@@ -17,6 +17,7 @@ namespace whisper_npu {
 enum class Backend {
     Auto,          // pick the first compiled-in, available backend
     IntelOpenVINO, // Intel NPU/GPU/CPU via OpenVINO GenAI  (reference impl)
+    IntelOnnx,     // Intel NPU/GPU/CPU via OpenVINO on the neutral ONNX (static, no-KV)
     AmdRyzenAI,    // AMD XDNA NPU via ONNX Runtime + VitisAI EP  (prepared)
     QualcommQNN,   // Qualcomm Hexagon NPU via ONNX Runtime + QNN EP  (prepared)
 };
@@ -71,6 +72,14 @@ struct TranscribeResult {
     double throughput_tps = -1.0;   // tokens/second
 
     bool has_token_metrics = false;
+
+    // Self-describing run metadata for the shared benchmark schema (empty/0 =
+    // unset). Lets ONNX vs OV-IR and different decode strategies be compared in
+    // one CSV alongside the Python-produced rows.
+    std::string runtime;          // e.g. "openvino", "onnxruntime"
+    std::string model_format;     // e.g. "onnx", "ov-ir"
+    std::string decode_strategy;  // e.g. "static-no-kv", "genai-bounded-kv"
+    long max_context = 0;         // static decoder context length (0 = n/a)
 };
 
 // 16 kHz, mono, float PCM normalized to [-1, 1].

@@ -48,6 +48,7 @@
   <ItemGroup>
     <ClCompile Include="$(WhisperHalRoot)src\factory.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\intel\intel_openvino_engine.cpp" />
+    <ClCompile Include="$(WhisperHalRoot)src\backends\intel\intel_onnx_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\amd\amd_ryzenai_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\qualcomm\qualcomm_qnn_engine.cpp" />
   </ItemGroup>
@@ -55,6 +56,7 @@
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\whisper_engine.hpp" />
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\audio.hpp" />
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\metrics.hpp" />
+    <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\whisper_frontend.hpp" />
     <ClInclude Include="$(WhisperHalRoot)src\backends\backend_registry.hpp" />
   </ItemGroup>
 

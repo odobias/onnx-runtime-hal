@@ -82,3 +82,9 @@ decode loop (`scripts\onnx_ov_decode.py`, `scripts\onnx_npu_static.py`) so quali
 is identical across runtimes and only load/latency vary. These are 12-clip
 aggregates, so they live in their own file rather than the per-clip
 `benchmark-results.csv` schema.
+
+`results\cpp-onnx-npu-findings.md` distills the **key lessons** from turning that
+experiment into the C++ HAL backend (`Backend::IntelOnnx`): which decode strategy
+actually compiles on the NPU, why `maxlen` isn't a latency lever, the mel-FFT win
+(~2× on NPU/GPU), and the GenAI-parity verdict. Read this first before revisiting
+NPU latency.

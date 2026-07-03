@@ -43,6 +43,9 @@ bool parse_backend(const std::string& s, whisper_npu::Backend& out) {
     const std::string v = lower(s);
     if (v == "auto")  { out = whisper_npu::Backend::Auto; return true; }
     if (v == "intel") { out = whisper_npu::Backend::IntelOpenVINO; return true; }
+    if (v == "intel-onnx" || v == "intelonnx" || v == "onnx") {
+        out = whisper_npu::Backend::IntelOnnx; return true;
+    }
     if (v == "amd")   { out = whisper_npu::Backend::AmdRyzenAI; return true; }
     if (v == "qualcomm" || v == "qnn") { out = whisper_npu::Backend::QualcommQNN; return true; }
     return false;
@@ -230,14 +233,15 @@ void append_result_csv(const std::string& path,
         << opt_num(er.wer, have_ref, 6) << ','
         << opt_num(er.cer, have_ref, 6) << ','
         << csv_escape(text) << ','
-        << csv_escape(engine.backend_name()) << ','
-        << "" << ','
-        << "" << ','
-        << "" << ','
-        << 1 << ','
-        << "ok" << ','
-        << cold_load << ','
-        << warm_load << '\n';
+        // Self-describing run metadata; fall back to backend name for runtime.
+        << csv_escape(last.runtime.empty() ? engine.backend_name() : last.runtime) << ','
+        << csv_escape(last.model_format) << ','
+        << csv_escape(last.decode_strategy) << ','
+        << (last.max_context > 0 ? std::to_string(last.max_context) : std::string()) << ','
+        << 1 << ','          // eval_clips: this CLI benchmarks a single audio file
+        << "ok" << ','       // reached here => run succeeded
+        << cold_load << ','  // cold_start_seconds
+        << warm_load << '\n';// hot_start_seconds
 }
 
 }  // namespace
@@ -273,7 +277,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0]
                   << " <model_dir> <audio.wav> [backend] [device] [runs]"
                      " [--cache <dir>] [--ref \"text\"] [--threads N] [--json] [--results <csv>]\n"
-                  << "  backend: auto | intel | amd | qualcomm   (default auto)\n"
+                  << "  backend: auto | intel | intel-onnx | amd | qualcomm   (default auto)\n"
                   << "  device : npu | gpu | cpu                 (default npu)\n"
                   << "  runs   : timed iterations                (default 5)\n"
                   << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"

@@ -12,7 +12,7 @@
 param(
     [string]$Model = "",
     [string]$Audio = "",
-    [ValidateSet("auto", "intel", "amd", "qualcomm")][string]$Backend = "intel",
+    [ValidateSet("auto", "intel", "intel-onnx", "amd", "qualcomm")][string]$Backend = "intel",
     [ValidateSet("npu", "gpu", "cpu")][string]$Device = "npu",
     [int]$Runs = 5,
     [int]$Threads = 0,
@@ -32,6 +32,7 @@ $root = Split-Path $PSScriptRoot -Parent
 if (-not $Model) {
     switch ($Backend) {
         "amd" { $Model = Join-Path $root "models\whisper-tiny-amd" }
+        "intel-onnx" { $Model = Join-Path $root "models\whisper-tiny-en-onnx" }
         default { $Model = Join-Path $root "models\whisper-tiny-en-ov" }
     }
 }
