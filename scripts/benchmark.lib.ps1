@@ -209,6 +209,21 @@ function Resolve-BenchmarkHostVendor([string]$Selector, [object]$Platform = $nul
 
 # --- detailed hardware inventory ---------------------------------------------
 
+# Heuristic PCI (vendor:device) -> NPU architecture map. Windows reports only a
+# generic device name ("NPU Compute Accelerator Device" on AMD), so the architecture
+# is DERIVED from the PCI hardware id, not read from the device. Always cross-check
+# against the raw pci_id the descriptor also carries; unknown ids return blank.
+function Get-BenchmarkNpuArchitecture([string]$PciId) {
+    switch ("$PciId".ToUpperInvariant()) {
+        '1022:1502' { return 'AMD XDNA (Phoenix / Hawk Point)' }
+        '1022:17F0' { return 'AMD XDNA 2 (Strix / Krackan Point)' }
+        '1022:1640' { return 'AMD XDNA 2 (Strix Halo)' }
+        '8086:7D1D' { return 'Intel AI Boost (Meteor / Arrow Lake NPU)' }
+        '8086:643E' { return 'Intel AI Boost (Lunar Lake NPU 4)' }
+        default { return '' }
+    }
+}
+
 # Collect a detailed descriptor of the chips a benchmark can run on: CPU, every
 # display adapter (integrated + discrete), and the NPU. All probes are best-effort
 # (CIM/PnP can be absent or access-denied) and degrade to blank fields rather than
@@ -249,7 +264,10 @@ function Get-BenchmarkHardware {
         }
     } catch { }
 
-    $npu = [pscustomobject]@{ name = ''; present = $false; manufacturer = ''; driver_version = ''; instance_id = '' }
+    $npu = [pscustomobject]@{
+        name = ''; architecture = ''; present = $false; manufacturer = ''
+        pci_id = ''; driver_version = ''; instance_id = ''
+    }
     try {
         $dev = @(Get-PnpDevice -PresentOnly -ErrorAction Stop |
                 Where-Object { $_.FriendlyName -match 'AI Boost|IPU|XDNA|NPU|Hexagon|Neural Proc' })
@@ -259,6 +277,11 @@ function Get-BenchmarkHardware {
             $npu.name = "$($d.FriendlyName)".Trim()
             $npu.manufacturer = "$($d.Manufacturer)".Trim()
             $npu.instance_id = "$($d.InstanceId)".Trim()
+            # The generic OS name has no architecture; the PCI vendor:device id does.
+            if ("$($d.InstanceId)" -match 'VEN_([0-9A-Fa-f]{4})&DEV_([0-9A-Fa-f]{4})') {
+                $npu.pci_id = ("{0}:{1}" -f $Matches[1], $Matches[2]).ToUpperInvariant()
+                $npu.architecture = Get-BenchmarkNpuArchitecture $npu.pci_id
+            }
             try {
                 $dv = (Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName 'DEVPKEY_Device_DriverVersion' -ErrorAction Stop).Data
                 if ($dv) { $npu.driver_version = "$dv" }
@@ -306,11 +329,17 @@ function Get-BenchmarkHardwareMarkdown([object]$Hardware) {
     }
 
     if ($Hardware.npu.present) {
+        $n = $Hardware.npu
+        # Lead with the derived architecture when known; otherwise the OS name. Always
+        # keep the OS-reported name + PCI id visible so the derivation is verifiable.
+        $headline = if ($n.architecture) { $n.architecture } else { $n.name }
         $nBits = @()
-        if ($Hardware.npu.manufacturer) { $nBits += $Hardware.npu.manufacturer }
-        if ($Hardware.npu.driver_version) { $nBits += "driver $($Hardware.npu.driver_version)" }
+        if ($n.architecture -and $n.name) { $nBits += $n.name }
+        elseif (-not $n.architecture -and $n.manufacturer) { $nBits += $n.manufacturer }
+        if ($n.pci_id) { $nBits += "PCI $($n.pci_id)" }
+        if ($n.driver_version) { $nBits += "driver $($n.driver_version)" }
         $nSuffix = if ($nBits.Count) { " ($($nBits -join ', '))" } else { "" }
-        $lines.Add("- **NPU**: ``$($Hardware.npu.name)``$nSuffix")
+        $lines.Add("- **NPU**: ``$headline``$nSuffix")
     } else {
         $lines.Add("- **NPU**: (none detected)")
     }
