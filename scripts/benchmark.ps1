@@ -72,9 +72,66 @@ function Get-PowerSource {
     } catch { return 'unknown' }
 }
 
+function Get-ModelPackage([string]$ModelDir) {
+    if (-not $ModelDir) { return "" }
+    return [System.IO.Path]::GetFileName(($ModelDir -replace '\\', '/').TrimEnd('/'))
+}
+
+function Get-InferredPrecision([string]$Package) {
+    $p = $Package.ToLowerInvariant()
+    if ($p -match 'int4') { return 'int4' }
+    if ($p -match 'int8') { return 'int8' }
+    if ($p -match 'fp16' -or $p -match '-f16') { return 'fp16' }
+    if ($p -match 'static') { return 'fp32-static' }
+    return 'fp32'
+}
+
+function Get-BenchmarkMeta($Variant, $ModelDir, $JsonRow) {
+    $modelPackage = Get-ModelPackage $ModelDir
+    $variantId = if ($Variant -and $Variant.id) { $Variant.id } else { "" }
+    if (-not $variantId -and $JsonRow -and $JsonRow.variant_id) { $variantId = $JsonRow.variant_id }
+    if (-not $variantId) { $variantId = $modelPackage }
+
+    $baseModel = if ($manifestObj.model) { $manifestObj.model } else { "openai/whisper-tiny.en" }
+    $precision = if ($Variant -and $Variant.precision) { $Variant.precision } else { Get-InferredPrecision $modelPackage }
+    $quantMethod = if ($Variant -and $Variant.method) { $Variant.method } else { "FP32 baseline (inferred from package name)" }
+
+    $executionProvider = ""
+    $runtime = ""
+    $modelFormat = ""
+    $decodeStrategy = ""
+    $maxContext = ""
+    if ($JsonRow) {
+        $executionProvider = Get-Optional $JsonRow "execution_provider" (Get-Optional $JsonRow "device" "")
+        $runtime = Get-Optional $JsonRow "runtime" (Get-Optional $JsonRow "backend" "")
+        $modelFormat = Get-Optional $JsonRow "model_format" ""
+        $decodeStrategy = Get-Optional $JsonRow "decode_strategy" ""
+        $maxContext = Get-Optional $JsonRow "max_context" ""
+        if ($JsonRow.model_package) { $modelPackage = $JsonRow.model_package }
+        if ($JsonRow.variant_id) { $variantId = $JsonRow.variant_id }
+        if ($JsonRow.base_model) { $baseModel = $JsonRow.base_model }
+        if ($JsonRow.precision) { $precision = $JsonRow.precision }
+        if ($JsonRow.quant_method) { $quantMethod = $JsonRow.quant_method }
+    }
+
+    return [pscustomobject]@{
+        model_package = $modelPackage
+        variant_id = $variantId
+        base_model = $baseModel
+        precision = $precision
+        quant_method = $quantMethod
+        execution_provider = $executionProvider
+        runtime = $runtime
+        model_format = $modelFormat
+        decode_strategy = $decodeStrategy
+        max_context = $maxContext
+    }
+}
+
 function Write-SharedResultRow($Path, [object]$Row) {
     $columns = @(
         "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name", "device_full_name",
+        "model_package", "variant_id", "base_model", "precision", "quant_method", "execution_provider",
         "model_dir", "audio_path", "audio_seconds", "runs", "warmup", "cache_dir",
         "cold_load_seconds", "warm_load_seconds", "mean_infer_seconds", "rtf", "realtime_factor",
         "label", "model_size_mb", "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps",
@@ -104,8 +161,8 @@ function Write-SharedResultRow($Path, [object]$Row) {
     Add-Content -Path $Path -Value $line -Encoding UTF8
 }
 
-function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref) {
-    $a = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
+function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref, $label) {
+    $a = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--label", $label, "--json")
     $oldEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -146,7 +203,7 @@ foreach ($v in $manifestObj.variants) {
             foreach ($c in $clips) {
                 $audio = Join-Path $root ($c.audio -replace '/', '\')
                 if (-not (Test-Path $audio)) { continue }
-                $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref
+                $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref $v.id
                 if (-not $r.ok) {
                     $status = "unsupported/error"; $errMsg = $r.error
                     Write-Host ("   {0}: {1}" -f $c.id, $r.error) -ForegroundColor Yellow
@@ -177,6 +234,9 @@ foreach ($v in $manifestObj.variants) {
             Write-SharedResultRow $Results ([pscustomobject]@{
                 timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
                 requested_backend = $v.backend; resolved_backend = ""; device = $dev; device_name = ""; device_full_name = ""
+                model_package = (Get-BenchmarkMeta $v $v.model_dir $null).model_package
+                variant_id = $v.id; base_model = $manifestObj.model; precision = $v.precision; quant_method = $v.method
+                execution_provider = ""
                 model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = ""; runs = $Runs; warmup = 1; cache_dir = $cacheDir
                 cold_load_seconds = ""; warm_load_seconds = ""; mean_infer_seconds = ""; rtf = ""; realtime_factor = ""
                 label = $v.id; model_size_mb = $v.size_mb; avg_logprob = ""; ttft_ms = ""; tpot_ms = ""; throughput_tps = ""
@@ -212,20 +272,24 @@ foreach ($v in $manifestObj.variants) {
             cer_pct = if ($cRef) { [math]::Round(100.0 * $cer, 2) } else { $null }
             error = ""
         }
+        $meta = Get-BenchmarkMeta $v $v.model_dir $firstRow
         Write-SharedResultRow $Results ([pscustomobject]@{
             timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             requested_backend = $v.backend; resolved_backend = $firstRow.backend; device = $dev
             device_name = $firstRow.device; device_full_name = $firstRow.device_full_name
+            model_package = $meta.model_package; variant_id = $meta.variant_id; base_model = $meta.base_model
+            precision = $meta.precision; quant_method = $meta.quant_method; execution_provider = $meta.execution_provider
             model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = $audioSeconds; runs = $Runs; warmup = 1; cache_dir = $cacheDir
             cold_load_seconds = $coldLoad; warm_load_seconds = $hotLoad
             mean_infer_seconds = ($meanMs / 1000.0); rtf = $meanRtf
             realtime_factor = if ($meanRtf -gt 0) { 1.0 / $meanRtf } else { "" }
-            label = $v.id; model_size_mb = $v.size_mb; avg_logprob = $meanLp
+            label = $meta.variant_id; model_size_mb = $v.size_mb; avg_logprob = $meanLp
             ttft_ms = ($rows | Measure-Object ttft_ms -Average).Average
             tpot_ms = ($rows | Measure-Object tpot_ms -Average).Average
             throughput_tps = $meanTps; wer = $wer; cer = $cer; transcription = $lastRow.text
             cold_start_seconds = $coldLoad; hot_start_seconds = $hotLoad; eval_clips = $rows.Count; status = "ok"
-            runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""
+            runtime = $meta.runtime; model_format = $meta.model_format; decode_strategy = $meta.decode_strategy
+            max_context = $meta.max_context
             power_source = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-PowerSource })
         })
         Write-Host ("   ok: {0} clips | {1} ms | WER {2}% | conf {3}" -f `

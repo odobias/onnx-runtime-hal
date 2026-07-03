@@ -426,6 +426,10 @@ public:
         out.text = decode_tokens(text_tokens, vocab_);
         out.infer_seconds =
             std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        out.runtime = "onnxruntime-vitisai";
+        out.model_format = "onnx";
+        out.decode_strategy = "static-no-kv";
+        out.max_context = static_cast<long>(kMaxTokens);
         return out;
     }
 

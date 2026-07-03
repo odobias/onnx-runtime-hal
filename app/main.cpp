@@ -25,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #if defined(_WIN32)
@@ -35,6 +36,7 @@
 #endif
 
 #include "whisper_npu/audio.hpp"
+#include "whisper_npu/benchmark_meta.hpp"
 #include "whisper_npu/metrics.hpp"
 #include "whisper_npu/whisper_engine.hpp"
 
@@ -173,9 +175,131 @@ std::string power_source() {
 #endif
 }
 
-// Shared, backend-neutral results schema. The trailing metric columns (label +
-// confidence/perf/accuracy) are populated only when the backend/run can supply
-// them, so rows from Intel/AMD/Qualcomm machines share one schema and concatenate.
+std::vector<std::string> split_csv_row(const std::string& line) {
+    std::vector<std::string> fields;
+    std::string cur;
+    bool in_quotes = false;
+    for (size_t i = 0; i < line.size(); ++i) {
+        const char c = line[i];
+        if (in_quotes) {
+            if (c == '"') {
+                if (i + 1 < line.size() && line[i + 1] == '"') {
+                    cur += '"';
+                    ++i;
+                } else {
+                    in_quotes = false;
+                }
+            } else {
+                cur += c;
+            }
+        } else if (c == '"') {
+            in_quotes = true;
+        } else if (c == ',') {
+            fields.push_back(cur);
+            cur.clear();
+        } else {
+            cur += c;
+        }
+    }
+    fields.push_back(cur);
+    return fields;
+}
+
+constexpr const char* kBenchmarkCsvHeader =
+    "timestamp_utc,requested_backend,resolved_backend,device,device_name,"
+    "device_full_name,"
+    "model_package,variant_id,base_model,precision,quant_method,execution_provider,"
+    "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
+    "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
+    "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
+    "throughput_tps,wer,cer,transcription,"
+    "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
+    "cold_start_seconds,hot_start_seconds,power_source";
+
+void migrate_benchmark_csv_schema(const std::filesystem::path& csv_path) {
+    namespace fs = std::filesystem;
+    std::ifstream in(csv_path);
+    if (!in) return;
+    std::string header;
+    std::getline(in, header);
+    if (header.find("model_package") != std::string::npos) return;
+
+    std::vector<std::string> old_header = split_csv_row(header);
+    std::vector<std::string> new_header = split_csv_row(kBenchmarkCsvHeader);
+    std::vector<std::vector<std::string>> rows;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty()) rows.push_back(split_csv_row(line));
+    }
+    in.close();
+
+    std::ofstream out(csv_path, std::ios::trunc);
+    if (!out) throw std::runtime_error("cannot upgrade results CSV schema: " + csv_path.string());
+    out << kBenchmarkCsvHeader << '\n';
+
+    for (const auto& row : rows) {
+        std::unordered_map<std::string, std::string> by_name;
+        for (size_t i = 0; i < old_header.size() && i < row.size(); ++i) {
+            by_name[old_header[i]] = row[i];
+        }
+
+        const std::string model_dir = by_name.count("model_dir") ? by_name["model_dir"] : "";
+        const std::string label = by_name.count("label") ? by_name["label"] : "";
+        whisper_npu::TranscribeResult last;
+        last.runtime = by_name.count("runtime") ? by_name["runtime"] : "";
+        last.model_format = by_name.count("model_format") ? by_name["model_format"] : "";
+        last.decode_strategy = by_name.count("decode_strategy") ? by_name["decode_strategy"] : "";
+        if (by_name.count("max_context") && !by_name["max_context"].empty()) {
+            last.max_context = std::strtol(by_name["max_context"].c_str(), nullptr, 10);
+        }
+
+        struct MigrationEngine : whisper_npu::IWhisperEngine {
+            std::string backend;
+            std::string device;
+            std::string full_device;
+            std::string backend_name() const override { return backend; }
+            std::string device_name() const override { return device; }
+            std::string full_device_name() const override { return full_device; }
+            double load_seconds() const override { return 0.0; }
+            whisper_npu::TranscribeResult transcribe(const std::vector<float>&) override {
+                return {};
+            }
+        };
+        MigrationEngine engine;
+        engine.backend = by_name.count("resolved_backend") ? by_name["resolved_backend"] : "";
+        engine.device = by_name.count("device_name") ? by_name["device_name"] : "";
+        engine.full_device = by_name.count("device_full_name") ? by_name["device_full_name"] : "";
+
+        const auto meta = whisper_npu::benchmark_meta::resolve(model_dir, label, engine, last);
+
+        if (by_name["runtime"].empty() || by_name["runtime"] == by_name["resolved_backend"]) {
+            by_name["runtime"] = meta.runtime;
+        }
+        if (by_name["model_format"].empty()) by_name["model_format"] = meta.model_format;
+        if (by_name["decode_strategy"].empty()) by_name["decode_strategy"] = meta.decode_strategy;
+        if ((!by_name.count("max_context") || by_name["max_context"].empty()) && meta.max_context > 0) {
+            by_name["max_context"] = std::to_string(meta.max_context);
+        }
+        if (by_name["label"].empty()) by_name["label"] = meta.variant_id;
+
+        by_name["model_package"] = meta.model_package;
+        by_name["variant_id"] = meta.variant_id;
+        by_name["base_model"] = meta.base_model;
+        by_name["precision"] = meta.precision;
+        by_name["quant_method"] = meta.quant_method;
+        by_name["execution_provider"] = meta.execution_provider;
+
+        for (size_t i = 0; i < new_header.size(); ++i) {
+            if (i) out << ',';
+            const auto it = by_name.find(new_header[i]);
+            out << csv_escape(it == by_name.end() ? "" : it->second);
+        }
+        out << '\n';
+    }
+}
+
+// Shared, backend-neutral results schema. Filter columns (model_package, variant_id,
+// precision, runtime, ...) are always populated so rows concatenate and filter cleanly.
 void append_result_csv(const std::string& path,
                        const std::string& requested_backend,
                        const whisper_npu::IWhisperEngine& engine,
@@ -201,48 +325,21 @@ void append_result_csv(const std::string& path,
     if (csv_path.has_parent_path()) fs::create_directories(csv_path.parent_path());
 
     const bool write_header = !fs::exists(csv_path) || fs::file_size(csv_path) == 0;
-    if (!write_header) {
-        // Additive schema migration: append any trailing columns the existing file
-        // predates, back-filling old rows with empty cells so positions stay aligned.
-        std::ifstream in(csv_path);
-        std::string header;
-        std::getline(in, header);
-        std::vector<std::string> rows;
-        std::string line;
-        while (std::getline(in, line)) rows.push_back(line);
-        in.close();
-
-        std::string new_header = header;
-        std::string pad;
-        if (new_header.find("cold_start_seconds") == std::string::npos) {
-            new_header += ",cold_start_seconds,hot_start_seconds";
-            pad += ",,";
-        }
-        if (new_header.find("power_source") == std::string::npos) {
-            new_header += ",power_source";
-            pad += ",";
-        }
-        if (new_header != header) {
-            std::ofstream rewrite(csv_path, std::ios::trunc);
-            if (!rewrite) throw std::runtime_error("cannot upgrade results CSV schema: " + path);
-            rewrite << new_header << '\n';
-            for (const auto& row : rows) rewrite << row << pad << '\n';
-        }
-    }
+    if (!write_header) migrate_benchmark_csv_schema(csv_path);
 
     std::ofstream out(csv_path, std::ios::app);
     if (!out) throw std::runtime_error("cannot open results CSV for append: " + path);
 
     if (write_header) {
-        out << "timestamp_utc,requested_backend,resolved_backend,device,device_name,"
-               "device_full_name,"
-               "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
-               "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
-               "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
-               "throughput_tps,wer,cer,transcription,"
-               "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
-               "cold_start_seconds,hot_start_seconds,power_source\n";
+        out << kBenchmarkCsvHeader << '\n';
     }
+
+    const auto meta = whisper_npu::benchmark_meta::resolve(model_dir, label, engine, last);
+    const std::string effective_label = label.empty() ? meta.variant_id : label;
+    const std::string runtime = meta.runtime;
+    const std::string model_format = meta.model_format;
+    const std::string decode_strategy = meta.decode_strategy;
+    const long max_context = meta.max_context;
 
     const bool tok = last.has_token_metrics;
     out << csv_escape(utc_now_iso8601()) << ','
@@ -251,6 +348,12 @@ void append_result_csv(const std::string& path,
         << csv_escape(to_string(device)) << ','
         << csv_escape(engine.device_name()) << ','
         << csv_escape(engine.full_device_name()) << ','
+        << csv_escape(meta.model_package) << ','
+        << csv_escape(meta.variant_id) << ','
+        << csv_escape(meta.base_model) << ','
+        << csv_escape(meta.precision) << ','
+        << csv_escape(meta.quant_method) << ','
+        << csv_escape(meta.execution_provider) << ','
         << csv_escape(model_dir) << ','
         << csv_escape(audio_path) << ','
         << std::setprecision(9) << audio_seconds << ','
@@ -262,7 +365,7 @@ void append_result_csv(const std::string& path,
         << mean_seconds << ','
         << rtf << ','
         << (rtf > 0.0 ? 1.0 / rtf : 0.0) << ','
-        << csv_escape(label) << ','
+        << csv_escape(effective_label) << ','
         << opt_num(model_size_mb_val, model_size_mb_val >= 0.0, 6) << ','
         << opt_num(last.avg_logprob, tok, 6) << ','
         << opt_num(last.ttft_ms, tok, 6) << ','
@@ -271,11 +374,10 @@ void append_result_csv(const std::string& path,
         << opt_num(er.wer, have_ref, 6) << ','
         << opt_num(er.cer, have_ref, 6) << ','
         << csv_escape(text) << ','
-        // Self-describing run metadata; fall back to backend name for runtime.
-        << csv_escape(last.runtime.empty() ? engine.backend_name() : last.runtime) << ','
-        << csv_escape(last.model_format) << ','
-        << csv_escape(last.decode_strategy) << ','
-        << (last.max_context > 0 ? std::to_string(last.max_context) : std::string()) << ','
+        << csv_escape(runtime) << ','
+        << csv_escape(model_format) << ','
+        << csv_escape(decode_strategy) << ','
+        << (max_context > 0 ? std::to_string(max_context) : std::string()) << ','
         << 1 << ','          // eval_clips: this CLI benchmarks a single audio file
         << "ok" << ','       // reached here => run succeeded
         << cold_load << ','  // cold_start_seconds
@@ -431,6 +533,9 @@ int main(int argc, char* argv[]) {
     ErrorRate er;
     if (have_ref) er = compute_error_rate(reference, text);
 
+    const auto bench_meta =
+        whisper_npu::benchmark_meta::resolve(opt.model_dir, label, *engine, last);
+
     if (!results_csv.empty()) {
         try {
             append_result_csv(results_csv, requested_backend, *engine, opt.device, opt.model_dir,
@@ -454,6 +559,18 @@ int main(int argc, char* argv[]) {
         js << ",\"cpu_threads_requested\":" << cpu_threads;
         js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
+        js << ",\"model_package\":\"" << json_escape(bench_meta.model_package) << "\"";
+        js << ",\"variant_id\":\"" << json_escape(bench_meta.variant_id) << "\"";
+        js << ",\"base_model\":\"" << json_escape(bench_meta.base_model) << "\"";
+        js << ",\"precision\":\"" << json_escape(bench_meta.precision) << "\"";
+        js << ",\"quant_method\":\"" << json_escape(bench_meta.quant_method) << "\"";
+        js << ",\"execution_provider\":\"" << json_escape(bench_meta.execution_provider) << "\"";
+        js << ",\"runtime\":\"" << json_escape(bench_meta.runtime) << "\"";
+        js << ",\"model_format\":\"" << json_escape(bench_meta.model_format) << "\"";
+        js << ",\"decode_strategy\":\"" << json_escape(bench_meta.decode_strategy) << "\"";
+        if (bench_meta.max_context > 0) {
+            js << ",\"max_context\":" << bench_meta.max_context;
+        }
         js << ",\"model_size_mb\":" << size_mb;
         js << ",\"audio\":\"" << json_escape(audio_path) << "\"";
         js << ",\"audio_len_s\":" << audio_len;
