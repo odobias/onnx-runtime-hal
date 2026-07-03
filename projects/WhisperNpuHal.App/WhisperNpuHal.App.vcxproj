@@ -78,8 +78,7 @@
        are copied when present; plain CPU ORT installs may only have onnxruntime.dll. -->
   <Target Name="CopyOrtRuntime" AfterTargets="Build" Condition="'$(EnableOrt)'=='true'">
     <ItemGroup>
-      <OrtRuntime Include="$(OrtBinDir)\onnxruntime.dll" />
-      <OrtRuntime Include="$(OrtBinDir)\onnxruntime_providers_shared.dll" />
+      <OrtRuntime Include="$(OrtBinDir)\onnxruntime*.dll" />
       <OrtRuntime Include="$(OrtBinDir)\DirectML.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(OrtRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />

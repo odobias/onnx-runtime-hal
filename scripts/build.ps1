@@ -6,6 +6,7 @@
 #   .\build.ps1 -Configuration Debug
 #   .\build.ps1 -EnableAmd -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel
+#   .\build.ps1 -EnableOrt -DisableIntel -OrtDir C:\onnxruntime
 
 [CmdletBinding()]
 param(
@@ -15,6 +16,7 @@ param(
     [switch]$DisableIntel,
     [switch]$EnableQualcomm,
     [string]$RyzenAiDir = "",
+    [string]$OrtDir = "",
     [switch]$Rebuild
 )
 
@@ -65,6 +67,9 @@ $args = @(
 )
 if ($RyzenAiDir) {
     $args += "/p:RyzenAiDir=$RyzenAiDir"
+}
+if ($OrtDir) {
+    $args += "/p:OrtDir=$OrtDir"
 }
 & $found.msbuild @args
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit 1 }

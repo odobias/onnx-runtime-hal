@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -65,8 +66,33 @@ std::string provider_for(Device device) {
     return "CPUExecutionProvider";
 }
 
-void append_provider(Ort::SessionOptions& so, const EngineOptions& options, const fs::path& model_dir) {
-    if (options.device == Device::CPU) {
+std::string lower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+std::string requested_provider(const EngineOptions& options) {
+    if (!options.device_override.empty()) return options.device_override;
+    return provider_for(options.device);
+}
+
+std::string cache_safe(std::string s) {
+    if (s.empty()) s = "static_onnx";
+    for (char& c : s) {
+        const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                        (c >= '0' && c <= '9') || c == '_' || c == '-';
+        if (!ok) c = '_';
+    }
+    return s;
+}
+
+void append_provider(Ort::SessionOptions& so, const EngineOptions& options, const fs::path& model_dir,
+                     const std::string& cache_key) {
+    const std::string provider = requested_provider(options);
+    const std::string p = lower(provider);
+
+    if (p == "cpu" || p == "cpuexecutionprovider") {
         if (options.cpu_threads > 0) {
             so.SetIntraOpNumThreads(options.cpu_threads);
             so.SetInterOpNumThreads(1);
@@ -74,32 +100,39 @@ void append_provider(Ort::SessionOptions& so, const EngineOptions& options, cons
         return;  // CPU EP is the default ORT fallback.
     }
 
-    if (options.device == Device::NPU) {
-        const char* allow = std::getenv("WHISPER_HAL_ORT_EXPERIMENTAL_NPU");
-        if (!allow || std::string(allow) != "1") {
-            throw std::runtime_error(
-                "VitisAI EP hard-crashes on this unchanged static ONNX export after compilation "
-                "(observed: cannot find producer for last_hidden_state). Set "
-                "WHISPER_HAL_ORT_EXPERIMENTAL_NPU=1 to try it anyway.");
-        }
+    if (p == "vitisai" || p == "vitisaiexecutionprovider") {
         std::unordered_map<std::string, std::string> vitis_opts;
         const fs::path config = model_dir / "vitisai_config.json";
         if (fs::exists(config)) vitis_opts["config_file"] = config.string();
         if (!options.cache_dir.empty()) {
             vitis_opts["cache_dir"] = options.cache_dir;
-            vitis_opts["cache_key"] = "whisper_tiny_en_static_onnx";
+            vitis_opts["cache_key"] = cache_key;
         }
         so.AppendExecutionProvider_VitisAI(vitis_opts);
         return;
     }
 
+    if (p == "dml" || p == "directml" || p == "dmlexecutionprovider") {
 #ifdef WHISPER_HAL_ORT_HAS_DML
-    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(so, 0));
-    return;
+        Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(so, 0));
+        return;
 #else
-    throw std::runtime_error(
-        "generic ONNX Runtime static backend was built without DirectML provider headers; use CPU/NPU");
+        throw std::runtime_error(
+            "generic ONNX Runtime static backend was built without DirectML provider headers; use CPU/NPU");
 #endif
+    }
+
+    throw std::runtime_error(
+        "unsupported ONNX Runtime provider override for static backend: " + provider +
+        " (supported: CPUExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
+}
+
+Ort::SessionOptions make_session_options(const EngineOptions& options, const fs::path& model_dir,
+                                         const std::string& cache_key) {
+    Ort::SessionOptions so;
+    so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+    append_provider(so, options, model_dir, cache_key);
+    return so;
 }
 
 class OrtStaticEngine final : public IWhisperEngine {
@@ -107,7 +140,7 @@ public:
     explicit OrtStaticEngine(const EngineOptions& options)
         : env_(ORT_LOGGING_LEVEL_WARNING, "whisper_hal_ort_static"),
           options_(options),
-          provider_(provider_for(options.device)),
+          provider_(requested_provider(options)),
           max_tokens_(env_max_tokens()) {
         const fs::path dir(options.model_dir);
         const fs::path enc_path = dir / "encoder_model.onnx";
@@ -128,13 +161,12 @@ public:
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
-        Ort::SessionOptions so;
-        so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-        append_provider(so, options_, dir);
-
         const auto t0 = std::chrono::steady_clock::now();
-        encoder_ = std::make_unique<Ort::Session>(env_, enc_path.c_str(), so);
-        decoder_ = std::make_unique<Ort::Session>(env_, dec_path.c_str(), so);
+        const std::string cache_base = cache_safe(dir.filename().string());
+        auto enc_so = make_session_options(options_, dir, cache_base + "_encoder");
+        encoder_ = std::make_unique<Ort::Session>(env_, enc_path.c_str(), enc_so);
+        auto dec_so = make_session_options(options_, dir, cache_base + "_decoder");
+        decoder_ = std::make_unique<Ort::Session>(env_, dec_path.c_str(), dec_so);
         load_seconds_ =
             std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     }
