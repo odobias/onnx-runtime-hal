@@ -9,7 +9,8 @@ hardware-independent runner with swappable per-platform backends.
   for AMD's `whisper-tiny-onnx-npu` model.
 - **ONNX Runtime static** — unchanged `whisper-tiny-en-static-onnx` via ORT providers.
   **Working on CPU, DirectML GPU, and AMD VitisAI NPU.**
-- **Qualcomm** — Snapdragon Hexagon via ONNX Runtime + QNN EP. **Prepared scaffold.**
+- **Qualcomm** — Snapdragon Hexagon via ONNX Runtime Plugin QNN EP. **Working on
+  `whisper-tiny-en-static-onnx` (same static ONNX as `onnx-static`).**
 
 Build system: **MSBuild / Visual Studio 2026** (`WhisperNpuHal.sln`).
 `PlatformToolset=$(DefaultPlatformToolset)`, so it also builds on older VS if needed.
@@ -67,7 +68,7 @@ individually):
 |---|---|---|---|
 | `setup-intel.ps1` | intel | OpenVINO GenAI C++ SDK (download or link) | `third_party/` |
 | `setup-amd.ps1` | amd | Ryzen AI SDK + NPU driver (vendor installers, elevated) | `C:\Program Files\RyzenAI\...`, conda env |
-| `setup-qualcomm.ps1` | qualcomm | link an installed QNN SDK (scaffold) | `third_party/qnn` |
+| `setup-qualcomm.ps1` | qualcomm | ONNX Runtime + Plugin QNN EP (pip + NuGet headers) | `third_party/onnxruntime`, `third_party/qnn-ep` |
 | `get-model.ps1` | intel | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper-tiny-en-ov/` |
 | `get-amd-model.ps1` | amd | download AMD ONNX Tiny + OpenAI tokenizer/config sidecars | `models/whisper-tiny-amd/` |
 | `get-audio.ps1` | all | public-domain 16 kHz sample | `models/jfk.wav` |
@@ -108,6 +109,18 @@ not present. On this AMD Ryzen AI machine, the unchanged static ONNX NPU path
 cold-compiles encoder and decoder into separate VitisAI cache entries (~214 s cold
 load), then hot-loads from cache in ~2.6 s and runs the JFK sample at ~0.053 RTF with
 0% WER.
+
+Qualcomm Snapdragon X (Plugin QNN EP on HTP):
+
+```powershell
+.\scripts\setup-qualcomm.ps1
+.\scripts\build.ps1 -EnableQualcomm -DisableIntel
+.\scripts\run.ps1 -Backend qualcomm -Device npu -Runs 1
+```
+
+Uses the same `models/whisper-tiny-en-static-onnx` package as `onnx-static`. First load
+compiles graphs to the Hexagon NPU (~20 s); inference on the JFK sample is ~0.5 s
+(~22x real time) on Snapdragon X Elite.
 
 ## Model store (Hugging Face)
 

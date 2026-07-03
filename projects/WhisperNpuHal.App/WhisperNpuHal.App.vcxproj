@@ -79,14 +79,33 @@
   <Target Name="CopyOrtRuntime" AfterTargets="Build" Condition="'$(EnableOrt)'=='true'">
     <ItemGroup>
       <OrtRuntime Include="$(OrtBinDir)\onnxruntime*.dll" />
-      <OrtRuntime Include="$(OrtBinDir)\DirectML.dll" />
+      <OrtRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
     </ItemGroup>
-    <Copy SourceFiles="@(OrtRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="Copied ONNX Runtime to $(OutDir)" />
+    <Copy SourceFiles="@(OrtRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(OrtRuntime)' != ''" />
+    <Message Importance="high" Text="Copied ONNX Runtime to $(OutDir)" Condition="'@(OrtRuntime)' != ''" />
   </Target>
 
   <!-- Copy RyzenAI / ONNX Runtime VitisAI EP runtime DLLs next to the exe so the
        AMD backend runs without an activated Python or conda environment. -->
+  <!-- Copy ONNX Runtime + Plugin QNN EP runtime for the Qualcomm backend. -->
+  <Target Name="CopyQualcommRuntime" AfterTargets="Build" Condition="'$(EnableQualcomm)'=='true'">
+    <ItemGroup>
+      <QualcommRuntime Include="$(OrtBinDir)\onnxruntime.dll" Condition="Exists('$(OrtBinDir)\onnxruntime.dll')" />
+      <QualcommRuntime Include="$(OrtBinDir)\onnxruntime_providers_shared.dll" Condition="Exists('$(OrtBinDir)\onnxruntime_providers_shared.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\onnxruntime_providers_qnn.dll" Condition="Exists('$(QnnEpDir)\onnxruntime_providers_qnn.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\QnnHtp.dll" Condition="Exists('$(QnnEpDir)\QnnHtp.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\QnnHtpNetRunExtensions.dll" Condition="Exists('$(QnnEpDir)\QnnHtpNetRunExtensions.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\QnnSystem.dll" Condition="Exists('$(QnnEpDir)\QnnSystem.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\QnnIr.dll" Condition="Exists('$(QnnEpDir)\QnnIr.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\QnnCpu.dll" Condition="Exists('$(QnnEpDir)\QnnCpu.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\QnnGpu.dll" Condition="Exists('$(QnnEpDir)\QnnGpu.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\HtpPrepare.dll" Condition="Exists('$(QnnEpDir)\HtpPrepare.dll')" />
+      <QualcommRuntime Include="$(QnnEpDir)\Genie.dll" Condition="Exists('$(QnnEpDir)\Genie.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(QualcommRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(QualcommRuntime)' != ''" />
+    <Message Importance="high" Text="Copied Qualcomm QNN runtime to $(OutDir)" Condition="'@(QualcommRuntime)' != ''" />
+  </Target>
+
   <Target Name="CopyAmdRuntime" AfterTargets="Build" Condition="'$(EnableAmd)'=='true'">
     <ItemGroup>
       <AmdRuntime Include="$(OrtAmdBinDir)\onnxruntime.dll" />

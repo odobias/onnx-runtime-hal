@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Qualcomm backend: ONNX Runtime + QNN EP (Snapdragon Hexagon). Imported only
-     when EnableQualcomm=true. Point OrtQnnDir at your ONNX Runtime (QNN) SDK, e.g.
-     /p:EnableQualcomm=true /p:OrtQnnDir=C:\qnn\onnxruntime  (typically ARM64). -->
+<!-- Qualcomm backend: ONNX Runtime 1.24+ Plugin QNN EP (Snapdragon Hexagon).
+     setup-qualcomm.ps1 stages third_party/onnxruntime + third_party/qnn-ep. -->
 <Project>
   <PropertyGroup>
-    <OrtQnnDir Condition="'$(OrtQnnDir)'=='' and '$(QNN_ORT_DIR)'!=''">$(QNN_ORT_DIR)</OrtQnnDir>
-    <OrtQnnInclude Condition="'$(OrtQnnInclude)'==''">$(OrtQnnDir)\include</OrtQnnInclude>
-    <OrtQnnLibDir Condition="'$(OrtQnnLibDir)'==''">$(OrtQnnDir)\lib</OrtQnnLibDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(ORT_DIR)'!=''">$(ORT_DIR)</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'==''">$(WhisperHalRoot)third_party\onnxruntime</OrtDir>
+    <QnnEpDir Condition="'$(QnnEpDir)'=='' and '$(QNN_EP_DIR)'!=''">$(QNN_EP_DIR)</QnnEpDir>
+    <QnnEpDir Condition="'$(QnnEpDir)'==''">$(WhisperHalRoot)third_party\qnn-ep</QnnEpDir>
+    <OrtInclude Condition="'$(OrtInclude)'==''">$(OrtDir)\include</OrtInclude>
+    <OrtLibDir Condition="'$(OrtLibDir)'==''">$(OrtDir)\lib</OrtLibDir>
+    <OrtBinDir Condition="'$(OrtBinDir)'==''">$(OrtDir)\bin</OrtBinDir>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OrtQnnInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WHISPER_HAL_QUALCOMM;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(OrtInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WHISPER_HAL_QUALCOMM;WHISPER_HAL_ORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(OrtQnnLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(OrtLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
