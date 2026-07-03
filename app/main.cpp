@@ -176,6 +176,11 @@ std::string power_source() {
 // Shared, backend-neutral results schema. The trailing metric columns (label +
 // confidence/perf/accuracy) are populated only when the backend/run can supply
 // them, so rows from Intel/AMD/Qualcomm machines share one schema and concatenate.
+//
+// AUTHORITATIVE COLUMN ORDER lives in scripts/benchmark.lib.ps1
+// (Get-BenchmarkResultColumns). The header emitted below MUST match that list;
+// the harness and this executor are the two writers of the same ledger. If you
+// add/reorder a column, change it in both places (and results/README.md).
 void append_result_csv(const std::string& path,
                        const std::string& requested_backend,
                        const whisper_npu::IWhisperEngine& engine,

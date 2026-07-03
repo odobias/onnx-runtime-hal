@@ -9,7 +9,7 @@ For encoder + decoder graphs it reports:
   4. a real encoder inference on CPU and NPU with timing
 
 Run with the onnxruntime-openvino venv:
-  .venv-ovep\Scripts\python.exe scripts\probe_ovep.py models\whisper-tiny-en-onnx
+  .venv-ovep\Scripts\python.exe scripts\experiments\probe_ovep.py models\whisper-tiny-en-onnx
 """
 import sys
 import time
