@@ -7,6 +7,7 @@
 #   .\run.ps1 -Device cpu -Threads 8            # pin OpenVINO CPU inference threads
 #   .\run.ps1 -Backend amd                      # NPU, AMD ONNX model, cache demo
 #   .\run.ps1 -Backend onnx-static -Device cpu  # unchanged static ONNX via ONNX Runtime
+#   .\run.ps1 -Backend onnx-static -Device npu -Provider VitisAIExecutionProvider
 #   .\run.ps1 -Model <model_dir> -Audio <wav> -NoCache -NoResults
 
 [CmdletBinding()]
@@ -17,6 +18,7 @@ param(
     [ValidateSet("npu", "gpu", "cpu")][string]$Device = "npu",
     [int]$Runs = 5,
     [int]$Threads = 0,
+    [string]$Provider = "",
     [string]$Configuration = "Release",
     [string]$Results = "",
     [string]$Label = "",
@@ -54,6 +56,7 @@ if (-not $NoCache) {
     $extraArgs += @("--cache", $cacheDir)
 }
 if ($Threads -gt 0) { $extraArgs += @("--threads", "$Threads") }
+if ($Provider) { $extraArgs += @("--provider", $Provider) }
 if (-not $NoResults) {
     $extraArgs += @("--results", $Results)
     if ($Label) { $extraArgs += @("--label", $Label) }

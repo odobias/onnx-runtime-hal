@@ -253,7 +253,7 @@ int main(int argc, char* argv[]) {
     using namespace whisper_npu;
 
     std::vector<std::string> pos;
-    std::string cache_dir, reference, results_csv, label;
+    std::string cache_dir, reference, results_csv, label, provider_override;
     bool json_out = false, have_ref = false;
     int cpu_threads = 0;
     for (int i = 1; i < argc; ++i) {
@@ -265,6 +265,8 @@ int main(int argc, char* argv[]) {
             have_ref = true;
         } else if (a == "--threads" && i + 1 < argc) {
             cpu_threads = std::max(0, std::atoi(argv[++i]));
+        } else if ((a == "--provider" || a == "--device-override") && i + 1 < argc) {
+            provider_override = argv[++i];
         } else if (a == "--json") {
             json_out = true;
         } else if (a == "--results" && i + 1 < argc) {
@@ -279,13 +281,14 @@ int main(int argc, char* argv[]) {
     if (pos.size() < 2) {
         std::cerr << "Usage: " << argv[0]
                   << " <model_dir> <audio.wav> [backend] [device] [runs]"
-                     " [--cache <dir>] [--ref \"text\"] [--threads N] [--json] [--results <csv>]\n"
+                     " [--cache <dir>] [--ref \"text\"] [--threads N] [--provider <ort-ep>] [--json] [--results <csv>]\n"
                   << "  backend: auto | intel | intel-onnx | onnx-static | amd | qualcomm   (default auto)\n"
                   << "  device : npu | gpu | cpu                 (default npu)\n"
                   << "  runs   : timed iterations                (default 5)\n"
                   << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"
                   << "  --ref \"text\": reference transcript -> compute WER/CER\n"
                   << "  --threads N: CPU inference thread count (CPU device only)\n"
+                  << "  --provider <ort-ep>: backend-specific provider override (e.g. VitisAIExecutionProvider)\n"
                   << "  --json: emit one machine-readable JSON record\n"
                   << "  --results <csv>: append a benchmark result row\n"
                   << "  --label <text>: tag the results row (e.g. quantization variant)\n\n";
@@ -301,6 +304,7 @@ int main(int argc, char* argv[]) {
     const std::string audio_path = pos[1];
     opt.cache_dir = cache_dir;
     opt.cpu_threads = cpu_threads;
+    opt.device_override = provider_override;
 
     Backend backend = Backend::Auto;
     if (pos.size() > 2 && !parse_backend(pos[2], backend)) {

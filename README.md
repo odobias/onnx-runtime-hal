@@ -8,7 +8,7 @@ hardware-independent runner with swappable per-platform backends.
 - **AMD** — Ryzen AI / XDNA via ONNX Runtime + VitisAI EP. **Working ONNX implementation**
   for AMD's `whisper-tiny-onnx-npu` model.
 - **ONNX Runtime static** — unchanged `whisper-tiny-en-static-onnx` via ORT providers.
-  **Working on CPU and DirectML GPU; VitisAI NPU currently fails in the provider.**
+  **Working on CPU, DirectML GPU, and AMD VitisAI NPU.**
 - **Qualcomm** — Snapdragon Hexagon via ONNX Runtime + QNN EP. **Prepared scaffold.**
 
 Build system: **MSBuild / Visual Studio 2026** (`WhisperNpuHal.sln`).
@@ -90,17 +90,24 @@ Run the unchanged static ONNX export through ONNX Runtime:
 
 ```powershell
 .\scripts\build.ps1 -EnableOrt -DisableIntel
+.\scripts\build.ps1 -EnableOrt -DisableIntel -OrtDir C:\path\to\onnxruntime   # non-RyzenAI ORT SDK
 .\scripts\run.ps1 -Backend onnx-static -Device cpu -Runs 1
 .\scripts\run.ps1 -Backend onnx-static -Device gpu -Runs 1
+.\scripts\run.ps1 -Backend onnx-static -Device npu -Provider VitisAIExecutionProvider -Runs 1
 ```
 
-`onnx-static` uses CPUExecutionProvider for CPU and DirectML for GPU. Point `OrtDir`
-at a platform ONNX Runtime SDK if the default Ryzen AI ORT location is not present.
-On this AMD
-Ryzen AI machine, the VitisAI NPU path compiles for about two minutes and then hard-crashes
-inside the provider with `cannot find producer ... last_hidden_state`; the backend now
-fails that device cleanly by default. Set `WHISPER_HAL_ORT_EXPERIMENTAL_NPU=1` only if
-you intentionally want to reproduce the provider failure.
+`onnx-static` defaults to CPUExecutionProvider for CPU, DirectML for GPU, and VitisAI
+for NPU. Override the selected ONNX Runtime provider with `--provider` on the app or
+`-Provider` on `run.ps1` (for example `CPUExecutionProvider`, `DmlExecutionProvider`,
+or `VitisAIExecutionProvider`). Provider cache keys are derived from the model directory
+and split by session (`*_encoder`, `*_decoder`), so encoder and decoder compiled blobs
+do not collide when a backend such as VitisAI persists artifacts.
+
+Point `OrtDir` at a platform ONNX Runtime SDK if the default Ryzen AI ORT location is
+not present. On this AMD Ryzen AI machine, the unchanged static ONNX NPU path
+cold-compiles encoder and decoder into separate VitisAI cache entries (~214 s cold
+load), then hot-loads from cache in ~2.6 s and runs the JFK sample at ~0.053 RTF with
+0% WER.
 
 ## Model store (Hugging Face)
 
