@@ -222,8 +222,16 @@ Python; the app copies the RyzenAI ONNX Runtime / VitisAI DLLs next to the exe.
 ```powershell
 .\scripts\run.ps1 -Backend amd -Device npu
 .\scripts\run.ps1 -Backend intel -Device npu
-.\scripts\benchmark.ps1 -Runs 3               # manifest-driven all-clip sweep
+.\scripts\benchmark.ps1 -Runs 3               # manifest-driven all-clip sweep (host NPU only)
+.\scripts\benchmark.ps1 -NpuVendor all        # attempt every vendor's variants
+.\scripts\benchmark.ps1 -NpuVendor intel      # force a specific vendor
 ```
+
+`benchmark.ps1` autodetects the host NPU vendor (a machine has one brand — Intel AI
+Boost, AMD XDNA/IPU, or Snapdragon Hexagon) and **skips variants targeting a different
+vendor** instead of wasting a compile on hardware that can't run them. Vendor-neutral
+static-ONNX variants always run. Override with `-NpuVendor all` (no filter) or a forced
+vendor. Skipped variants are listed in the report as `skip:other-npu`, not failures.
 
 Each platform should run only its own manifest entries locally. The CSV schema is
 documented in `results\README.md`; use `-Results <path>` to write benchmark sweeps to
@@ -252,8 +260,10 @@ count is not a cosmetic knob, it's the main lever you have.
 `compare-devices.ps1` runs a single variant (fp16 by default) across every requested
 device and pivots the report on *device* instead of *quantization method* (that's
 `benchmark.ps1`'s job). It reads `backend` from the same manifest entry as the canonical
-benchmark. Unsupported combos — no NPU present, GPU not wired for a backend, etc. — are
-recorded as failures, not crashes, per the same backend-neutral contract.
+benchmark. When no `-Variant` is given it autodetects the host NPU vendor and defaults to
+a variant this machine can actually run (override with `-NpuVendor`); an explicitly
+requested cross-vendor variant still runs, with a warning. Unsupported combos — no NPU
+present, GPU not wired for a backend, etc. — are recorded as failures, not crashes.
 
 Measured on this dev machine (AMD Threadripper PRO 7955WX, 16C/32T, NVIDIA T1000 — i.e.
 **zero Intel NPU/GPU hardware**) with `compare-devices.ps1`, whisper-tiny.en fp16, 12

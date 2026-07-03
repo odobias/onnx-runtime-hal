@@ -22,6 +22,9 @@ param(
     [int]$Runs = 3,
     [int]$Threads = 0,                # CPU only; 0 = runtime default
     [int]$MaxClips = 0,               # 0 = all clips in the eval set
+    # NPU vendor: auto (detect host, prefer matching variant), all (no preference),
+    # or a forced vendor. Only affects default variant selection + a mismatch warning.
+    [ValidateSet("auto", "all", "intel", "amd", "qualcomm")][string]$NpuVendor = "auto",
     [string]$Configuration = "Release"
 )
 
@@ -45,13 +48,24 @@ if (-not $manifestObj.variants -or $manifestObj.variants.Count -eq 0) {
     exit 1
 }
 
+# Autodetect the host NPU vendor so default variant selection prefers something this
+# machine can actually run (one NPU brand per host).
+$platform = Get-BenchmarkPlatform
+$hostVendor = Resolve-BenchmarkHostVendor $NpuVendor $platform
+$supported = @($manifestObj.variants | Where-Object { Test-BenchmarkVariantSupported -Backend $_.backend -HostVendor $hostVendor })
+
 $v = $null
 if ($Variant) {
     $v = $manifestObj.variants | Where-Object { $_.id -eq $Variant } | Select-Object -First 1
     if (-not $v) { Write-Host "Variant '$Variant' not found in manifest." -ForegroundColor Red; exit 1 }
+    if (-not (Test-BenchmarkVariantSupported -Backend $v.backend -HostVendor $hostVendor)) {
+        Write-Host ("  ! '{0}' targets {1} NPU but host is {2}; running anyway as requested." -f `
+                $v.id, (Get-BenchmarkBackendVendor $v.backend), $hostVendor) -ForegroundColor Yellow
+    }
 } else {
-    $v = $manifestObj.variants | Where-Object { $_.precision -eq "fp16" } | Select-Object -First 1
-    if (-not $v) { $v = $manifestObj.variants | Select-Object -First 1 }
+    $pool = if ($supported.Count) { $supported } else { $manifestObj.variants }
+    $v = $pool | Where-Object { $_.precision -eq "fp16" } | Select-Object -First 1
+    if (-not $v) { $v = $pool | Select-Object -First 1 }
 }
 
 $modelDir = Join-Path $root ($v.model_dir -replace '/', '\')

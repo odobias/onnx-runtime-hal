@@ -18,6 +18,9 @@ param(
     [int]$Runs = 3,
     [int]$MaxClips = 0,            # 0 = all clips in the eval set
     [string]$Results = "",
+    # NPU vendor filter: auto (detect this host), all (try everything), or a forced
+    # vendor. A machine has one NPU brand, so by default we skip other vendors' variants.
+    [ValidateSet("auto", "all", "intel", "amd", "qualcomm")][string]$NpuVendor = "auto",
     [string]$Configuration = "Release"
 )
 
@@ -46,13 +49,30 @@ New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 if (-not $Results) { $Results = Join-Path $reportsDir "benchmark-results.csv" }
 $cacheRoot = Join-Path $root "cache"
 
-# Shared harness helpers (CSV schema, power source, app invocation, aggregation)
-# live in benchmark.lib.ps1, dot-sourced above.
+# Autodetect the host NPU vendor (one brand per machine) and skip variants that
+# target a different vendor's NPU. -NpuVendor all disables the filter; -NpuVendor
+# <intel|amd|qualcomm> forces it. Shared harness helpers (CSV schema, power source,
+# app invocation, aggregation, detection) live in benchmark.lib.ps1.
+$platform = Get-BenchmarkPlatform
+$hostVendor = Resolve-BenchmarkHostVendor $NpuVendor $platform
 
 $summary = @()
 $detail = @()
 
 foreach ($v in $manifestObj.variants) {
+    if (-not (Test-BenchmarkVariantSupported -Backend $v.backend -HostVendor $hostVendor)) {
+        $vend = Get-BenchmarkBackendVendor $v.backend
+        Write-Host ("-- skip {0} (backend {1} targets {2} NPU; host is {3}) --" -f `
+                $v.id, $v.backend, $vend, $hostVendor) -ForegroundColor DarkGray
+        $summary += [pscustomobject]@{
+            variant = $v.id; precision = $v.precision; backend = $v.backend; device = "-"
+            status = "skip:other-npu"; clips = 0; size_mb = $v.size_mb
+            cold_s = $null; hot_s = $null; mean_ms = $null; rtf = $null; xrt = $null
+            tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null
+            error = "$vend variant on $hostVendor host"
+        }
+        continue
+    }
     $modelDir = Join-Path $root ($v.model_dir -replace '/', '\')
     $devList = if ($Devices.Count) { $Devices } else { $v.devices }
 
@@ -168,6 +188,7 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("# Whisper NPU HAL - quantization benchmark")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("- Model: ``$($manifestObj.model)``")
+[void]$md.AppendLine("- Host: ``$($platform.cpu_name)`` | NPU vendor ``$($platform.npu_vendor)``$(if ($platform.npu_device) { " ($($platform.npu_device))" }) | filter ``$hostVendor``")
 [void]$md.AppendLine("- Eval clips: $($clips.Count) | Runs/clip: $Runs | Generated: $(Get-Date -Format s)")
 [void]$md.AppendLine("- Confidence = mean per-token log-prob (self-reported; higher = more confident, not calibrated truth).")
 [void]$md.AppendLine("- WER/CER micro-averaged over clips after normalization.")

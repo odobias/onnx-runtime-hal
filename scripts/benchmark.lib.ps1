@@ -92,6 +92,121 @@ function Get-BenchmarkPowerSource {
     } catch { return 'unknown' }
 }
 
+# --- platform / NPU vendor autodetection -------------------------------------
+
+# Map a manifest backend string to the NPU vendor it targets. "Neutral" backends
+# (vendor-agnostic static ONNX, or Auto) run anywhere; vendor backends only run on
+# a matching host. Keep this in sync with the backend aliases in app/main.cpp and
+# the ValidateSet in run.ps1.
+function Get-BenchmarkBackendVendor([string]$Backend) {
+    switch -Regex ("$Backend".ToLowerInvariant()) {
+        '^intel-onnx$' { return 'Intel' }
+        '^intel$'      { return 'Intel' }
+        '^amd'         { return 'AMD' }
+        '^qualcomm'    { return 'Qualcomm' }
+        default        { return 'Neutral' }  # onnx-static, ort, auto, unknown
+    }
+}
+
+# Normalize a user-supplied vendor selector to the canonical casing used here.
+function Get-BenchmarkVendorName([string]$Vendor) {
+    switch -Regex ("$Vendor".ToLowerInvariant()) {
+        '^intel$'    { return 'Intel' }
+        '^amd$'      { return 'AMD' }
+        '^qualcomm$' { return 'Qualcomm' }
+        '^all$'      { return 'All' }
+        '^auto$'     { return 'Auto' }
+        default      { return 'Unknown' }
+    }
+}
+
+# Detect the host's NPU vendor. On current AI-PC hardware the NPU brand tracks the
+# CPU brand (Intel Core Ultra -> AI Boost, AMD Ryzen AI -> XDNA/IPU, Snapdragon X ->
+# Hexagon), so CPU manufacturer is the reliable primary signal; a PnP probe enriches
+# it for reporting and as a tie-breaker. Returns cpu/npu vendor + device string.
+function Get-BenchmarkPlatform {
+    $cpuName = ''; $cpuVendor = 'Unknown'
+    try {
+        $cpu = Get-CimInstance -ClassName Win32_Processor -ErrorAction Stop | Select-Object -First 1
+        $cpuName = "$($cpu.Name)".Trim()
+        switch -Regex ("$($cpu.Manufacturer)".Trim()) {
+            'Intel'              { $cpuVendor = 'Intel' }
+            'AMD|Advanced Micro' { $cpuVendor = 'AMD' }
+            'Qualcomm'           { $cpuVendor = 'Qualcomm' }
+        }
+        if ($cpuVendor -eq 'Unknown') {
+            switch -Regex ($cpuName) {
+                'Intel'                      { $cpuVendor = 'Intel' }
+                'AMD|Ryzen'                  { $cpuVendor = 'AMD' }
+                'Snapdragon|Qualcomm|Oryon'  { $cpuVendor = 'Qualcomm' }
+            }
+        }
+    } catch { }
+
+    if ($cpuVendor -eq 'Unknown') {
+        switch -Regex ("$env:PROCESSOR_IDENTIFIER") {
+            'Intel'        { $cpuVendor = 'Intel' }
+            'AMD'          { $cpuVendor = 'AMD' }
+            'Qualcomm|ARM' { $cpuVendor = 'Qualcomm' }
+        }
+    }
+    # The Ryzen AI SDK env var is an unambiguous AMD signal when CPU probing fails.
+    if ($cpuVendor -eq 'Unknown' -and $env:RYZEN_AI_INSTALLATION_PATH) { $cpuVendor = 'AMD' }
+
+    $npuDevice = ''; $npuPresent = $false
+    try {
+        $pnp = @(Get-PnpDevice -PresentOnly -ErrorAction Stop |
+                Where-Object { $_.FriendlyName -match 'AI Boost|IPU|XDNA|NPU|Hexagon|Neural Proc' })
+        if ($pnp.Count) { $npuPresent = $true; $npuDevice = $pnp[0].FriendlyName }
+    } catch { }
+
+    return [pscustomobject]@{
+        cpu_vendor  = $cpuVendor
+        cpu_name    = $cpuName
+        npu_vendor  = $cpuVendor
+        npu_device  = $npuDevice
+        npu_present = $npuPresent
+    }
+}
+
+# Should a variant with this backend run on a host with this NPU vendor? Neutral
+# backends always run; vendor backends only when they match. If the host vendor is
+# Unknown/All we can't (or shouldn't) filter, so everything is allowed.
+function Test-BenchmarkVariantSupported {
+    param(
+        [Parameter(Mandatory)] [string]$Backend,
+        [Parameter(Mandatory)] [string]$HostVendor
+    )
+    if ($HostVendor -eq 'All' -or $HostVendor -eq 'Unknown') { return $true }
+    $vendor = Get-BenchmarkBackendVendor $Backend
+    return ($vendor -eq 'Neutral' -or $vendor -eq $HostVendor)
+}
+
+# Resolve the effective host vendor to filter by, given a user selector
+# ("auto" -> detect, "all" -> no filter, or an explicit vendor). Emits a banner and
+# returns the canonical vendor name ('Intel'|'AMD'|'Qualcomm'|'All'|'Unknown').
+function Resolve-BenchmarkHostVendor([string]$Selector, [object]$Platform = $null) {
+    $sel = Get-BenchmarkVendorName $Selector
+    if ($sel -eq 'All') {
+        Write-Host "Platform filter: OFF (-NpuVendor all) -- attempting every variant." -ForegroundColor Cyan
+        return 'All'
+    }
+    if ($sel -eq 'Intel' -or $sel -eq 'AMD' -or $sel -eq 'Qualcomm') {
+        Write-Host ("Platform filter: forced NPU vendor = {0}." -f $sel) -ForegroundColor Cyan
+        return $sel
+    }
+    # auto / unknown selector -> detect
+    if (-not $Platform) { $Platform = Get-BenchmarkPlatform }
+    $dev = if ($Platform.npu_device) { $Platform.npu_device } else { "no NPU device detected" }
+    Write-Host ("Platform: {0} | NPU vendor {1} | {2}" -f `
+            $Platform.cpu_name, $Platform.npu_vendor, $dev) -ForegroundColor Cyan
+    if ($Platform.npu_vendor -eq 'Unknown') {
+        Write-Host "  ! Could not determine NPU vendor; running all variants (use -NpuVendor to force)." -ForegroundColor Yellow
+        return 'Unknown'
+    }
+    return $Platform.npu_vendor
+}
+
 # --- app invocation ----------------------------------------------------------
 
 # Run one clip through the app and return the parsed JSON record. Native STDERR
