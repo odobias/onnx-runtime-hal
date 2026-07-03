@@ -74,10 +74,22 @@ std::string lower(std::string s) {
     return s;
 }
 
-// Logical device -> preferred ORT execution provider. NPU is vendor-aware:
-// when the QNN plugin EP is compiled in (Snapdragon), NPU maps to QNN; otherwise
-// it falls back to the VitisAI bridge EP (AMD).
+// Logical device -> preferred ORT execution provider. Vendor-aware and
+// compile-gated:
+//  * WHISPER_HAL_OPENVINO (Intel): NPU/GPU/CPU all route through the OpenVINO EP.
+//    The concrete OpenVINO device_type is carried in the token ("openvino:NPU")
+//    so the NPU->GPU->CPU fallback chain steps devices, not just providers.
+//  * WHISPER_HAL_QUALCOMM (Snapdragon): NPU -> QNN.
+//  * otherwise (AMD): NPU -> VitisAI bridge EP.
 std::string provider_for(Device device) {
+#ifdef WHISPER_HAL_OPENVINO
+    switch (device) {
+        case Device::CPU: return "openvino:CPU";
+        case Device::GPU: return "openvino:GPU";
+        case Device::NPU: return "openvino:NPU";
+    }
+    return "openvino:CPU";
+#else
     switch (device) {
         case Device::CPU: return "CPUExecutionProvider";
         case Device::GPU: return "DmlExecutionProvider";
@@ -89,12 +101,14 @@ std::string provider_for(Device device) {
 #endif
     }
     return "CPUExecutionProvider";
+#endif
 }
 
 // Human-facing runtime tag for the shared benchmark schema, derived from the EP
 // that actually built the session.
 std::string runtime_for(const std::string& provider) {
     const std::string p = lower(provider);
+    if (p.find("openvino") != std::string::npos) return "onnxruntime-openvino";
     if (p.find("qnn") != std::string::npos) return "onnxruntime-qnn";
     if (p.find("vitis") != std::string::npos) return "onnxruntime-vitisai";
     if (p.find("dml") != std::string::npos || p.find("directml") != std::string::npos)
@@ -187,6 +201,27 @@ void append_provider(Ort::Env& env, Ort::SessionOptions& so, const EngineOptions
                      const std::string& cache_key) {
     const std::string p = lower(provider);
 
+    // Intel native path: OpenVINO EP. Accepts "openvino", "openvinoexecutionprovider",
+    // or an "openvino:<DEVICE>" token from the fallback chain. The OpenVINO
+    // device_type comes from the token suffix when present, else from options.device.
+    if (p.rfind("openvino", 0) == 0) {
+        std::string device_type;
+        const auto colon = provider.find(':');
+        if (colon != std::string::npos) {
+            device_type = provider.substr(colon + 1);
+        } else {
+            device_type = options.device == Device::NPU   ? "NPU"
+                          : options.device == Device::GPU ? "GPU"
+                                                          : "CPU";
+        }
+        std::unordered_map<std::string, std::string> ov_opts{{"device_type", device_type}};
+        // OpenVINO EP blob caching: persist the device-compiled model so reruns skip
+        // the (10-15s on NPU/GPU) compile. This is the cold-vs-hot lever for OVEP.
+        if (!options.cache_dir.empty()) ov_opts["cache_dir"] = options.cache_dir;
+        so.AppendExecutionProvider_OpenVINO_V2(ov_opts);
+        return;
+    }
+
     if (p == "cpu" || p == "cpuexecutionprovider") {
         if (options.cpu_threads > 0) {
             so.SetIntraOpNumThreads(options.cpu_threads);
@@ -235,7 +270,8 @@ void append_provider(Ort::Env& env, Ort::SessionOptions& so, const EngineOptions
 
     throw std::runtime_error(
         "unsupported ONNX Runtime provider override for static backend: " + provider +
-        " (supported: CPUExecutionProvider, QNNExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
+        " (supported: OpenVINOExecutionProvider[:NPU|GPU|CPU], CPUExecutionProvider, "
+        "QNNExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
 }
 
 Ort::SessionOptions make_session_options(Ort::Env& env, const EngineOptions& options,
@@ -467,6 +503,9 @@ Device best_available_device() {
             }
             return false;
         };
+        // OpenVINO EP (Intel) => NPU is the strongest target; the engine's
+        // NPU->GPU->CPU OpenVINO fallback validates it at session-build time.
+        if (has("openvino")) return Device::NPU;
         if (has("vitisai")) return Device::NPU;
         if (has("dml") || has("directml")) return Device::GPU;
     } catch (...) {

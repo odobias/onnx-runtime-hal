@@ -43,6 +43,13 @@ struct EngineOptions {
     // from `device`.
     std::string device_override;
 
+    // True when the caller asked for automatic device selection (CLI device "auto")
+    // rather than naming NPU/GPU/CPU. Only then may Backend::Auto self-pick the
+    // device (e.g. the unified ORT binary's best_available_device). When false, an
+    // explicitly requested `device` is always honored -- otherwise a benchmark row
+    // requesting GPU/CPU would silently run (and be mislabeled) on the NPU.
+    bool auto_device = false;
+
     // Directory for the compiled-model cache. When set, the backend persists its
     // device-compiled blob here so subsequent loads skip the (slow) NPU compile
     // step. Empty = no on-disk caching. This is the key to a fast-loading runner.

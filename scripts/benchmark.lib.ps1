@@ -265,6 +265,29 @@ function Resolve-BenchmarkHostVendor([string]$Selector, [object]$Platform = $nul
     return $Platform.npu_vendor
 }
 
+# --- unified OVEP binary (Intel native ORT path) -----------------------------
+
+# Path to the unified ONNX Runtime + OpenVINO EP binary. It ships openvino 2025.4.1
+# DLLs that cannot share an output folder with the Intel GenAI build's openvino
+# 2026.x, so it lives in its own "x64-ovep" tree (see msbuild\common.props). Intel
+# NPUs are x64, so this path is x64-only by construction.
+function Get-BenchmarkOvepExe([string]$Root, [string]$Configuration = "Release") {
+    return (Join-Path $Root "build\x64-ovep\$Configuration\WhisperNpuHal.App.exe")
+}
+
+# Choose the exe to run a variant with. On an Intel host the neutral self-selecting
+# variant ("auto"/onnx-static/ort backends) runs through the unified OVEP binary --
+# the default Intel build is OpenVINO GenAI and has no ONNX Runtime backend compiled
+# in, so it cannot serve the neutral static-ONNX path. Everything else (the OV-IR
+# variants, and every non-Intel host) uses the default exe.
+function Get-BenchmarkExeForVariant($Variant, [string]$DefaultExe, [string]$Root, [string]$HostVendor, [string]$Configuration = "Release") {
+    if ($HostVendor -eq 'Intel' -and (Get-BenchmarkBackendVendor $Variant.backend) -eq 'Neutral') {
+        $ovep = Get-BenchmarkOvepExe $Root $Configuration
+        if (Test-Path $ovep) { return $ovep }
+    }
+    return $DefaultExe
+}
+
 # --- environment bootstrap ---------------------------------------------------
 
 # Invoke a sibling setup/build script in an ISOLATED child PowerShell process.
@@ -361,6 +384,36 @@ function Initialize-BenchmarkEnvironment {
         }
     } else {
         Write-Host "  - app already built" -ForegroundColor DarkGray
+    }
+
+    # 1b) Intel native path: also build the unified OVEP binary (ONNX Runtime +
+    #     OpenVINO EP) so the self-selecting `auto` variant runs on the Intel
+    #     NPU/GPU/CPU through ORT, mirroring AMD (VitisAI) and Qualcomm (QNN).
+    #     Best-effort -- a failure here leaves the default Intel (GenAI) variants
+    #     fully working; only the neutral ORT path is skipped.
+    if ($vendor -eq 'Intel') {
+        $ovepExe = Get-BenchmarkOvepExe $Root $Configuration
+        if (-not (Test-Path $ovepExe)) {
+            try {
+                $ortLib = Join-Path $Root "third_party\onnxruntime-openvino\lib\onnxruntime.lib"
+                if (-not (Test-Path $ortLib)) {
+                    Write-Host "  - assemble ORT + OpenVINO EP distro (setup-ovep.ps1)" -ForegroundColor DarkCyan
+                    Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "setup-ovep.ps1") | Out-Null
+                }
+                if (Test-Path $ortLib) {
+                    Write-Host "  - build unified OVEP binary (build.ps1 -EnableOvep)" -ForegroundColor DarkCyan
+                    Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "build.ps1") `
+                        -ScriptArgs @("-Configuration", $Configuration, "-EnableOvep") | Out-Null
+                }
+            } catch {
+                Write-Host ("  ! OVEP setup failed ({0}); Intel native ORT path will be skipped." -f $_.Exception.Message) -ForegroundColor Yellow
+            }
+            if (-not (Test-Path $ovepExe)) {
+                Write-Host "  ! unified OVEP binary unavailable; the 'auto' variant will use the default exe on Intel." -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "  - unified OVEP binary already built" -ForegroundColor DarkGray
+        }
     }
 
     # 2) Sample audio (public) -- also the fallback clip for the eval set.

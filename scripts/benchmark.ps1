@@ -115,6 +115,12 @@ foreach ($v in $manifestObj.variants) {
     }
     $modelDir = Join-Path $root ($v.model_dir -replace '/', '\')
     $devList = if ($Devices.Count) { $Devices } else { $v.devices }
+    # Neutral self-selecting variants run through the unified OVEP binary on Intel
+    # (the default GenAI exe has no ORT backend); all others use the default exe.
+    $variantExe = Get-BenchmarkExeForVariant $v $exe $root $hostVendor $Configuration
+    if ($variantExe -ne $exe) {
+        Write-Host ("   (via unified OVEP binary: {0})" -f (Split-Path $variantExe -Leaf)) -ForegroundColor DarkCyan
+    }
 
     foreach ($dev in $devList) {
         $tag = "$($v.id)-$dev"
@@ -147,14 +153,14 @@ foreach ($v in $manifestObj.variants) {
                     if ($warm) {
                         Write-Host "   (hot-only: cache empty -> warming with one cold compile)" -ForegroundColor DarkYellow
                         $warmAudio = Join-Path $root ($warm.audio -replace '/', '\')
-                        $null = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $warmAudio -Backend $v.backend -Device $dev -Runs 1 -CacheDir $cacheDir -Ref $warm.ref
+                        $null = Invoke-BenchmarkClip -Exe $variantExe -ModelDir $modelDir -Audio $warmAudio -Backend $v.backend -Device $dev -Runs 1 -CacheDir $cacheDir -Ref $warm.ref
                     }
                 }
             }
             foreach ($c in $clips) {
                 $audio = Join-Path $root ($c.audio -replace '/', '\')
                 if (-not (Test-Path $audio)) { continue }
-                $r = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $audio -Backend $v.backend -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref $c.ref -HotOnly:$HotOnly
+                $r = Invoke-BenchmarkClip -Exe $variantExe -ModelDir $modelDir -Audio $audio -Backend $v.backend -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref $c.ref -HotOnly:$HotOnly
                 if (-not $r.ok) {
                     $status = "unsupported/error"; $errMsg = $r.error
                     Write-Host ("   {0}: {1}" -f $c.id, $r.error) -ForegroundColor Yellow

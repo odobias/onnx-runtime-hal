@@ -60,7 +60,10 @@ std::unique_ptr<IWhisperEngine> create_engine(Backend backend, const EngineOptio
         // ORT was not compiled in.
         if (ort_static::available()) {
             EngineOptions o = options;
-            if (o.device_override.empty()) {
+            // Only auto-pick the device when the caller asked for it (device "auto").
+            // An explicitly requested NPU/GPU/CPU must be honored so per-device
+            // benchmark rows are not silently collapsed onto the NPU.
+            if (o.auto_device && o.device_override.empty()) {
                 o.device = ort_static::best_available_device();
             }
             return ort_static::create(o);

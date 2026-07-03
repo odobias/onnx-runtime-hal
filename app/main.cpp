@@ -465,6 +465,9 @@ int main(int argc, char* argv[]) {
         std::cerr << "Unknown device: " << pos[3] << "\n";
         return 1;
     }
+    // Distinguish "auto" (let Backend::Auto self-pick) from an explicit NPU/GPU/CPU,
+    // which parse_device also resolves to a concrete device but must be honored as-is.
+    opt.auto_device = pos.size() > 3 && lower(pos[3]) == "auto";
     const int runs = pos.size() > 4 ? std::max(1, std::atoi(pos[4].c_str())) : 5;
     const int warmup = 1;
     const std::string requested_backend = to_string(backend);
