@@ -69,6 +69,9 @@ bool parse_device(const std::string& s, whisper_npu::Device& out) {
     if (v == "npu") { out = whisper_npu::Device::NPU; return true; }
     if (v == "gpu") { out = whisper_npu::Device::GPU; return true; }
     if (v == "cpu") { out = whisper_npu::Device::CPU; return true; }
+    // "auto" is a placeholder: with the Auto backend the engine self-selects the
+    // device (best_available_device), so the value here is overridden anyway.
+    if (v == "auto") { out = whisper_npu::Device::NPU; return true; }
     return false;
 }
 

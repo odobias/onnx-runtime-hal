@@ -434,11 +434,13 @@ std::unique_ptr<IWhisperEngine> create(const EngineOptions& options) {
 
 bool available() { return true; }
 
-// Probe the real ORT execution-provider device list and return the best logical
-// device this build can run on right now: NPU if a QNN accelerator is present,
-// otherwise CPU. (DirectML/GPU is dormant on ARM64 -- see the fallback chain.)
+// Return the best logical device the unified binary should start on. The engine's
+// NPU->GPU->CPU fallback chain validates the pick at session-build time, so a wrong
+// guess degrades gracefully rather than failing.
 Device best_available_device() {
 #ifdef WHISPER_HAL_QUALCOMM
+    // Qualcomm / ARM64: confirm a real QNN NPU via the EP device list. DirectML/GPU
+    // is dormant on ARM64, so it is NPU-or-CPU here.
     try {
         Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "whisper_hal_probe");
         register_qnn_library(env);
@@ -451,8 +453,27 @@ Device best_available_device() {
     } catch (...) {
         // Fall through to CPU if the plugin can't be probed.
     }
-#endif
     return Device::CPU;
+#else
+    // x64 (and any non-Qualcomm build): pick the strongest execution provider that
+    // is actually compiled into this ONNX Runtime. VitisAI => AMD Ryzen NPU, then
+    // DirectML => GPU, else CPU. GetAvailableProviders() is available on every ORT
+    // version, so this path does not depend on the newer EP-device API.
+    try {
+        const std::vector<std::string> providers = Ort::GetAvailableProviders();
+        auto has = [&](const char* needle) {
+            for (const std::string& p : providers) {
+                if (lower(p).find(needle) != std::string::npos) return true;
+            }
+            return false;
+        };
+        if (has("vitisai")) return Device::NPU;
+        if (has("dml") || has("directml")) return Device::GPU;
+    } catch (...) {
+        // Fall through to CPU on any probe failure.
+    }
+    return Device::CPU;
+#endif
 }
 
 #else  // !WHISPER_HAL_ORT
