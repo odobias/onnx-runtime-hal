@@ -5,11 +5,13 @@
 #   .\build.ps1                       # Release|x64, Intel backend
 #   .\build.ps1 -Configuration Debug
 #   .\build.ps1 -EnableAmd -DisableIntel
+#   .\build.ps1 -EnableOrt -DisableIntel
 
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")][string]$Configuration = "Release",
     [switch]$EnableAmd,
+    [switch]$EnableOrt,
     [switch]$DisableIntel,
     [switch]$EnableQualcomm,
     [string]$RyzenAiDir = "",
@@ -47,12 +49,14 @@ Write-Host ("VS install   : {0}  {1}" -f $found.vs, ($(if ($isVs2026) { '(VS 202
 
 $target = if ($Rebuild) { "Rebuild" } else { "Build" }
 $enableIntel = -not $DisableIntel
+$enableOrt = $EnableOrt -or $EnableAmd
 $args = @(
     $sln,
     "/t:$target",
     "/p:Configuration=$Configuration",
     "/p:Platform=x64",
     "/p:EnableIntel=$([bool]$enableIntel)".ToLower(),
+    "/p:EnableOrt=$([bool]$enableOrt)".ToLower(),
     "/p:EnableAmd=$([bool]$EnableAmd)".ToLower(),
     "/p:EnableQualcomm=$([bool]$EnableQualcomm)".ToLower(),
     "/m",

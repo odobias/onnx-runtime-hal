@@ -32,6 +32,7 @@
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(WhisperHalRoot)msbuild\common.props" />
+  <Import Project="$(WhisperHalRoot)msbuild\backend.ort.props" Condition="'$(EnableOrt)'=='true'" />
   <Import Project="$(WhisperHalRoot)msbuild\backend.intel.props" Condition="'$(EnableIntel)'=='true'" />
   <Import Project="$(WhisperHalRoot)msbuild\backend.amd.props" Condition="'$(EnableAmd)'=='true'" />
   <Import Project="$(WhisperHalRoot)msbuild\backend.qualcomm.props" Condition="'$(EnableQualcomm)'=='true'" />
@@ -71,6 +72,18 @@
     </ItemGroup>
     <Copy SourceFiles="@(IntelRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Message Importance="high" Text="Copied Intel OpenVINO runtime to $(OutDir)" />
+  </Target>
+
+  <!-- Copy generic ONNX Runtime DLLs for the static ONNX backend. Extra provider DLLs
+       are copied when present; plain CPU ORT installs may only have onnxruntime.dll. -->
+  <Target Name="CopyOrtRuntime" AfterTargets="Build" Condition="'$(EnableOrt)'=='true'">
+    <ItemGroup>
+      <OrtRuntime Include="$(OrtBinDir)\onnxruntime.dll" />
+      <OrtRuntime Include="$(OrtBinDir)\onnxruntime_providers_shared.dll" />
+      <OrtRuntime Include="$(OrtBinDir)\DirectML.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OrtRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied ONNX Runtime to $(OutDir)" />
   </Target>
 
   <!-- Copy RyzenAI / ONNX Runtime VitisAI EP runtime DLLs next to the exe so the

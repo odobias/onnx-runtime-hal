@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic ONNX Runtime backend. Point OrtDir at a platform ORT distribution.
+     On AMD machines this defaults to the Ryzen AI SDK's ORT package. -->
+<Project>
+  <PropertyGroup>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'=='' and '$(RYZEN_AI_INSTALLATION_PATH)'!=''">$(RYZEN_AI_INSTALLATION_PATH)</RyzenAiDir>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'==''">C:\Program Files\RyzenAI\1.8.0-beta</RyzenAiDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(OrtAmdDir)'!=''">$(OrtAmdDir)</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'==''">$(RyzenAiDir)\onnxruntime</OrtDir>
+    <OrtInclude Condition="'$(OrtInclude)'==''">$(OrtDir)\include\onnxruntime\core\session</OrtInclude>
+    <OrtLibDir Condition="'$(OrtLibDir)'==''">$(OrtDir)\lib</OrtLibDir>
+    <OrtBinDir Condition="'$(OrtBinDir)'==''">$(OrtDir)\bin</OrtBinDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OrtInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WHISPER_HAL_ORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OrtLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

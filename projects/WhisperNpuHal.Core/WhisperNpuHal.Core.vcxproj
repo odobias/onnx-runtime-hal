@@ -32,6 +32,7 @@
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(WhisperHalRoot)msbuild\common.props" />
+  <Import Project="$(WhisperHalRoot)msbuild\backend.ort.props" Condition="'$(EnableOrt)'=='true'" />
   <Import Project="$(WhisperHalRoot)msbuild\backend.intel.props" Condition="'$(EnableIntel)'=='true'" />
   <Import Project="$(WhisperHalRoot)msbuild\backend.amd.props" Condition="'$(EnableAmd)'=='true'" />
   <Import Project="$(WhisperHalRoot)msbuild\backend.qualcomm.props" Condition="'$(EnableQualcomm)'=='true'" />
@@ -49,6 +50,7 @@
     <ClCompile Include="$(WhisperHalRoot)src\factory.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\intel\intel_openvino_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\intel\intel_onnx_engine.cpp" />
+    <ClCompile Include="$(WhisperHalRoot)src\backends\ort_static\ort_static_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\amd\amd_ryzenai_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\qualcomm\qualcomm_qnn_engine.cpp" />
   </ItemGroup>
