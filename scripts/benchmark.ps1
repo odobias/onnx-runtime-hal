@@ -21,6 +21,8 @@ param(
     # NPU vendor filter: auto (detect this host), all (try everything), or a forced
     # vendor. A machine has one NPU brand, so by default we skip other vendors' variants.
     [ValidateSet("auto", "all", "intel", "amd", "qualcomm")][string]$NpuVendor = "auto",
+    # Restrict the sweep to specific manifest variant id(s). Empty = all variants.
+    [string[]]$Variant = @(),
     [string]$Configuration = "Release",
     [ValidateSet("x64", "ARM64")][string]$BuildPlatform = "",
     # Skip the self-contained bootstrap (build + fetch models/eval/audio). Use when
@@ -70,6 +72,10 @@ foreach ($p in @($Manifest, $EvalSet, $exe)) {
 }
 
 $manifestObj = Get-Content $Manifest -Raw | ConvertFrom-Json
+if ($Variant.Count) {
+    $manifestObj.variants = @($manifestObj.variants | Where-Object { $Variant -contains $_.id })
+    if (-not $manifestObj.variants.Count) { Write-Host "No manifest variant matched: $($Variant -join ', ')" -ForegroundColor Red; exit 1 }
+}
 $clips = Get-Content $EvalSet | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json }
 if ($MaxClips -gt 0 -and $clips.Count -gt $MaxClips) { $clips = $clips[0..($MaxClips - 1)] }
 Write-Host ("Manifest: {0} variant(s) | Eval: {1} clip(s) | Runs: {2}" -f `

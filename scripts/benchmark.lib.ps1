@@ -290,6 +290,38 @@ function Invoke-BenchmarkChildScript {
     return $code
 }
 
+# Merge (idempotently) the neutral unified `auto` variant into a generated manifest.
+# The unified binary self-selects its execution provider (NPU>GPU>CPU) at runtime, so
+# this one entry runs the same self-selecting benchmark on any host. Runs on the
+# portable static ONNX model. Returns $true if the manifest was written. No-op (returns
+# $false) when the manifest or model is absent -- there is nothing to attach the entry to.
+function Add-BenchmarkUnifiedAutoVariant {
+    param(
+        [Parameter(Mandatory)] [string]$Manifest,
+        [Parameter(Mandatory)] [string]$Models
+    )
+    $modelRel = "models/whisper-tiny-en-static-onnx"
+    $modelDir = Join-Path $Models "whisper-tiny-en-static-onnx"
+    if (-not (Test-Path $Manifest) -or -not (Test-Path $modelDir)) { return $false }
+
+    $sizeMb = [math]::Round(((Get-ChildItem $modelDir -Recurse -File -ErrorAction SilentlyContinue |
+                Measure-Object Length -Sum).Sum / 1MB), 1)
+    $entry = [ordered]@{
+        id        = "whisper-tiny-unified-auto"
+        backend   = "auto"
+        precision = "fp32-static"
+        method    = "unified ONNX Runtime; binary self-selects the EP (NPU>GPU>CPU)"
+        model_dir = $modelRel
+        devices   = @("auto")
+        size_mb   = $sizeMb
+    }
+    $manifestObj = Get-Content $Manifest -Raw | ConvertFrom-Json
+    $variants = @($manifestObj.variants | Where-Object { $_.id -ne $entry.id })
+    $manifestObj.variants = @($variants + $entry)
+    $manifestObj | ConvertTo-Json -Depth 8 | Set-Content -Path $Manifest -Encoding UTF8
+    return $true
+}
+
 # Ensure everything a sweep needs exists, building the app and fetching
 # models/eval/audio on demand so `benchmark.ps1` works from a fresh checkout.
 # Idempotent: every step is skipped when its output is already present. This
@@ -368,6 +400,16 @@ function Initialize-BenchmarkEnvironment {
     if (-not (Test-Path $EvalSet)) {
         Write-Host "  - build eval set" -ForegroundColor DarkCyan
         Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-eval-set.ps1") | Out-Null
+    }
+
+    # 5) Register the neutral self-selecting variant. The manifest is generated
+    #    (gitignored), so this tracked step re-injects the unified `auto` entry on
+    #    every run whenever the portable static ONNX model is present -- letting the
+    #    same self-selecting benchmark run on any platform (x64 or ARM64).
+    if (Test-Path $staticEnc) {
+        if (Add-BenchmarkUnifiedAutoVariant -Manifest $Manifest -Models $models) {
+            Write-Host "  - registered unified 'auto' variant (self-selecting EP)" -ForegroundColor DarkCyan
+        }
     }
 
     # Final gate: these three are non-negotiable for a sweep.
