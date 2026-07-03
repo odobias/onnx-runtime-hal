@@ -265,6 +265,120 @@ function Resolve-BenchmarkHostVendor([string]$Selector, [object]$Platform = $nul
     return $Platform.npu_vendor
 }
 
+# --- environment bootstrap ---------------------------------------------------
+
+# Invoke a sibling setup/build script in an ISOLATED child PowerShell process.
+# This is deliberate: get-eval-set.ps1 ends in `exit 0`, build.ps1/get-models.ps1
+# `exit 1` on failure, and in PowerShell an `exit` inside a `& .\child.ps1` call
+# terminates the PARENT script too -- which would silently kill the benchmark
+# before the sweep. A child process contains the exit code so we can react to it.
+function Invoke-BenchmarkChildScript {
+    param(
+        [Parameter(Mandatory)] [string]$ScriptPath,
+        [string[]]$ScriptArgs = @(),
+        [switch]$Fatal
+    )
+    $psExe = $null
+    try { $psExe = (Get-Process -Id $PID -ErrorAction Stop).Path } catch { }
+    if (-not $psExe) { $psExe = "powershell" }
+    & $psExe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @ScriptArgs
+    $code = $LASTEXITCODE
+    if ($null -eq $code) { $code = 0 }
+    if ($code -ne 0 -and $Fatal) {
+        throw ("{0} failed (exit {1})" -f [System.IO.Path]::GetFileName($ScriptPath), $code)
+    }
+    return $code
+}
+
+# Ensure everything a sweep needs exists, building the app and fetching
+# models/eval/audio on demand so `benchmark.ps1` works from a fresh checkout.
+# Idempotent: every step is skipped when its output is already present. This
+# assumes the toolchain + vendor SDK are installed (that is bootstrap.ps1's job);
+# if the build can't run it says exactly that. Model fetches for the neutral
+# onnx-static artifact require an authenticated `hf` CLI on PATH and are
+# best-effort -- a missing private snapshot won't abort the run.
+function Initialize-BenchmarkEnvironment {
+    param(
+        [Parameter(Mandatory)] [string]$Root,
+        [Parameter(Mandatory)] [string]$Exe,
+        [Parameter(Mandatory)] [string]$Manifest,
+        [Parameter(Mandatory)] [string]$EvalSet,
+        [string]$Configuration = "Release",
+        [object]$Platform = $null
+    )
+    if (-not $Platform) { $Platform = Get-BenchmarkPlatform }
+    $vendor  = $Platform.npu_vendor
+    $scripts = Join-Path $Root "scripts"
+    $models  = Join-Path $Root "models"
+
+    Write-Host ("== Bootstrap: preparing benchmark prerequisites (host {0}) ==" -f $vendor) -ForegroundColor Cyan
+
+    # 1) Build the app for this host's backends if it is not built yet.
+    if (-not (Test-Path $Exe)) {
+        $buildArgs = @("-Configuration", $Configuration)
+        switch ($vendor) {
+            'AMD'      { $buildArgs += @("-EnableAmd", "-DisableIntel") }
+            'Qualcomm' { $buildArgs += @("-EnableQualcomm", "-DisableIntel") }
+            'Intel'    { }                       # Intel/OpenVINO is the default build
+            default    { $buildArgs += @("-EnableOrt") }  # unknown host: at least the neutral ORT backend
+        }
+        Write-Host ("  - build app ({0})" -f ($buildArgs -join ' ')) -ForegroundColor DarkCyan
+        Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "build.ps1") -ScriptArgs $buildArgs -Fatal | Out-Null
+        if (-not (Test-Path $Exe)) {
+            throw ("app build did not produce {0}. Install the toolchain/SDK first: .\scripts\bootstrap.ps1 -Platform {1}" -f $Exe, $vendor.ToLower())
+        }
+    } else {
+        Write-Host "  - app already built" -ForegroundColor DarkGray
+    }
+
+    # 2) Sample audio (public) -- also the fallback clip for the eval set.
+    if (-not (Test-Path (Join-Path $models "jfk.wav"))) {
+        Write-Host "  - fetch sample audio" -ForegroundColor DarkCyan
+        Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-audio.ps1") | Out-Null
+    }
+
+    # 3) Models for this host's runnable variants. The private snapshot
+    #    (get-models.ps1) carries the neutral onnx-static model + base manifest;
+    #    the public per-vendor scripts fill in vendor models and merge their entry.
+    $staticEnc = Join-Path $models "whisper-tiny-en-static-onnx\encoder_model.onnx"
+    if (-not (Test-Path $Manifest) -or -not (Test-Path $staticEnc)) {
+        if (Get-Command hf -ErrorAction SilentlyContinue) {
+            Write-Host "  - fetch model snapshot (private HF; best-effort)" -ForegroundColor DarkCyan
+            Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-models.ps1") | Out-Null
+        } else {
+            Write-Host "  ! neutral onnx-static model missing and 'hf' CLI not on PATH; skipping private snapshot." -ForegroundColor Yellow
+        }
+    }
+    switch ($vendor) {
+        'AMD' {
+            if (-not (Test-Path (Join-Path $models "whisper-tiny-amd\tiny_encoder.onnx")) -or -not (Test-Path $Manifest)) {
+                Write-Host "  - fetch AMD model + merge manifest" -ForegroundColor DarkCyan
+                Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-amd-model.ps1") | Out-Null
+            }
+        }
+        'Intel' {
+            if (-not (Test-Path $Manifest)) {
+                Write-Host "  - export Intel OpenVINO model" -ForegroundColor DarkCyan
+                Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-model.ps1") | Out-Null
+            }
+        }
+    }
+
+    # 4) Eval set (public LibriSpeech, or jfk fallback).
+    if (-not (Test-Path $EvalSet)) {
+        Write-Host "  - build eval set" -ForegroundColor DarkCyan
+        Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-eval-set.ps1") | Out-Null
+    }
+
+    # Final gate: these three are non-negotiable for a sweep.
+    $missing = @($Manifest, $EvalSet, $Exe | Where-Object { -not (Test-Path $_) })
+    if ($missing.Count) {
+        throw ("bootstrap could not produce required prerequisites:`n  {0}`nRun .\scripts\bootstrap.ps1 -Platform {1} to install the toolchain/SDK and models." -f `
+                ($missing -join "`n  "), $vendor.ToLower())
+    }
+    Write-Host "== Bootstrap: ready ==" -ForegroundColor Green
+}
+
 # --- detailed hardware inventory ---------------------------------------------
 
 # Heuristic PCI (vendor:device) -> NPU architecture map. Windows reports only a
@@ -440,11 +554,13 @@ function Invoke-BenchmarkClip {
         [Parameter(Mandatory)] [string]$CacheDir,
         [Parameter(Mandatory)] [string]$Ref,
         [int]$Threads = 0,
-        [string]$Provider = ""
+        [string]$Provider = "",
+        [switch]$HotOnly
     )
     $a = @($ModelDir, $Audio, $Backend, $Device, "$Runs", "--cache", $CacheDir, "--ref", $Ref, "--json")
     if ($Threads -gt 0) { $a += @("--threads", "$Threads") }
     if ($Provider) { $a += @("--provider", $Provider) }
+    if ($HotOnly) { $a += "--hot-only" }
 
     $oldEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"

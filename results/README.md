@@ -94,6 +94,29 @@ name like "NPU Compute Accelerator Device" — so verify it against the raw `pci
 and latency). It also appends one canonical aggregate row per `variant × device` to
 `benchmark-results.csv`, so single-run and swept results live in the same schema.
 
+**Cold-compile caching.** By default the harness wipes `cache/<variant>-<device>` before
+each variant so `cold_start_seconds` measures a true from-scratch compile (the ~215s NPU
+VitisAI compile). Pass `-ReuseCache` to keep the persisted compiled-model cache and skip
+that compile on reruns — but note that `cold_start_seconds` then reflects a load from the
+populated cache, not a real cold compile. Use `-ReuseCache` for fast iteration; omit it
+when publishing cold-start numbers.
+
+**Hot-only runs.** Pass `-HotOnly` (implies `-ReuseCache`) to skip the cold compile
+entirely: each engine loads once from the persisted cache and `cold_start_seconds` is
+reported as N/A. If a `variant × device` has no cache yet, it is warmed once (one compile)
+before measuring, so the first `-HotOnly` run on a fresh cache still pays a single compile.
+The underlying CLI exposes the same via `whisper_hal ... --cache <dir> --hot-only`. This is
+the fast path for iterating on inference latency/accuracy without re-paying the NPU compile.
+
+**Self-bootstrapping.** `benchmark.ps1` runs from a fresh checkout: before the sweep it
+detects the host NPU vendor, builds the app for that host's backends, and fetches any
+missing models / eval set / sample audio. Every step is idempotent (present artifacts are
+skipped). It assumes the toolchain and vendor SDK are already installed — that is
+`bootstrap.ps1`'s job; if the build can't run it says so and points there. The neutral
+`onnx-static` model comes from a private HF snapshot and needs an authenticated `hf` CLI on
+PATH (best-effort — a missing snapshot won't abort the run). Pass `-SkipBootstrap` to skip
+preparation when the environment is already set up.
+
 `models\manifest.json` is the platform contract. Each variant entry must include:
 `id`, `backend`, `precision`, `method`, `model_dir`, `devices`, and `size_mb`.
 Intel export scripts and AMD model download scripts merge their own entries into this file
