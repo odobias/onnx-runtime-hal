@@ -6,7 +6,7 @@ loop via optimum-onnx's ORTModelForSpeechSeq2Seq, so we get correct
 transcriptions, WER/CER, self-confidence (mean per-token log-prob), and
 end-to-end latency -- directly comparable to the OpenVINO-IR GenAI baseline.
 
-  .venv\Scripts\python.exe scripts\eval_onnx_quality.py models\whisper-tiny-en-onnx models\eval\eval.jsonl
+  .venv\Scripts\python.exe scripts\experiments\eval_onnx_quality.py models\whisper-tiny-en-onnx models\eval\eval.jsonl
 """
 import json
 import sys

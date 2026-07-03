@@ -16,6 +16,11 @@ Use `-Results <path>` to write somewhere else, or `-NoResults` for scratch runs.
 
 ## Schema
 
+The **authoritative column order** is defined once in `scripts/benchmark.lib.ps1`
+(`Get-BenchmarkResultColumns`). The PowerShell harness and the C++ executor
+(`app/main.cpp`) are the two writers of this ledger and both follow that list — keep
+all three in sync when adding or reordering columns.
+
 - `timestamp_utc`: UTC timestamp when the row was written.
 - `requested_backend`: CLI backend selector, e.g. `AmdRyzenAI`, `IntelOpenVINO`, or `Auto`.
 - `resolved_backend`: concrete engine that actually ran.
@@ -79,7 +84,7 @@ instead of overwriting other platforms.
 `results\onnx-portability.{md,csv}` captures a separate experiment: running one
 **vendor-neutral ONNX** (not the Intel-specific OV-IR) across CPU/GPU/NPU to test
 whether a single model artifact is viable across runtimes. It uses a hand-rolled
-decode loop (`scripts\onnx_ov_decode.py`, `scripts\onnx_npu_static.py`) so quality
+decode loop (`scripts\experiments\onnx_ov_decode.py`, `scripts\experiments\onnx_npu_static.py`) so quality
 is identical across runtimes and only load/latency vary. These are 12-clip
 aggregates, so they live in their own file rather than the per-clip
 `benchmark-results.csv` schema.

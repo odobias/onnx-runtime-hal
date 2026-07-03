@@ -1,0 +1,165 @@
+# Shared benchmark harness library. This is the single home for the concerns that
+# every benchmark entry point (benchmark.ps1, compare-devices.ps1, run.ps1) needs:
+# the canonical results-CSV schema, the app invocation + JSON parse, clip aggregation
+# math, and best-effort power-source detection.
+#
+# Dot-source it from a sibling script:
+#     . (Join-Path $PSScriptRoot "benchmark.lib.ps1")
+#
+# Design: the C++ app (app/main.cpp) is the executor -- it runs ONE clip on ONE
+# backend/device and emits one JSON record (and optionally appends one CSV row).
+# This library is the harness -- it owns invocation, aggregation across clips, and
+# writing the shared cross-machine ledger. Keep that split intact: aggregation and
+# benchmark policy live here, not in the app.
+
+# --- console -----------------------------------------------------------------
+
+# Force UTF-8 across chcp / console / pipeline so non-ASCII transcripts survive
+# capture. Call once near the top of an entry-point script.
+function Initialize-BenchmarkConsole {
+    chcp 65001 > $null
+    [Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+    $global:OutputEncoding = [System.Text.UTF8Encoding]::new()
+}
+
+# --- results CSV schema (single source of truth) -----------------------------
+
+# Canonical column order for results/benchmark-results.csv. This is the authoritative
+# list for the PowerShell harness; the C++ app (app/main.cpp) writes the same schema
+# for its single-run rows and MUST be kept in sync with this list. See results/README.md.
+function Get-BenchmarkResultColumns {
+    return @(
+        "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name", "device_full_name",
+        "model_dir", "audio_path", "audio_seconds", "runs", "warmup", "cache_dir",
+        "cold_load_seconds", "warm_load_seconds", "mean_infer_seconds", "rtf", "realtime_factor",
+        "label", "model_size_mb", "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps",
+        "wer", "cer", "transcription",
+        "runtime", "model_format", "decode_strategy", "max_context", "eval_clips", "status",
+        "cold_start_seconds", "hot_start_seconds", "power_source"
+    )
+}
+
+function ConvertTo-BenchmarkCsvCell($Value) {
+    $s = if ($null -eq $Value) { "" } else { [string]$Value }
+    if ($s.IndexOfAny([char[]]",`"`r`n") -lt 0) { return $s }
+    return '"' + ($s -replace '"', '""') + '"'
+}
+
+function Get-BenchmarkOptional($Object, [string]$Name, $Default = $null) {
+    if ($null -ne $Object -and $Object.PSObject.Properties.Name -contains $Name) { return $Object.$Name }
+    return $Default
+}
+
+# Append one aggregate row to the shared results CSV, migrating an older/narrower
+# header to the current schema in place (preserving existing rows) when needed.
+function Write-BenchmarkResultRow($Path, [object]$Row) {
+    $columns = Get-BenchmarkResultColumns
+
+    $parent = Split-Path $Path -Parent
+    if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
+    $header = $columns -join ","
+    if (-not (Test-Path $Path) -or (Get-Item $Path).Length -eq 0) {
+        $header | Set-Content -Path $Path -Encoding UTF8
+    } else {
+        $existingHeader = Get-Content -Path $Path -TotalCount 1
+        if ($existingHeader -ne $header) {
+            $oldRows = @(Import-Csv -Path $Path)
+            $header | Set-Content -Path $Path -Encoding UTF8
+            foreach ($old in $oldRows) {
+                $oldLine = ($columns | ForEach-Object { ConvertTo-BenchmarkCsvCell (Get-BenchmarkOptional $old $_ "") }) -join ","
+                Add-Content -Path $Path -Value $oldLine -Encoding UTF8
+            }
+        }
+    }
+
+    $line = ($columns | ForEach-Object { ConvertTo-BenchmarkCsvCell (Get-BenchmarkOptional $Row $_ "") }) -join ","
+    Add-Content -Path $Path -Value $line -Encoding UTF8
+}
+
+# --- power source ------------------------------------------------------------
+
+# Best-effort AC vs battery detection (battery => throttled clocks, which silently
+# skews comparisons). Returns "ac" / "battery" / "unknown".
+function Get-BenchmarkPowerSource {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        switch ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus) {
+            'Online' { return 'ac' }
+            'Offline' { return 'battery' }
+            default { return 'unknown' }
+        }
+    } catch { return 'unknown' }
+}
+
+# --- app invocation ----------------------------------------------------------
+
+# Run one clip through the app and return the parsed JSON record. Native STDERR
+# (ORT/VitisAI warnings) is captured, not promoted to a terminating error. On
+# failure returns [pscustomobject]@{ ok = $false; error = "..." }.
+function Invoke-BenchmarkClip {
+    param(
+        [Parameter(Mandatory)] [string]$Exe,
+        [Parameter(Mandatory)] [string]$ModelDir,
+        [Parameter(Mandatory)] [string]$Audio,
+        [Parameter(Mandatory)] [string]$Backend,
+        [Parameter(Mandatory)] [string]$Device,
+        [Parameter(Mandatory)] [int]$Runs,
+        [Parameter(Mandatory)] [string]$CacheDir,
+        [Parameter(Mandatory)] [string]$Ref,
+        [int]$Threads = 0,
+        [string]$Provider = ""
+    )
+    $a = @($ModelDir, $Audio, $Backend, $Device, "$Runs", "--cache", $CacheDir, "--ref", $Ref, "--json")
+    if ($Threads -gt 0) { $a += @("--threads", "$Threads") }
+    if ($Provider) { $a += @("--provider", $Provider) }
+
+    $oldEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $raw = & $Exe @a 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldEap
+    }
+    $line = ($raw | Where-Object { $_ -match '^\{"ok"' } | Select-Object -Last 1)
+    if (-not $line) { return [pscustomobject]@{ ok = $false; error = "no-json-output (exit $exitCode)" } }
+    return $line | ConvertFrom-Json
+}
+
+# --- aggregation -------------------------------------------------------------
+
+# Cold/hot engine-load seconds come from the first successful clip's record
+# (load happens once per engine, not per clip). Tolerates the legacy load_warm_s
+# field name for hot start.
+function Get-BenchmarkLoadTimes($FirstRow) {
+    $hot = if ($FirstRow.PSObject.Properties.Name -contains "load_hot_s") { $FirstRow.load_hot_s } else { $FirstRow.load_warm_s }
+    return [pscustomobject]@{ cold = $FirstRow.load_cold_s; hot = $hot }
+}
+
+# Aggregate a set of successful clip records into the means/sums both harnesses
+# report. WER/CER are micro-averaged (sum edits / sum refs), not averaged per clip.
+function Measure-BenchmarkClips($Rows) {
+    $wEdits = ($Rows | Measure-Object word_edits -Sum).Sum
+    $wRef = ($Rows | Measure-Object ref_words -Sum).Sum
+    $cEdits = ($Rows | Measure-Object char_edits -Sum).Sum
+    $cRef = ($Rows | Measure-Object ref_chars -Sum).Sum
+    return [pscustomobject]@{
+        count         = $Rows.Count
+        mean_ms       = ($Rows | Measure-Object mean_ms -Average).Average
+        mean_rtf      = ($Rows | Measure-Object rtf -Average).Average
+        mean_tps      = ($Rows | Measure-Object throughput_tps -Average).Average
+        mean_logprob  = ($Rows | Measure-Object avg_logprob -Average).Average
+        mean_ttft_ms  = ($Rows | Measure-Object ttft_ms -Average).Average
+        mean_tpot_ms  = ($Rows | Measure-Object tpot_ms -Average).Average
+        audio_seconds = ($Rows | Measure-Object audio_len_s -Sum).Sum
+        word_edits    = $wEdits
+        ref_words     = $wRef
+        char_edits    = $cEdits
+        ref_chars     = $cRef
+        wer           = if ($wRef) { $wEdits / $wRef } else { $null }
+        cer           = if ($cRef) { $cEdits / $cRef } else { $null }
+        first_row     = ($Rows | Select-Object -First 1)
+        last_row      = ($Rows | Select-Object -Last 1)
+    }
+}

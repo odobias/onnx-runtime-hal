@@ -27,10 +27,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
-chcp 65001 > $null
-[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
-$OutputEncoding = [System.Text.UTF8Encoding]::new()
+. (Join-Path $PSScriptRoot "benchmark.lib.ps1")
+Initialize-BenchmarkConsole
 
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Manifest) { $Manifest = Join-Path $root "models\manifest.json" }
@@ -69,36 +67,10 @@ $reportsDir = Join-Path $root "build\reports"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 $cacheRoot = Join-Path $root "cache"
 
-# Best-effort AC vs battery detection; all devices run in this one session, so a
-# single reading applies to the whole comparison (battery => throttled clocks).
-function Get-PowerSource {
-    try {
-        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-        switch ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus) {
-            'Online' { return 'ac' }
-            'Offline' { return 'battery' }
-            default { return 'unknown' }
-        }
-    } catch { return 'unknown' }
-}
-$powerSource = Get-PowerSource
+# All devices run in this one session, so a single power reading applies to the
+# whole comparison. Power source + clip invocation come from benchmark.lib.ps1.
+$powerSource = Get-BenchmarkPowerSource
 Write-Host ("Power: {0}" -f $powerSource) -ForegroundColor Cyan
-
-function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref, $threads) {
-    $args = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
-    if ($threads -gt 0) { $args += @("--threads", "$threads") }
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        $raw = & $exe @args 2>&1
-        $exitCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $oldEap
-    }
-    $line = ($raw | Where-Object { $_ -match '^\{"ok"' } | Select-Object -Last 1)
-    if (-not $line) { return [pscustomobject]@{ ok = $false; error = "no-json-output (exit $exitCode)" } }
-    return $line | ConvertFrom-Json
-}
 
 $rows = @()
 foreach ($dev in $Devices) {
@@ -115,7 +87,7 @@ foreach ($dev in $Devices) {
     foreach ($c in $clips) {
         $audio = Join-Path $root ($c.audio -replace '/', '\')
         if (-not (Test-Path $audio)) { continue }
-        $r = Invoke-Clip $modelDir $audio $v.backend $dev $Runs $cacheDir $c.ref $Threads
+        $r = Invoke-BenchmarkClip -Exe $exe -ModelDir $modelDir -Audio $audio -Backend $v.backend -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref $c.ref -Threads $Threads
         if (-not $r.ok) {
             $status = "unsupported/error"
             $errMsg = ($r.error -split "`n")[0]
@@ -123,8 +95,8 @@ foreach ($dev in $Devices) {
             break
         }
         if ($first) {
-            $coldLoad = $r.load_cold_s
-            $hotLoad = if ($r.PSObject.Properties.Name -contains "load_hot_s") { $r.load_hot_s } else { $r.load_warm_s }
+            $load = Get-BenchmarkLoadTimes $r
+            $coldLoad = $load.cold; $hotLoad = $load.hot
             $threadsUsed = $r.cpu_threads_requested; $hwConcurrency = $r.hw_concurrency
             $chip = $r.device_full_name
             $first = $false
@@ -142,14 +114,9 @@ foreach ($dev in $Devices) {
         continue
     }
 
-    $meanMs = ($clipResults | Measure-Object mean_ms -Average).Average
-    $meanRtf = ($clipResults | Measure-Object rtf -Average).Average
-    $meanTps = ($clipResults | Measure-Object throughput_tps -Average).Average
-    $meanLp = ($clipResults | Measure-Object avg_logprob -Average).Average
-    $wEdits = ($clipResults | Measure-Object word_edits -Sum).Sum
-    $wRef = ($clipResults | Measure-Object ref_words -Sum).Sum
-    $cEdits = ($clipResults | Measure-Object char_edits -Sum).Sum
-    $cRef = ($clipResults | Measure-Object ref_chars -Sum).Sum
+    $agg = Measure-BenchmarkClips $clipResults
+    $meanMs = $agg.mean_ms; $meanRtf = $agg.mean_rtf; $meanTps = $agg.mean_tps; $meanLp = $agg.mean_logprob
+    $wEdits = $agg.word_edits; $wRef = $agg.ref_words; $cEdits = $agg.char_edits; $cRef = $agg.ref_chars
 
     $rows += [pscustomobject]@{
         device = $dev; chip = $(if ($chip) { $chip } else { "-" }); status = "ok"; clips = $clipResults.Count

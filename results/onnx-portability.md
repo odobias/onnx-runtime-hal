@@ -60,8 +60,8 @@ load time, latency and quality.
    requires the vendor's bounded-KV runtime, not a generic ONNX.
 
 See `onnx-portability.csv` for the raw numbers. Scripts:
-`scripts/onnx_ov_decode.py` (dyn KV-cache CPU/GPU), `scripts/onnx_npu_static.py`
-(static NPU), `scripts/onnx_decode.py` (raw ORT), `scripts/probe_ort_raw.py`.
+`scripts/experiments/onnx_ov_decode.py` (dyn KV-cache CPU/GPU), `scripts/experiments/onnx_npu_static.py`
+(static NPU), `scripts/experiments/onnx_decode.py` (raw ORT), `scripts/experiments/probe_ort_raw.py`.
 
 ## C++ port (production HAL backend)
 

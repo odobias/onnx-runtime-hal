@@ -14,7 +14,7 @@ in a separate variant dir; Intel keeps eating FP32.
 > optimization. This experiment shows naive PTQ INT8 isn't shippable anyway, but
 > the AMD path doesn't hinge on it. See "FP32 is the real AMD path" below.
 
-Script: `scripts/quantize_int8_vitis.py` (calibration) + `scripts/_eval_int8.py`
+Script: `scripts/experiments/quantize_int8_vitis.py` (calibration) + `scripts/experiments/_eval_int8.py`
 (pure-ORT decode check). Tooling: `onnxruntime.quantization` 1.27 (no `vai_q_onnx`
 / AMD Quark installed). Calibration set: 12 LibriSpeech clips + `jfk.wav`, real mel
 features via `WhisperFeatureExtractor`; decoder calibrated on real greedy-decode
@@ -68,7 +68,7 @@ quantization, not a runtime bug (same script's FP32 path decodes perfectly).
 
 ## FP32 is the real AMD path (correcting the premise)
 
-Inspection of `models/whisper-tiny-amd/` (via `scripts/_inspect_amd.py`):
+Inspection of `models/whisper-tiny-amd/` (via `scripts/experiments/_inspect_amd.py`):
 
 | file | initializer dtypes | QDQ nodes | I/O | notes |
 |---|---|---|---|---|

@@ -5,7 +5,7 @@ Compiles the SAME ONNX at fp32 / fp16 / bf16 (via INFERENCE_PRECISION_HINT) and
 INT8 (NNCF weight compression), on CPU / GPU / NPU, and times the encoder forward.
 Answers: what precisions does each device actually accept, and how fast.
 
-  .venv-ovep\Scripts\python.exe scripts\probe_precisions.py models\whisper-tiny-en-onnx-static
+  .venv-ovep\Scripts\python.exe scripts\experiments\probe_precisions.py models\whisper-tiny-en-onnx-static
 """
 import sys
 import time
