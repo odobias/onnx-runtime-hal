@@ -5,9 +5,11 @@
   <PropertyGroup>
     <RyzenAiDir Condition="'$(RyzenAiDir)'=='' and '$(RYZEN_AI_INSTALLATION_PATH)'!=''">$(RYZEN_AI_INSTALLATION_PATH)</RyzenAiDir>
     <RyzenAiDir Condition="'$(RyzenAiDir)'==''">C:\Program Files\RyzenAI\1.8.0-beta</RyzenAiDir>
-    <OrtDir Condition="'$(OrtDir)'=='' and '$(OrtAmdDir)'!=''">$(OrtAmdDir)</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(ORT_DIR)'!=''">$(ORT_DIR)</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and Exists('$(WhisperHalRoot)third_party\onnxruntime\include')">$(WhisperHalRoot)third_party\onnxruntime</OrtDir>
     <OrtDir Condition="'$(OrtDir)'==''">$(RyzenAiDir)\onnxruntime</OrtDir>
-    <OrtInclude Condition="'$(OrtInclude)'==''">$(OrtDir)\include\onnxruntime\core\session</OrtInclude>
+    <OrtInclude Condition="'$(OrtInclude)'=='' and Exists('$(OrtDir)\include\onnxruntime\core\session')">$(OrtDir)\include\onnxruntime\core\session</OrtInclude>
+    <OrtInclude Condition="'$(OrtInclude)'==''">$(OrtDir)\include</OrtInclude>
     <OrtLibDir Condition="'$(OrtLibDir)'==''">$(OrtDir)\lib</OrtLibDir>
     <OrtBinDir Condition="'$(OrtBinDir)'==''">$(OrtDir)\bin</OrtBinDir>
   </PropertyGroup>

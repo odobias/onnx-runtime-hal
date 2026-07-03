@@ -51,7 +51,7 @@ Write-Host ("VS install   : {0}  {1}" -f $found.vs, ($(if ($isVs2026) { '(VS 202
 
 $target = if ($Rebuild) { "Rebuild" } else { "Build" }
 $enableIntel = -not $DisableIntel
-$enableOrt = $EnableOrt -or $EnableAmd
+$enableOrt = $EnableOrt -or $EnableAmd -or $EnableQualcomm
 $args = @(
     $sln,
     "/t:$target",

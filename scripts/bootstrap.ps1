@@ -101,9 +101,12 @@ switch ($Platform) {
         $buildArgs.DisableIntel = $true
     }
     'qualcomm' {
-        Write-Host "== Step 2/5: Qualcomm QNN SDK ==" -ForegroundColor Cyan
+        Write-Host "== Step 2/5: ONNX Runtime + QNN EP ==" -ForegroundColor Cyan
         & (Join-Path $scripts "setup-qualcomm.ps1")
-        Write-Host "== Step 3/5: model (Qualcomm backend is a scaffold; skipping) ==" -ForegroundColor DarkGray
+        Write-Host "== Step 3/5: models (HF snapshot if missing) ==" -ForegroundColor Cyan
+        if (-not (Test-Path (Join-Path (Split-Path $scripts -Parent) "models\whisper-tiny-en-static-onnx\encoder_model.onnx"))) {
+            & (Join-Path $scripts "get-models.ps1")
+        }
         $buildArgs.EnableQualcomm = $true
         $buildArgs.DisableIntel = $true
     }
@@ -120,5 +123,5 @@ Write-Host "Bootstrap complete ($Platform). Run it with:" -ForegroundColor Green
 switch ($Platform) {
     'intel'    { Write-Host "  .\scripts\run.ps1 -Backend intel -Device npu" -ForegroundColor White }
     'amd'      { Write-Host "  .\scripts\run.ps1 -Backend amd -Device npu" -ForegroundColor White }
-    'qualcomm' { Write-Host "  (Qualcomm backend is a scaffold -- builds as a throwing stub)" -ForegroundColor White }
+    'qualcomm' { Write-Host "  .\scripts\run.ps1 -Backend qualcomm -Device npu" -ForegroundColor White }
 }
