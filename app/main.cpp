@@ -7,6 +7,7 @@
 //   device : npu  | gpu | cpu                   (default: npu)
 //   runs   : timed iterations                   (default: 5)
 //   --cache <dir> : persist compiled model; loads twice (cold vs hot)
+//   --hot-only    : load once from a populated --cache (skip cold compile; cold=n/a)
 //   --ref "<text>": reference transcript -> compute WER/CER
 //   --threads N   : CPU inference thread count (CPU device only; default: runtime default)
 //   --json        : emit one machine-readable JSON record (for the harness)
@@ -397,7 +398,7 @@ int main(int argc, char* argv[]) {
 
     std::vector<std::string> pos;
     std::string cache_dir, reference, results_csv, label, provider_override;
-    bool json_out = false, have_ref = false;
+    bool json_out = false, have_ref = false, hot_only = false;
     int cpu_threads = 0;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -410,6 +411,8 @@ int main(int argc, char* argv[]) {
             cpu_threads = std::max(0, std::atoi(argv[++i]));
         } else if ((a == "--provider" || a == "--device-override") && i + 1 < argc) {
             provider_override = argv[++i];
+        } else if (a == "--hot-only") {
+            hot_only = true;
         } else if (a == "--json") {
             json_out = true;
         } else if (a == "--results" && i + 1 < argc) {
@@ -429,6 +432,7 @@ int main(int argc, char* argv[]) {
                   << "  device : npu | gpu | cpu                 (default npu)\n"
                   << "  runs   : timed iterations                (default 5)\n"
                   << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"
+                  << "  --hot-only  : load once from a populated --cache (skip cold compile; cold=n/a)\n"
                   << "  --ref \"text\": reference transcript -> compute WER/CER\n"
                   << "  --threads N: CPU inference thread count (CPU device only)\n"
                   << "  --provider <ort-ep>: backend-specific provider override (e.g. VitisAIExecutionProvider)\n"
@@ -491,24 +495,41 @@ int main(int argc, char* argv[]) {
                   << "\n\n";
     }
 
-    // Cold start (compiles; writes cache if enabled).
+    // cold_load == -1 signals "not measured" (hot-only mode); downstream tools treat
+    // a negative load as N/A rather than a real zero-second cold start.
     std::unique_ptr<IWhisperEngine> engine;
-    double cold_load = 0.0, warm_load = -1.0;
-    try {
-        engine = create_engine(backend, opt);
-        cold_load = engine->load_seconds();
-    } catch (const std::exception& e) {
-        return fail(3, std::string("Engine creation failed: ") + e.what());
-    }
+    double cold_load = -1.0, warm_load = -1.0;
 
-    // Hot start (imports cached blob) to quantify the caching win.
-    if (!cache_dir.empty()) {
+    if (hot_only) {
+        // Hot-only: skip the cold compile entirely and load once straight from a
+        // pre-populated cache. There is nothing to be "hot" from without a cache.
+        if (cache_dir.empty()) {
+            return fail(4, "--hot-only requires --cache <dir> with a populated compiled cache");
+        }
         try {
-            auto warm = create_engine(backend, opt);
-            warm_load = warm->load_seconds();
-            engine = std::move(warm);
+            engine = create_engine(backend, opt);
+            warm_load = engine->load_seconds();
         } catch (const std::exception& e) {
-            if (!json_out) std::cerr << "Hot reload failed: " << e.what() << "\n";
+            return fail(3, std::string("Engine creation failed: ") + e.what());
+        }
+    } else {
+        // Cold start (compiles; writes cache if enabled).
+        try {
+            engine = create_engine(backend, opt);
+            cold_load = engine->load_seconds();
+        } catch (const std::exception& e) {
+            return fail(3, std::string("Engine creation failed: ") + e.what());
+        }
+
+        // Hot start (imports cached blob) to quantify the caching win.
+        if (!cache_dir.empty()) {
+            try {
+                auto warm = create_engine(backend, opt);
+                warm_load = warm->load_seconds();
+                engine = std::move(warm);
+            } catch (const std::exception& e) {
+                if (!json_out) std::cerr << "Hot reload failed: " << e.what() << "\n";
+            }
         }
     }
 
@@ -581,6 +602,7 @@ int main(int argc, char* argv[]) {
         js << ",\"audio_len_s\":" << audio_len;
         js << ",\"runs\":" << runs;
         js << ",\"warmup\":" << warmup;
+        js << ",\"hot_only\":" << (hot_only ? "true" : "false");
         js << ",\"load_cold_s\":" << cold_load;
         js << ",\"load_warm_s\":" << warm_load;
         js << ",\"load_hot_s\":" << warm_load;
@@ -620,11 +642,13 @@ int main(int argc, char* argv[]) {
         std::cout << "\n";
         std::cout << "power        : " << power_source() << "\n";
         std::cout << std::setprecision(3);
-        std::cout << "load (cold)  : " << cold_load << " s\n";
+        if (cold_load >= 0.0) std::cout << "load (cold)  : " << cold_load << " s\n";
+        else                  std::cout << "load (cold)  : n/a (hot-only)\n";
         if (warm_load >= 0.0) {
             std::cout << "load (hot)   : " << warm_load << " s";
-            if (warm_load > 0.0) std::cout << "   (" << std::setprecision(1) << (cold_load / warm_load)
-                                           << "x faster)" << std::setprecision(3);
+            if (cold_load > 0.0 && warm_load > 0.0)
+                std::cout << "   (" << std::setprecision(1) << (cold_load / warm_load)
+                          << "x faster)" << std::setprecision(3);
             std::cout << "\n";
         }
         std::cout << std::setprecision(1);
