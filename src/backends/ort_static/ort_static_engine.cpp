@@ -491,10 +491,17 @@ Device best_available_device() {
     }
     return Device::CPU;
 #else
-    // x64 (and any non-Qualcomm build): pick the strongest execution provider that
-    // is actually compiled into this ONNX Runtime. VitisAI => AMD Ryzen NPU, then
-    // DirectML => GPU, else CPU. GetAvailableProviders() is available on every ORT
-    // version, so this path does not depend on the newer EP-device API.
+    // x64 (and any non-Qualcomm build). Self-select using ORT's EP-device list as a
+    // real hardware probe where it can see the silicon, with two important limits
+    // established empirically on this hardware:
+    //   * The VitisAI EP (AMD XDNA NPU) is registered via the legacy
+    //     AppendExecutionProvider API and NEVER appears in GetEpDevices(). So a
+    //     compiled-in VitisAI EP is the only signal we get; trust it and let the
+    //     engine's NPU->GPU->CPU session fallback demote if the NPU is truly absent.
+    //     (Detecting AMD-NPU *absence* up front would need an OS-level PnP probe.)
+    //   * The OpenVINO EP (Intel) and DirectML (GPU) DO enumerate their devices, so
+    //     for those we honor the probe: pick a tier only if the hardware is present.
+    // Set WHISPER_HAL_LOG_PROBE=1 to dump the enumerated devices to stderr.
     try {
         const std::vector<std::string> providers = Ort::GetAvailableProviders();
         auto has = [&](const char* needle) {
@@ -503,11 +510,51 @@ Device best_available_device() {
             }
             return false;
         };
-        // OpenVINO EP (Intel) => NPU is the strongest target; the engine's
-        // NPU->GPU->CPU OpenVINO fallback validates it at session-build time.
-        if (has("openvino")) return Device::NPU;
-        if (has("vitisai")) return Device::NPU;
-        if (has("dml") || has("directml")) return Device::GPU;
+        const bool has_vitisai = has("vitisai");
+        const bool has_openvino = has("openvino");
+        const bool can_gpu = has_openvino || has("dml") || has("directml");
+        const bool log_probe = !env_or("WHISPER_HAL_LOG_PROBE", "").empty();
+
+        // Hardware enumeration (authoritative for CPU, DirectML GPUs, and OpenVINO
+        // NPU/GPU; blind to VitisAI). The EP-device API landed in ORT 1.22
+        // (ORT_API_VERSION 22); on older headers we skip the probe and let the
+        // compiled-in-EP heuristic below drive the pick.
+        bool probed = false, hw_npu = false, hw_gpu = false;
+#if defined(ORT_API_VERSION) && ORT_API_VERSION >= 22
+        try {
+            Ort::Env probe_env(ORT_LOGGING_LEVEL_WARNING, "whisper_hal_probe");
+            auto devices = probe_env.GetEpDevices();
+            probed = !devices.empty();
+            for (const auto& d : devices) {
+                const OrtHardwareDeviceType t = d.Device().Type();
+                if (t == OrtHardwareDeviceType_NPU) hw_npu = true;
+                else if (t == OrtHardwareDeviceType_GPU) hw_gpu = true;
+                if (log_probe) {
+                    const char* tn = t == OrtHardwareDeviceType_NPU   ? "NPU"
+                                     : t == OrtHardwareDeviceType_GPU ? "GPU"
+                                                                      : "CPU";
+                    std::cerr << "[whisper-hal probe] EP=" << d.EpName() << " hw=" << tn << "\n";
+                }
+            }
+        } catch (const std::exception& e) {
+            if (log_probe) std::cerr << "[whisper-hal probe] GetEpDevices unavailable: " << e.what() << "\n";
+        }
+#else
+        if (log_probe) std::cerr << "[whisper-hal probe] EP-device API not in this ORT; using heuristic\n";
+#endif
+
+        // AMD Ryzen AI: VitisAI is invisible to the probe, so trust the compiled-in
+        // EP. The session-build fallback validates and demotes if the NPU is absent.
+        if (has_vitisai) return Device::NPU;
+        // Intel: the OpenVINO EP enumerates its NPU, so require the probe to see it.
+        if (probed && hw_npu && has_openvino) return Device::NPU;
+        // GPU: honor the probe when it worked; assume present only if we couldn't probe.
+        if (can_gpu && (hw_gpu || !probed)) return Device::GPU;
+        // Probe worked and found nothing we can target -> CPU is the honest answer.
+        if (probed) return Device::CPU;
+        // No usable probe (older ORT): last-resort compiled-in-EP heuristic.
+        if (has_openvino) return Device::NPU;
+        if (can_gpu) return Device::GPU;
     } catch (...) {
         // Fall through to CPU on any probe failure.
     }
