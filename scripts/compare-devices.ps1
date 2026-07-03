@@ -69,6 +69,21 @@ $reportsDir = Join-Path $root "build\reports"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 $cacheRoot = Join-Path $root "cache"
 
+# Best-effort AC vs battery detection; all devices run in this one session, so a
+# single reading applies to the whole comparison (battery => throttled clocks).
+function Get-PowerSource {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        switch ([System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus) {
+            'Online' { return 'ac' }
+            'Offline' { return 'battery' }
+            default { return 'unknown' }
+        }
+    } catch { return 'unknown' }
+}
+$powerSource = Get-PowerSource
+Write-Host ("Power: {0}" -f $powerSource) -ForegroundColor Cyan
+
 function Invoke-Clip($modelDir, $audio, $backend, $device, $runs, $cacheDir, $ref, $threads) {
     $args = @($modelDir, $audio, $backend, $device, "$runs", "--cache", $cacheDir, "--ref", $ref, "--json")
     if ($threads -gt 0) { $args += @("--threads", "$threads") }
@@ -122,7 +137,7 @@ foreach ($dev in $Devices) {
             device = $dev; chip = $null; status = $status; clips = 0
             cold_s = $null; hot_s = $null; mean_ms = $null; rtf = $null; xrt = $null
             tps = $null; avg_logprob = $null; wer_pct = $null; cer_pct = $null
-            threads = $null; hw_concurrency = $null; error = $errMsg
+            threads = $null; hw_concurrency = $null; power_source = $powerSource; error = $errMsg
         }
         continue
     }
@@ -146,7 +161,7 @@ foreach ($dev in $Devices) {
         cer_pct = if ($cRef) { [math]::Round(100.0 * $cEdits / $cRef, 2) } else { $null }
         threads = if ($dev -eq "CPU") { if ($threadsUsed -gt 0) { $threadsUsed } else { "default" } } else { "-" }
         hw_concurrency = if ($dev -eq "CPU") { $hwConcurrency } else { "-" }
-        error = ""
+        power_source = $powerSource; error = ""
     }
     Write-Host ("   ok: {0} clips | {1} ms | {2}x RT | WER {3}%" -f `
             $clipResults.Count, [math]::Round($meanMs, 1), [math]::Round((1.0 / [math]::Max($meanRtf, 1e-9)), 1),
@@ -171,6 +186,7 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("")
 [void]$md.AppendLine("- Model: ``$($manifestObj.model)`` | Variant: ``$($v.id)`` ($($v.precision), $($v.size_mb) MB, backend ``$($v.backend)``)")
 [void]$md.AppendLine("- Eval clips: $($clips.Count) | Runs/clip: $Runs | Generated: $(Get-Date -Format s)")
+[void]$md.AppendLine("- Power source: ``$powerSource`` (battery = throttled clocks; treat cross-machine numbers accordingly).")
 [void]$md.AppendLine("- Speedup = slowest-successful-device / this device's mean latency (bigger = faster).")
 [void]$md.AppendLine("- Confidence = mean per-token log-prob (self-reported, not calibrated truth).")
 [void]$md.AppendLine("- Cold start = first engine creation after cache deletion; hot start = second engine creation in the same process after cache population.")

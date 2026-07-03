@@ -27,6 +27,13 @@
 #include <thread>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>  // GetSystemPowerStatus (AC vs battery detection)
+#endif
+
 #include "whisper_npu/audio.hpp"
 #include "whisper_npu/metrics.hpp"
 #include "whisper_npu/whisper_engine.hpp"
@@ -150,6 +157,22 @@ std::string opt_num(double v, bool present, int prec = 6) {
     return o.str();
 }
 
+// Best-effort AC vs battery detection, read at run time. Power state changes
+// CPU/NPU clocking (battery = throttled), so an unlabeled battery run can silently
+// skew a comparison; record it per row. "ac" / "battery" / "unknown".
+std::string power_source() {
+#if defined(_WIN32)
+    SYSTEM_POWER_STATUS s{};
+    if (GetSystemPowerStatus(&s)) {
+        if (s.ACLineStatus == 1) return "ac";       // plugged in (also desktops w/o battery)
+        if (s.ACLineStatus == 0) return "battery";  // running on battery
+    }
+    return "unknown";  // ACLineStatus 255 = unknown, or call failed
+#else
+    return "unknown";
+#endif
+}
+
 // Shared, backend-neutral results schema. The trailing metric columns (label +
 // confidence/perf/accuracy) are populated only when the backend/run can supply
 // them, so rows from Intel/AMD/Qualcomm machines share one schema and concatenate.
@@ -179,19 +202,31 @@ void append_result_csv(const std::string& path,
 
     const bool write_header = !fs::exists(csv_path) || fs::file_size(csv_path) == 0;
     if (!write_header) {
+        // Additive schema migration: append any trailing columns the existing file
+        // predates, back-filling old rows with empty cells so positions stay aligned.
         std::ifstream in(csv_path);
         std::string header;
         std::getline(in, header);
-        if (header.find("cold_start_seconds") == std::string::npos) {
-            std::vector<std::string> rows;
-            std::string line;
-            while (std::getline(in, line)) rows.push_back(line);
-            in.close();
+        std::vector<std::string> rows;
+        std::string line;
+        while (std::getline(in, line)) rows.push_back(line);
+        in.close();
 
+        std::string new_header = header;
+        std::string pad;
+        if (new_header.find("cold_start_seconds") == std::string::npos) {
+            new_header += ",cold_start_seconds,hot_start_seconds";
+            pad += ",,";
+        }
+        if (new_header.find("power_source") == std::string::npos) {
+            new_header += ",power_source";
+            pad += ",";
+        }
+        if (new_header != header) {
             std::ofstream rewrite(csv_path, std::ios::trunc);
             if (!rewrite) throw std::runtime_error("cannot upgrade results CSV schema: " + path);
-            rewrite << header << ",cold_start_seconds,hot_start_seconds\n";
-            for (const auto& row : rows) rewrite << row << ",,\n";
+            rewrite << new_header << '\n';
+            for (const auto& row : rows) rewrite << row << pad << '\n';
         }
     }
 
@@ -206,7 +241,7 @@ void append_result_csv(const std::string& path,
                "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
                "throughput_tps,wer,cer,transcription,"
                "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
-               "cold_start_seconds,hot_start_seconds\n";
+               "cold_start_seconds,hot_start_seconds,power_source\n";
     }
 
     const bool tok = last.has_token_metrics;
@@ -244,7 +279,8 @@ void append_result_csv(const std::string& path,
         << 1 << ','          // eval_clips: this CLI benchmarks a single audio file
         << "ok" << ','       // reached here => run succeeded
         << cold_load << ','  // cold_start_seconds
-        << warm_load << '\n';// hot_start_seconds
+        << warm_load << ','  // hot_start_seconds
+        << csv_escape(power_source()) << '\n';
 }
 
 }  // namespace
@@ -414,6 +450,7 @@ int main(int argc, char* argv[]) {
         js << ",\"backend\":\"" << json_escape(engine->backend_name()) << "\"";
         js << ",\"device\":\"" << json_escape(engine->device_name()) << "\"";
         js << ",\"device_full_name\":\"" << json_escape(engine->full_device_name()) << "\"";
+        js << ",\"power_source\":\"" << json_escape(power_source()) << "\"";
         js << ",\"cpu_threads_requested\":" << cpu_threads;
         js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
@@ -459,6 +496,7 @@ int main(int argc, char* argv[]) {
                       << " / " << std::thread::hardware_concurrency() << " logical)";
         }
         std::cout << "\n";
+        std::cout << "power        : " << power_source() << "\n";
         std::cout << std::setprecision(3);
         std::cout << "load (cold)  : " << cold_load << " s\n";
         if (warm_load >= 0.0) {
