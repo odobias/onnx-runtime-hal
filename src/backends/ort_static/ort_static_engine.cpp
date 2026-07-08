@@ -13,8 +13,10 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 #include <vector>
 
@@ -286,13 +288,55 @@ void append_provider(Ort::Env& env, Ort::SessionOptions& so, const EngineOptions
         "QNNExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
 }
 
-Ort::SessionOptions make_session_options(Ort::Env& env, const EngineOptions& options,
-                                         const std::string& provider, const fs::path& model_dir,
-                                         const std::string& cache_key) {
-    Ort::SessionOptions so;
-    so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-    append_provider(env, so, options, provider, model_dir, cache_key);
-    return so;
+// Build one ORT session for `provider`, adding QNN context-binary caching when a
+// cache_dir is set. The HTP compile is QNN's ~15s cold cost; ORT's EPContext
+// mechanism dumps that compiled graph to "<key>_qnn_ctx.onnx" and reloads it on the
+// next process, turning the cold compile into a ~1s blob load. OpenVINO/VitisAI keep
+// their own cache_dir handling in append_provider, so this fast path is scoped to QNN
+// and stays inert on x64 builds (the QNN token never enters the chain there).
+std::unique_ptr<Ort::Session> build_session(Ort::Env& env, const EngineOptions& options,
+                                            const std::string& provider,
+                                            const fs::path& model_path, const fs::path& model_dir,
+                                            const std::string& cache_key) {
+    fs::path ctx_path;
+    if (is_qnn(provider) && !options.cache_dir.empty()) {
+        ctx_path = fs::path(options.cache_dir) / (cache_key + "_qnn_ctx.onnx");
+    }
+
+    auto make_so = [&](bool generate_ctx) {
+        Ort::SessionOptions so;
+        so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+        append_provider(env, so, options, provider, model_dir, cache_key);
+        if (generate_ctx) {
+            const std::string p = ctx_path.string();
+            so.AddConfigEntry("ep.context_enable", "1");
+            so.AddConfigEntry("ep.context_file_path", p.c_str());
+            so.AddConfigEntry("ep.context_embed_mode", "1");  // embed the HTP binary in the .onnx
+        }
+        return so;
+    };
+
+    // Fast path: a compiled QNN context already exists -> load it and skip the HTP compile.
+    if (!ctx_path.empty() && fs::exists(ctx_path)) {
+        try {
+            auto so = make_so(false);
+            return std::make_unique<Ort::Session>(env, ctx_path.c_str(), so);
+        } catch (const std::exception& e) {
+            // The context is EP/arch/QNN-version specific; a stale blob can't load. Recompile.
+            std::cerr << "[whisper-hal] QNN context cache '" << ctx_path.string()
+                      << "' unusable (" << e.what() << "); recompiling\n";
+            std::error_code ec;
+            fs::remove(ctx_path, ec);
+        }
+    }
+
+    // Compile path. For QNN with a cache_dir this session-create also dumps the context binary.
+    if (!ctx_path.empty()) {
+        std::error_code ec;
+        fs::create_directories(ctx_path.parent_path(), ec);
+    }
+    auto so = make_so(!ctx_path.empty());
+    return std::make_unique<Ort::Session>(env, model_path.c_str(), so);
 }
 
 class OrtStaticEngine final : public IWhisperEngine {
@@ -331,10 +375,8 @@ public:
             const std::string& provider = chain[i];
             try {
                 const auto t0 = std::chrono::steady_clock::now();
-                auto enc_so = make_session_options(env_, options_, provider, dir, cache_base + "_encoder");
-                encoder_ = std::make_unique<Ort::Session>(env_, enc_path.c_str(), enc_so);
-                auto dec_so = make_session_options(env_, options_, provider, dir, cache_base + "_decoder");
-                decoder_ = std::make_unique<Ort::Session>(env_, dec_path.c_str(), dec_so);
+                encoder_ = build_session(env_, options_, provider, enc_path, dir, cache_base + "_encoder");
+                decoder_ = build_session(env_, options_, provider, dec_path, dir, cache_base + "_decoder");
                 load_seconds_ =
                     std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
                 active_provider_ = provider;
