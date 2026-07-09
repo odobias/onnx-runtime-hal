@@ -179,6 +179,19 @@ requires **write** access (owner). This is an alternative to reproducing models 
 `get-model.ps1` / `get-amd-model.ps1` / `export-variants.ps1` — pull the exact pinned
 artifacts instead of re-running the export toolchain.
 
+**The benchmark depends only on this HF repo — no Avast internal repository is involved.**
+Everything the C++ benchmark consumes comes from the private HF snapshot above:
+`get-models.ps1` pulls the Whisper ONNX packages, eval set, and sample audio, and
+`get-deepfake-models.ps1` pulls the deepfake classifier models (Text Scam Classifier,
+FakeAudio detector) from the **same** repo's `deepfake/*` subtree — neither script touches
+any internal/corporate artifact store. The classifiers carry one extra, HF-independent
+requirement: `benchmark-onnx.ps1` feeds them pre-baked input tensors that a Python `.venv`
+generates on first run (`scripts/experiments/dump_fixtures.py`), because the C++ app doesn't
+tokenize text or embed audio itself. That `.venv` is optional — when it (or the classifier
+models) is absent, the ONNX benchmark simply **skips** the classifiers and runs the full
+HF-hosted Whisper matrix. So an HF-only checkout benchmarks everything reachable without ever
+reaching for an internal repo.
+
 ## Quantization benchmark (confidence + performance + accuracy)
 
 The runner reports three axes per run, all backend-neutral (any backend fills what it
