@@ -30,9 +30,9 @@
          is a self-contained package. Set /p:BundleModel=false to skip the (large)
          copy during iterative dev builds. -->
     <BundleModel Condition="'$(BundleModel)'==''">true</BundleModel>
-    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(WhisperHalRoot)models\whisper-tiny-en-static-onnx</BundledModelDir>
+    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(WhisperHalRoot)models\whisper\en-static-onnx</BundledModelDir>
 
-    <!-- The AMD-native whisper-tiny-amd model is ONLY used by the `amd` backend
+    <!-- The AMD-native whisper/amd model is ONLY used by the `amd` backend
          variant; the unified auto/onnx-static path runs the portable static model
          above. It is ~155 MB, so bundling it is opt-in (off by default). Turn on
          with /p:BundleAmdModel=true (or build.ps1 -BundleAmdModel) when you want a

@@ -36,15 +36,15 @@ Initialize-BenchmarkConsole
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Model) {
     switch ($Backend) {
-        "amd" { $Model = Join-Path $root "models\whisper-tiny-amd" }
-        "intel-onnx" { $Model = Join-Path $root "models\whisper-tiny-en-onnx" }
-        "onnx-static" { $Model = Join-Path $root "models\whisper-tiny-en-static-onnx" }
-        "onnx-dynamic" { $Model = Join-Path $root "models\whisper-tiny-en-onnx" }
-        "qualcomm" { $Model = Join-Path $root "models\whisper-tiny-en-static-onnx" }
-        default { $Model = Join-Path $root "models\whisper-tiny-en-ov" }
+        "amd" { $Model = Join-Path $root "models\whisper\amd" }
+        "intel-onnx" { $Model = Join-Path $root "models\whisper\en-onnx" }
+        "onnx-static" { $Model = Join-Path $root "models\whisper\en-static-onnx" }
+        "onnx-dynamic" { $Model = Join-Path $root "models\whisper\en-onnx" }
+        "qualcomm" { $Model = Join-Path $root "models\whisper\en-static-onnx" }
+        default { $Model = Join-Path $root "models\whisper\en-ov" }
     }
 }
-if (-not $Audio) { $Audio = Join-Path $root "models\jfk.wav" }
+if (-not $Audio) { $Audio = Join-Path $root "models\audio\jfk.wav" }
 if (-not $Results) { $Results = Join-Path $root "results\benchmark-results.csv" }
 
 $exe = Join-Path $root "build\x64\$Configuration\WhisperNpuHal.App.exe"

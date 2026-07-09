@@ -2,11 +2,11 @@
 # sidecars into one HAL model directory.
 #
 #   .\scripts\get-amd-model.ps1
-#   .\scripts\get-amd-model.ps1 -Out whisper-tiny-amd
+#   .\scripts\get-amd-model.ps1 -Out whisper/amd
 
 [CmdletBinding()]
 param(
-    [string]$Out = "whisper-tiny-amd"
+    [string]$Out = "whisper/amd"
 )
 
 $ErrorActionPreference = "Stop"
@@ -137,7 +137,7 @@ foreach ($file in $tokenizerFiles) {
 
 $sizeMb = [math]::Round(((Get-ChildItem $outDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB), 1)
 $entry = [ordered]@{
-    id        = $Out
+    id        = "whisper-tiny-amd"
     backend   = "amd"
     precision = "fp32-static"
     method    = "AMD Whisper Tiny ONNX NPU export (static decoder context)"

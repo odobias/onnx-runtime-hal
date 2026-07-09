@@ -21,7 +21,7 @@ param(
     [switch]$EnableOvep,
     [switch]$DisableIntel,
     [switch]$EnableQualcomm,
-    # Also bundle the ~155 MB AMD-native whisper-tiny-amd model into the package.
+    # Also bundle the ~155 MB AMD-native whisper/amd model into the package.
     # Off by default -- the unified auto/onnx-static path runs the portable static
     # model and does not need it; enable only to run the amd-native variant offline.
     [switch]$BundleAmdModel,

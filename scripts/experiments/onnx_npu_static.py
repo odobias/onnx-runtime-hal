@@ -12,7 +12,7 @@ is harmless. Shapes are constant every step => NPU-compilable.
 
 Cost: O(n * MAXLEN) instead of O(n) (no cache reuse), but fully static + cached.
 
-  .venv\\Scripts\\python.exe scripts\\onnx_npu_static.py models\\whisper-tiny-en-onnx models\\eval\\eval.jsonl NPU 64
+  .venv\\Scripts\\python.exe scripts\\onnx_npu_static.py models\\whisper\\en-onnx models\\eval\\eval.jsonl NPU 64
 """
 import json
 import os
@@ -115,7 +115,7 @@ class OVWhisperStatic:
 
 
 def main():
-    model_dir = sys.argv[1] if len(sys.argv) > 1 else "models/whisper-tiny-en-onnx"
+    model_dir = sys.argv[1] if len(sys.argv) > 1 else "models/whisper/en-onnx"
     eval_path = sys.argv[2] if len(sys.argv) > 2 else "models/eval/eval.jsonl"
     device = sys.argv[3] if len(sys.argv) > 3 else "NPU"
     maxlen = int(sys.argv[4]) if len(sys.argv) > 4 else 64

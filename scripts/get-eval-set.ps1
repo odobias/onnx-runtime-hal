@@ -40,10 +40,10 @@ $ok = ($LASTEXITCODE -eq 0)
 
 if (-not $ok) {
     Write-Host "Dataset build failed; falling back to jfk.wav clip." -ForegroundColor Yellow
-    $jfk = Join-Path $root "models\jfk.wav"
+    $jfk = Join-Path $root "models\audio\jfk.wav"
     if (-not (Test-Path $jfk)) { & (Join-Path $PSScriptRoot "get-audio.ps1") }
     $ref = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
-    $rec = [ordered]@{ id = "jfk"; audio = "models/jfk.wav"; ref = $ref; duration_s = 11.0 }
+    $rec = [ordered]@{ id = "jfk"; audio = "models/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
     ($rec | ConvertTo-Json -Compress) | Set-Content -Path (Join-Path $evalDir "eval.jsonl") -Encoding UTF8
     Write-Host "Wrote 1 utterance (jfk) to models\eval\eval.jsonl" -ForegroundColor Green
 }

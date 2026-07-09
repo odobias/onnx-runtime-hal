@@ -18,7 +18,7 @@ namespace fs = std::filesystem;
 namespace fe = whisper_npu::frontend;
 
 struct Row {
-    std::string model_package;      // e.g. whisper-tiny-en-static-onnx
+    std::string model_package;      // e.g. en-static-onnx (leaf of models/whisper/en-static-onnx)
     std::string variant_id;         // manifest id or label fallback
     std::string base_model;         // e.g. openai/whisper-tiny.en
     std::string precision;          // fp32, fp16, int8, int4, fp32-static, ...
@@ -143,7 +143,7 @@ inline Row resolve(const std::string& model_dir,
     if (out.model_format.empty()) {
         if (backend_lc.find("openvino genai") != std::string::npos ||
             out.model_package.find("-ov-") != std::string::npos ||
-            out.model_package.find("whisper-tiny-en-ov") != std::string::npos) {
+            out.model_package.find("en-ov") != std::string::npos) {
             out.model_format = "ov-ir";
         } else {
             out.model_format = "onnx";

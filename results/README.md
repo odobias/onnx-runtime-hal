@@ -27,7 +27,7 @@ all three in sync when adding or reordering columns.
 - `device`: logical device selector, e.g. `NPU`, `CPU`, `GPU`.
 - `device_name`: backend-specific device string (`NPU`/`GPU`/`CPU` for Intel; an EP name like `CPUExecutionProvider` for AMD).
 - `device_full_name`: the actual hardware identity when the backend can query it, e.g. `Intel(R) AI Boost` or `13th Gen Intel(R) Core(TM) i7-1370P` on Intel (via `ov::device::full_name`). Empty when the backend doesn't expose one (AMD/Qualcomm currently don't) or for rows written before this column existed.
-- `model_package`: basename of `model_dir`, e.g. `whisper-tiny-en-static-onnx`. Always populated.
+- `model_package`: basename of `model_dir`, e.g. `en-static-onnx`. Always populated.
 - `variant_id`: manifest `id` or `--label`; falls back to `model_package`. Always populated.
 - `base_model`: Hugging Face model id from `models/manifest.json` (default `openai/whisper-tiny.en`).
 - `precision`: `fp32`, `fp16`, `int8`, `int4`, `fp32-static`, etc. From manifest when available, else inferred from the package name.

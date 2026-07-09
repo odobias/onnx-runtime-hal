@@ -2,12 +2,12 @@
 """Print input/output tensor names + shapes for the whisper ONNX decoders, so the
 C++ dynamic (KV-cache) backend feeds exactly the right names. Read-only.
 
-    .venv\\Scripts\\python.exe scripts\\experiments\\dump_onnx_io.py models\\whisper-tiny-en-onnx
+    .venv\\Scripts\\python.exe scripts\\experiments\\dump_onnx_io.py models\\whisper\\en-onnx
 """
 import sys
 import onnxruntime as ort
 
-model_dir = sys.argv[1] if len(sys.argv) > 1 else "models/whisper-tiny-en-onnx"
+model_dir = sys.argv[1] if len(sys.argv) > 1 else "models/whisper/en-onnx"
 
 for f in ("encoder_model.onnx", "decoder_model.onnx", "decoder_with_past_model.onnx"):
     path = f"{model_dir}/{f}"

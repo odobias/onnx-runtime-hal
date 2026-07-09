@@ -104,7 +104,7 @@ switch ($Platform) {
         Write-Host "== Step 2/5: ONNX Runtime + QNN EP ==" -ForegroundColor Cyan
         & (Join-Path $scripts "setup-qualcomm.ps1")
         Write-Host "== Step 3/5: models (HF snapshot if missing) ==" -ForegroundColor Cyan
-        if (-not (Test-Path (Join-Path (Split-Path $scripts -Parent) "models\whisper-tiny-en-static-onnx\encoder_model.onnx"))) {
+        if (-not (Test-Path (Join-Path (Split-Path $scripts -Parent) "models\whisper\en-static-onnx\encoder_model.onnx"))) {
             & (Join-Path $scripts "get-models.ps1")
         }
         $buildArgs.EnableQualcomm = $true

@@ -1,5 +1,5 @@
 # Exports whisper-tiny(.en) to the STOCK optimum "with-past" ONNX (encoder +
-# decoder + decoder_with_past) into models/whisper-tiny-en-onnx. This is the model
+# decoder + decoder_with_past) into models/whisper/en-onnx. This is the model
 # the onnx-dynamic backend runs: a real KV cache (encoder cross-attention K/V
 # computed once, decoder self-attention K/V grow per token), which is faster than
 # the static no-KV recompute on CPU/GPU but is NOT NPU-compilable (dynamic shapes).
@@ -14,7 +14,7 @@
 [CmdletBinding()]
 param(
     [string]$Model = "openai/whisper-tiny.en",
-    [string]$Out = "whisper-tiny-en-onnx"
+    [string]$Out = "whisper/en-onnx"
 )
 
 $ErrorActionPreference = "Stop"

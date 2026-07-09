@@ -1,7 +1,7 @@
 # One Binary Across Vendors — Feasibility Notes
 
 Research parked for later: can we ship **one** benchmark deploy that runs the unified
-`whisper-tiny-en-static-onnx` model on Intel / AMD / Qualcomm NPUs? This is the
+`whisper/en-static-onnx` model on Intel / AMD / Qualcomm NPUs? This is the
 distilled answer, the evidence, and what to watch. Companion to the "Build once,
 self-select everywhere" section of the top-level `README.md`.
 

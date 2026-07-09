@@ -58,8 +58,8 @@ if (-not $Audio) { $Audio = Join-Path $root "models\eval\ls_000.wav" }
 #   static  : no-KV recompute (fixed shapes) -> NPU-compilable, slower.
 #   dynamic : with-past KV cache (growing shapes) -> faster on CPU/GPU, but the
 #             NPU compilers reject dynamic shapes, so it is a CPU/GPU-only citizen.
-$whisperStatic = Join-Path $root "models\whisper-tiny-en-static-onnx"
-$whisperDynamic = Join-Path $root "models\whisper-tiny-en-onnx"
+$whisperStatic = Join-Path $root "models\whisper\en-static-onnx"
+$whisperDynamic = Join-Path $root "models\whisper\en-onnx"
 $whisperVariants = @(
     @{ Backend = "onnx-static";  Model = $whisperStatic;  Devices = @("npu", "gpu", "cpu"); Label = "onnx-static" }
     @{ Backend = "onnx-dynamic"; Model = $whisperDynamic; Devices = @("gpu", "cpu");        Label = "onnx-dynamic" }
