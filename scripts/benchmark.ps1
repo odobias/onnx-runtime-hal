@@ -201,6 +201,7 @@ foreach ($v in $manifestObj.variants) {
                 wer = ""; cer = ""; transcription = ""; cold_start_seconds = ""; hot_start_seconds = ""; eval_clips = 0
                 status = "$(if ($status -eq 'ok') { 'fail' } else { $status })$(if ($errMsg) { " ($errMsg)" })"
                 runtime = ""; model_format = ""; decode_strategy = ""; max_context = ""; power_source = (Get-BenchmarkPowerSource)
+                host_arch = (Get-BenchmarkHostArch); host_os = (Get-BenchmarkHostOs); runtime_version = ""
             })
             continue
         }
@@ -242,6 +243,9 @@ foreach ($v in $manifestObj.variants) {
             runtime = $meta.runtime; model_format = $meta.model_format; decode_strategy = $meta.decode_strategy
             max_context = $meta.max_context
             power_source = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-BenchmarkPowerSource })
+            host_arch = (Get-BenchmarkRowValue $firstRow 'host_arch' (Get-BenchmarkHostArch))
+            host_os = (Get-BenchmarkRowValue $firstRow 'host_os' (Get-BenchmarkHostOs))
+            runtime_version = (Get-BenchmarkRowValue $firstRow 'runtime_version' '')
         })
         Write-Host ("   ok: {0} clips | {1} ms | WER {2}% | conf {3}" -f `
                 $rows.Count, [math]::Round($meanMs, 1),

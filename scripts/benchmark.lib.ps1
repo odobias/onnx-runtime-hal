@@ -39,7 +39,8 @@ function Get-BenchmarkResultColumns {
         "label", "model_size_mb", "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps",
         "wer", "cer", "transcription",
         "runtime", "model_format", "decode_strategy", "max_context", "eval_clips", "status",
-        "cold_start_seconds", "hot_start_seconds", "power_source"
+        "cold_start_seconds", "hot_start_seconds", "power_source",
+        "host_arch", "host_os", "runtime_version"
     )
 }
 
@@ -148,6 +149,48 @@ function Get-BenchmarkPowerSource {
             default { return 'unknown' }
         }
     } catch { return 'unknown' }
+}
+
+# --- host identity -----------------------------------------------------------
+
+# ISA of the current host, normalized to the same tokens the C++ runner emits
+# (x64 / arm64 / x86). This is the axis that decides which vendor DLL pack a build
+# belongs to, so it's stamped per row to keep cross-ISA results attributable.
+function Get-BenchmarkHostArch {
+    try {
+        switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
+            'X64'   { return 'x64' }
+            'Arm64' { return 'arm64' }
+            'X86'   { return 'x86' }
+            default { return "$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)".ToLowerInvariant() }
+        }
+    } catch {
+        $a = $env:PROCESSOR_ARCHITECTURE
+        if ($a -eq 'AMD64') { return 'x64' }
+        if ($a -eq 'ARM64') { return 'arm64' }
+        if ($a -eq 'x86') { return 'x86' }
+        return 'unknown'
+    }
+}
+
+# Best-effort OS identity, e.g. "Windows 11 (build 26100)".
+function Get-BenchmarkHostOs {
+    try {
+        $v = [Environment]::OSVersion.Version
+        $name = if ($v.Major -eq 10 -and $v.Build -ge 22000) { 'Windows 11' }
+                elseif ($v.Major -eq 10) { 'Windows 10' }
+                else { 'Windows' }
+        return "$name (build $($v.Build))"
+    } catch { return 'Windows' }
+}
+
+# Prefer the value the runner binary reported (authoritative for "which build"),
+# falling back to this host's own detection when the JSON row lacks it.
+function Get-BenchmarkRowValue($JsonRow, [string]$Name, [string]$Fallback) {
+    if ($JsonRow -and ($JsonRow.PSObject.Properties.Name -contains $Name) -and $JsonRow.$Name) {
+        return $JsonRow.$Name
+    }
+    return $Fallback
 }
 
 # --- platform / NPU vendor autodetection -------------------------------------

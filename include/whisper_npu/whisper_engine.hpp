@@ -111,6 +111,13 @@ public:
     // get compared across machines.
     virtual std::string full_device_name() const { return {}; }
 
+    // Version of the underlying inference runtime, when the backend can report it
+    // (the ONNX Runtime backends return Ort::GetVersionString() -> "1.24.4"; the
+    // Intel backends return OpenVINO's build number). Empty when not applicable.
+    // Records WHICH runtime build produced a row so results gathered across
+    // platforms / vendor DLL packs stay attributable in one ledger.
+    virtual std::string runtime_version() const { return {}; }
+
     // Wall-clock time spent constructing/compiling this engine (model load +
     // device compile). With a warm cache this should drop dramatically.
     virtual double load_seconds() const = 0;

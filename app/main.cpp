@@ -38,6 +38,7 @@
 
 #include "whisper_npu/audio.hpp"
 #include "whisper_npu/benchmark_meta.hpp"
+#include "whisper_npu/classifier.hpp"
 #include "whisper_npu/metrics.hpp"
 #include "whisper_npu/whisper_engine.hpp"
 
@@ -179,6 +180,50 @@ std::string power_source() {
 #endif
 }
 
+// Compile-time target ISA of this binary. This is the axis that decides which
+// vendor DLL pack a build belongs to (x64 = Intel/AMD; arm64 = Qualcomm/QNN), so
+// it's recorded per row to keep cross-ISA results attributable in one ledger.
+std::string host_arch() {
+#if defined(_M_ARM64) || defined(__aarch64__)
+    return "arm64";
+#elif defined(_M_X64) || defined(__x86_64__)
+    return "x64";
+#elif defined(_M_IX86) || defined(__i386__)
+    return "x86";
+#else
+    return "unknown";
+#endif
+}
+
+// Best-effort OS identity. On Windows, RtlGetVersion is the only non-deprecated
+// way to read the real build number (GetVersionEx lies without a manifest).
+std::string host_os() {
+#if defined(_WIN32)
+    if (HMODULE nt = GetModuleHandleW(L"ntdll.dll")) {
+        using RtlGetVersionFn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
+        if (auto fn = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(nt, "RtlGetVersion"))) {
+            RTL_OSVERSIONINFOW vi{};
+            vi.dwOSVersionInfoSize = sizeof(vi);
+            if (fn(&vi) == 0) {
+                const char* name = (vi.dwMajorVersion == 10 && vi.dwBuildNumber >= 22000)
+                                       ? "Windows 11"
+                                       : (vi.dwMajorVersion == 10 ? "Windows 10" : "Windows");
+                std::ostringstream o;
+                o << name << " (build " << vi.dwBuildNumber << ")";
+                return o.str();
+            }
+        }
+    }
+    return "Windows";
+#elif defined(__linux__)
+    return "Linux";
+#elif defined(__APPLE__)
+    return "macOS";
+#else
+    return "unknown";
+#endif
+}
+
 std::vector<std::string> split_csv_row(const std::string& line) {
     std::vector<std::string> fields;
     std::string cur;
@@ -218,7 +263,8 @@ constexpr const char* kBenchmarkCsvHeader =
     "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
     "throughput_tps,wer,cer,transcription,"
     "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
-    "cold_start_seconds,hot_start_seconds,power_source";
+    "cold_start_seconds,hot_start_seconds,power_source,"
+    "host_arch,host_os,runtime_version";
 
 void migrate_benchmark_csv_schema(const std::filesystem::path& csv_path) {
     namespace fs = std::filesystem;
@@ -226,7 +272,10 @@ void migrate_benchmark_csv_schema(const std::filesystem::path& csv_path) {
     if (!in) return;
     std::string header;
     std::getline(in, header);
-    if (header.find("model_package") != std::string::npos) return;
+    // The PowerShell harness writes CRLF; strip a trailing CR before comparing so a
+    // byte-identical header isn't spuriously "migrated" on every C++ append.
+    if (!header.empty() && header.back() == '\r') header.pop_back();
+    if (header == kBenchmarkCsvHeader) return;  // already the current schema
 
     std::vector<std::string> old_header = split_csv_row(header);
     std::vector<std::string> new_header = split_csv_row(kBenchmarkCsvHeader);
@@ -391,7 +440,171 @@ void append_result_csv(const std::string& path,
         << "ok" << ','       // reached here => run succeeded
         << cold_load << ','  // cold_start_seconds
         << warm_load << ','  // hot_start_seconds
-        << csv_escape(power_source()) << '\n';
+        << csv_escape(power_source()) << ','
+        << csv_escape(host_arch()) << ','
+        << csv_escape(host_os()) << ','
+        << csv_escape(engine.runtime_version()) << '\n';
+}
+
+// --- deepfake classifier mode -----------------------------------------------
+// Separate ledger from the ASR benchmark: classifiers have a different I/O
+// contract and metric set (accuracy + cross-EP probability agreement, not
+// WER/RTF), so mixing them into benchmark-results.csv would produce a ragged,
+// meaning-diluted schema. One row per (model, EP) run.
+void append_classifier_csv(const std::string& path, const whisper_npu::classifier::Result& r) {
+    namespace fs = std::filesystem;
+    const fs::path csv_path(path);
+    if (csv_path.has_parent_path()) fs::create_directories(csv_path.parent_path());
+    const bool write_header = !fs::exists(csv_path) || fs::file_size(csv_path) == 0;
+    std::ofstream out(csv_path, std::ios::app);
+    if (!out) throw std::runtime_error("cannot open classifier results CSV for append: " + path);
+
+    static const char* header =
+        "timestamp_utc,model,requested_device,execution_provider,runtime,runtime_version,"
+        "host_arch,host_os,backend_name,runs,load_seconds,mean_infer_ms,median_infer_ms,p90_infer_ms,"
+        "model_size_mb,eval_samples,correct,accuracy,max_abs_p_diff,power_source,eval_detail";
+    if (write_header) out << header << '\n';
+
+    // eval_detail packs per-sample results without CSV-hostile commas: samples
+    // separated by ';', fields within a sample by '|' -> id|label|pred|p|expected_p.
+    std::ostringstream detail;
+    detail << std::fixed << std::setprecision(6);
+    for (size_t i = 0; i < r.samples.size(); ++i) {
+        const auto& s = r.samples[i];
+        if (i) detail << ';';
+        detail << s.id << '|' << s.label << '|' << s.predicted << '|' << s.p << '|' << s.expected_p;
+    }
+
+    const double acc = r.eval_samples ? static_cast<double>(r.correct) / r.eval_samples : 0.0;
+    out << csv_escape(utc_now_iso8601()) << ','
+        << csv_escape(r.model) << ','
+        << csv_escape(r.requested_device) << ','
+        << csv_escape(r.execution_provider) << ','
+        << csv_escape(r.runtime) << ','
+        << csv_escape(r.runtime_version) << ','
+        << csv_escape(r.host_arch) << ','
+        << csv_escape(r.host_os) << ','
+        << csv_escape(r.backend_name) << ','
+        << r.runs << ','
+        << std::setprecision(6) << r.load_seconds << ','
+        << r.mean_infer_ms << ','
+        << r.median_infer_ms << ','
+        << r.p90_infer_ms << ','
+        << r.model_size_mb << ','
+        << r.eval_samples << ','
+        << r.correct << ','
+        << acc << ','
+        << r.max_abs_p_diff << ','
+        << csv_escape(power_source()) << ','
+        << csv_escape(detail.str()) << '\n';
+}
+
+int run_classify(const std::string& dir, whisper_npu::Device device, const std::string& provider,
+                 int runs, int cpu_threads, const std::string& cache_dir,
+                 const std::string& results_csv, bool json_out) {
+    using namespace whisper_npu;
+    auto fail = [&](int code, const std::string& msg) {
+        if (json_out) std::cout << "{\"ok\":false,\"error\":\"" << json_escape(msg) << "\"}\n";
+        else std::cerr << msg << "\n";
+        return code;
+    };
+    if (!classifier::available()) {
+        return fail(3, "classifier mode needs an ONNX Runtime build "
+                       "(scripts\\build.ps1 -EnableOrt -DisableIntel)");
+    }
+
+    classifier::Result r;
+    try {
+        r = classifier::run(dir, device, provider, runs, cpu_threads, cache_dir);
+    } catch (const std::exception& e) {
+        return fail(4, std::string("classifier run failed: ") + e.what());
+    }
+    r.host_arch = host_arch();
+    r.host_os = host_os();
+
+    if (!results_csv.empty()) {
+        try {
+            append_classifier_csv(results_csv, r);
+        } catch (const std::exception& e) {
+            std::cerr << "classifier results append failed: " << e.what() << "\n";
+        }
+    }
+
+    const double acc = r.eval_samples ? 100.0 * r.correct / r.eval_samples : 0.0;
+    if (json_out) {
+        std::ostringstream js;
+        js << std::fixed << std::setprecision(6) << "{";
+        js << "\"ok\":true";
+        js << ",\"model\":\"" << json_escape(r.model) << "\"";
+        js << ",\"requested_device\":\"" << json_escape(r.requested_device) << "\"";
+        js << ",\"execution_provider\":\"" << json_escape(r.execution_provider) << "\"";
+        js << ",\"runtime\":\"" << json_escape(r.runtime) << "\"";
+        js << ",\"runtime_version\":\"" << json_escape(r.runtime_version) << "\"";
+        js << ",\"host_arch\":\"" << json_escape(r.host_arch) << "\"";
+        js << ",\"host_os\":\"" << json_escape(r.host_os) << "\"";
+        js << ",\"power_source\":\"" << json_escape(power_source()) << "\"";
+        js << ",\"load_seconds\":" << r.load_seconds;
+        js << ",\"model_size_mb\":" << r.model_size_mb;
+        js << ",\"runs\":" << r.runs;
+        js << ",\"mean_infer_ms\":" << r.mean_infer_ms;
+        js << ",\"median_infer_ms\":" << r.median_infer_ms;
+        js << ",\"p90_infer_ms\":" << r.p90_infer_ms;
+        js << ",\"eval_samples\":" << r.eval_samples;
+        js << ",\"correct\":" << r.correct;
+        js << ",\"accuracy_pct\":" << acc;
+        js << ",\"max_abs_p_diff\":" << r.max_abs_p_diff;
+        js << ",\"samples\":[";
+        for (size_t i = 0; i < r.samples.size(); ++i) {
+            const auto& s = r.samples[i];
+            if (i) js << ',';
+            js << "{\"id\":\"" << json_escape(s.id) << "\",\"label\":\"" << json_escape(s.label)
+               << "\",\"pred\":\"" << json_escape(s.predicted) << "\",\"p\":" << s.p
+               << ",\"expected_p\":" << s.expected_p << ",\"correct\":" << (s.correct ? "true" : "false")
+               << "}";
+        }
+        js << "]}";
+        std::cout << js.str() << "\n";
+        return 0;
+    }
+
+    std::cout << std::fixed;
+    std::cout << "Classifier : " << r.model << "   EP " << r.execution_provider << "  ["
+              << r.requested_device << "]\n";
+    std::cout << "runtime    : " << r.runtime << "  " << r.runtime_version << "\n";
+    std::cout << "host       : " << r.host_arch << " / " << r.host_os << "\n";
+    std::cout << "power      : " << power_source() << "\n";
+    std::cout << std::setprecision(3);
+    std::cout << "load       : " << r.load_seconds << " s";
+    if (r.model_size_mb >= 0) std::cout << "   (model " << std::setprecision(1) << r.model_size_mb << " MB)";
+    std::cout << std::setprecision(3) << "\n";
+    std::cout << std::setprecision(2);
+    std::cout << "infer      : mean " << r.mean_infer_ms << " ms (median " << r.median_infer_ms
+              << ", p90 " << r.p90_infer_ms << ")  over " << r.runs << " runs x " << r.samples.size()
+              << " samples\n\n";
+
+    std::cout << "  " << std::left << std::setw(14) << "sample" << std::setw(10) << "label"
+              << std::setw(10) << "pred" << std::right << std::setw(10) << "p" << std::setw(12)
+              << "cpu_ref_p" << std::setw(10) << "|dp|" << "  hit\n";
+    std::cout << "  " << std::string(72, '-') << "\n";
+    for (const auto& s : r.samples) {
+        const std::string hit = !s.has_label ? "-" : (s.correct ? "OK" : "MISS");
+        std::cout << "  " << std::left << std::setw(14) << s.id << std::setw(10) << s.label
+                  << std::setw(10) << s.predicted << std::right << std::setprecision(4)
+                  << std::setw(10) << s.p << std::setw(12) << s.expected_p << std::setw(10)
+                  << std::abs(s.p - s.expected_p) << "  " << hit << "\n";
+    }
+    std::cout << "\n";
+    if (r.eval_samples > 0) {
+        std::cout << "accuracy   : " << r.correct << "/" << r.eval_samples << "  ("
+                  << std::setprecision(1) << acc << "%)\n";
+    } else {
+        std::cout << "accuracy   : n/a (no ground-truth labels in fixture)\n";
+    }
+    std::cout << std::setprecision(6);
+    std::cout << "agreement  : max |p - cpu_ref_p| = " << r.max_abs_p_diff
+              << (r.max_abs_p_diff < 1e-3 ? "  (matches CPU)" : "  (EP diverges from CPU!)") << "\n";
+    if (!results_csv.empty()) std::cout << "results csv: " << results_csv << "\n";
+    return 0;
 }
 
 }  // namespace
@@ -400,12 +613,14 @@ int main(int argc, char* argv[]) {
     using namespace whisper_npu;
 
     std::vector<std::string> pos;
-    std::string cache_dir, reference, results_csv, label, provider_override;
+    std::string cache_dir, reference, results_csv, label, provider_override, classify_dir;
     bool json_out = false, have_ref = false, hot_only = false;
     int cpu_threads = 0;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "--cache" && i + 1 < argc) {
+        if (a == "--classify" && i + 1 < argc) {
+            classify_dir = argv[++i];
+        } else if (a == "--cache" && i + 1 < argc) {
             cache_dir = argv[++i];
         } else if (a == "--ref" && i + 1 < argc) {
             reference = argv[++i];
@@ -427,6 +642,19 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Deepfake classifier mode: replay pre-baked fixture tensors through ORT EPs.
+    // Positionals here are [device] [runs]; no model_dir/audio needed.
+    if (!classify_dir.empty()) {
+        Device cdev = Device::CPU;
+        if (!pos.empty() && !parse_device(pos[0], cdev)) {
+            std::cerr << "Unknown device: " << pos[0] << " (npu|gpu|cpu)\n";
+            return 1;
+        }
+        const int cruns = pos.size() > 1 ? std::max(1, std::atoi(pos[1].c_str())) : 20;
+        return run_classify(classify_dir, cdev, provider_override, cruns, cpu_threads, cache_dir,
+                            results_csv, json_out);
+    }
+
     if (pos.size() < 2) {
         std::cerr << "Usage: " << argv[0]
                   << " <model_dir> <audio.wav> [backend] [device] [runs]"
@@ -441,7 +669,9 @@ int main(int argc, char* argv[]) {
                   << "  --provider <ort-ep>: backend-specific provider override (e.g. VitisAIExecutionProvider)\n"
                   << "  --json: emit one machine-readable JSON record\n"
                   << "  --results <csv>: append a benchmark result row\n"
-                  << "  --label <text>: tag the results row (e.g. quantization variant)\n\n";
+                  << "  --label <text>: tag the results row (e.g. quantization variant)\n"
+                  << "  --classify <fixture_dir> [device] [runs]: deepfake-classifier mode\n"
+                  << "      (replays scripts/experiments/dump_fixtures.py tensors through ORT EPs)\n\n";
         std::cerr << "Compiled-in backends:";
         for (Backend b : available_backends()) std::cerr << " " << to_string(b);
         if (available_backends().empty()) std::cerr << " (none!)";
@@ -588,6 +818,9 @@ int main(int argc, char* argv[]) {
         js << ",\"device\":\"" << json_escape(engine->device_name()) << "\"";
         js << ",\"device_full_name\":\"" << json_escape(engine->full_device_name()) << "\"";
         js << ",\"power_source\":\"" << json_escape(power_source()) << "\"";
+        js << ",\"host_arch\":\"" << json_escape(host_arch()) << "\"";
+        js << ",\"host_os\":\"" << json_escape(host_os()) << "\"";
+        js << ",\"runtime_version\":\"" << json_escape(engine->runtime_version()) << "\"";
         js << ",\"cpu_threads_requested\":" << cpu_threads;
         js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
@@ -647,6 +880,9 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "\n";
         std::cout << "power        : " << power_source() << "\n";
+        std::cout << "host         : " << host_arch() << " / " << host_os() << "\n";
+        if (!engine->runtime_version().empty())
+            std::cout << "runtime ver  : " << engine->runtime_version() << "\n";
         std::cout << std::setprecision(3);
         if (cold_load >= 0.0) std::cout << "load (cold)  : " << cold_load << " s\n";
         else                  std::cout << "load (cold)  : n/a (hot-only)\n";
