@@ -25,6 +25,11 @@ bool available();
 Device best_available_device();
 }  // namespace ort_static
 
+namespace ort_dynamic {
+std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
+bool available();
+}  // namespace ort_dynamic
+
 namespace amd {
 std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
 bool available();

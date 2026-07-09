@@ -17,6 +17,10 @@ Why fixtures instead of doing preprocessing in C++:
 
 Output (gitignored, under models/deepfake/fixtures/<model>/):
   model.tsv    onnx_path <tab> positive_index <tab> threshold <tab> pos_label <tab> neg_label
+               (onnx_path is stored RELATIVE to the fixture dir, forward-slashed, so a
+                fixture tree stays valid after being pushed to / pulled from HF onto a
+                machine with a different repo root. The C++ loader resolves it against the
+                fixture dir; absolute paths are still honored for backward compatibility.)
   samples.tsv  sample_id <tab> label <tab> expected_pred <tab> expected_p
   inputs.tsv   sample_id <tab> input_name <tab> dtype(f32|i64) <tab> shape(csv) <tab> file
   data/*.bin   raw little-endian tensors
@@ -82,9 +86,12 @@ def dump_model(name, module, positive_index=1):
     data_dir = os.path.join(out_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
 
+    # Store the model path RELATIVE to the fixture dir so the fixture survives a
+    # round-trip through HF onto a machine with a different repo root.
+    rel_model = os.path.relpath(model_path, out_dir).replace(os.sep, "/")
     with open(os.path.join(out_dir, "model.tsv"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\t".join([
-            model_path, str(positive_index), str(module.THRESHOLD),
+            rel_model, str(positive_index), str(module.THRESHOLD),
             module.POSITIVE_LABEL, module.NEGATIVE_LABEL,
         ]) + "\n")
 

@@ -143,6 +143,9 @@ Fixture load_fixture(const fs::path& dir) {
     const auto m = split_tab(model[0]);
     if (m.size() < 5) throw std::runtime_error("malformed model.tsv (need 5 cols) in " + dir.string());
     fx.onnx_path = m[0];
+    // dump_fixtures.py writes a fixture-relative path so the tree is portable across
+    // machines/repo roots; resolve it here. Absolute paths (older fixtures) pass through.
+    if (fx.onnx_path.is_relative()) fx.onnx_path = (dir / fx.onnx_path).lexically_normal();
     fx.positive_index = std::atoi(m[1].c_str());
     fx.threshold = std::strtod(m[2].c_str(), nullptr);
     fx.positive_label = m[3];

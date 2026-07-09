@@ -19,6 +19,7 @@ enum class Backend {
     IntelOpenVINO, // Intel NPU/GPU/CPU via OpenVINO GenAI  (reference impl)
     IntelOnnx,     // Intel NPU/GPU/CPU via OpenVINO on the neutral ONNX (static, no-KV)
     OnnxRuntimeStatic, // Vendor-neutral static ONNX via ONNX Runtime providers
+    OnnxRuntimeDynamic, // Vendor-neutral with-past KV-cache ONNX via ORT (CPU/GPU; NPU rejects dynamic shapes)
     AmdRyzenAI,    // AMD XDNA NPU via ONNX Runtime + VitisAI EP  (prepared)
     QualcommQNN,   // Qualcomm Hexagon NPU via ONNX Runtime + QNN EP  (prepared)
 };
