@@ -1,53 +1,79 @@
-# Downloads the proprietary deepfake-detection pipeline models (FakeAudio /
-# Generated Audio Detector, Text Scam Classifier, and the sherpa-exported
-# Whisper tiny.en used by that pipeline) from the internal Avast Artifactory
-# into models/deepfake/. Output is gitignored (models/ is never committed) --
-# a fresh clone/machine re-runs this script instead of the binaries living in
-# git. These are internal proprietary artifacts: do NOT push them anywhere
-# public (they are intentionally excluded from scripts/push-models.ps1's
-# scope -- that script snapshots ASR benchmark variants only).
+# Downloads the deepfake-detection pipeline classifier models (FakeAudio /
+# Generated Audio Detector, and the Text Scam Classifier) from the private
+# Hugging Face model repo into models/deepfake/. Output is gitignored (models/
+# is never committed) -- a fresh clone/machine re-runs this script instead of
+# the binaries living in git.
 #
-# Auth: Windows Integrated Auth against artifactory.ida.avast.com. Must be run
-# on a machine joined to / VPN'd into the corporate network with a domain
-# account that has read access to the ai-models-generic-local repo.
+# The models are mirrored to HF by scripts/push-models.ps1 (which snapshots the
+# whole models/ tree). This script pulls only the deepfake/* subtree, so it does
+# NOT touch any internal/corporate artifact repository.
 #
-#   .\scripts\get-deepfake-models.ps1                 # fetch everything
-#   .\scripts\get-deepfake-models.ps1 -Models fakeaudio,tsc
-#   .\scripts\get-deepfake-models.ps1 -Models whisper -SkipInt8
+# For a private repo you must first:  hf auth login
+#
+#   .\scripts\get-deepfake-models.ps1                    # fetch fakeaudio + tsc
+#   .\scripts\get-deepfake-models.ps1 -Models tsc
+#   .\scripts\get-deepfake-models.ps1 -Repo my-user/other-repo
 
 [CmdletBinding()]
 param(
-    [ValidateSet("fakeaudio", "tsc", "whisper", "all")]
+    [ValidateSet("fakeaudio", "tsc", "all")]
     [string[]]$Models = @("all"),
-    [switch]$SkipInt8
+    [string]$Repo = "odobias/npu-hal-over-9000"
 )
 
 $ErrorActionPreference = "Stop"
 chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path $PSScriptRoot -Parent
-$outRoot = Join-Path (Join-Path $root "models") "deepfake"
-New-Item -ItemType Directory -Force -Path $outRoot | Out-Null
+# HF stores these under deepfake/... so downloading into models/ lands them at
+# the paths the validators/benchmark expect (models/deepfake/...).
+$outDir = Join-Path $root "models"
+$outRoot = Join-Path $outDir "deepfake"
 
-if ($Models -contains "all") { $Models = @("fakeaudio", "tsc", "whisper") }
+if ($Models -contains "all") { $Models = @("fakeaudio", "tsc") }
 
-$base = "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/vertex-ai/ppp-ctores-deepfk-ai-f6/europe-west1"
-
-function Get-File {
-    param(
-        [Parameter(Mandatory)][string]$Uri,
-        [Parameter(Mandatory)][string]$OutFile
-    )
-    if (Test-Path $OutFile) {
-        Write-Host "Already present: $OutFile" -ForegroundColor DarkGray
-        return
-    }
-    New-Item -ItemType Directory -Force -Path (Split-Path $OutFile -Parent) | Out-Null
-    Write-Host "Downloading $Uri" -ForegroundColor Cyan
-    $ProgressPreference = "SilentlyContinue"
-    Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseDefaultCredentials
+$hf = (Get-Command hf -ErrorAction SilentlyContinue).Source
+if (-not $hf) {
+    # Fall back to the project venv's CLI so a fresh shell works without activating it.
+    $venvHf = Join-Path $root ".venv\Scripts\hf.exe"
+    if (Test-Path $venvHf) { $hf = $venvHf }
 }
+if (-not $hf) {
+    Write-Host "hf CLI not found. Install with: pip install -U 'huggingface_hub[cli]'" -ForegroundColor Red
+    exit 1
+}
+
+# Qualify a bare repo name with the logged-in username (mirrors get-models.ps1).
+$repoId = $Repo
+if ($repoId -notmatch "/") {
+    $ns = (& python -c "from huggingface_hub import whoami; print(whoami()['name'])" 2>$null)
+    if ($LASTEXITCODE -ne 0 -or -not $ns) {
+        Write-Host "Not logged in (or can't resolve user). Run: hf auth login   -- or pass -Repo <user>/<name>." -ForegroundColor Red
+        exit 1
+    }
+    $repoId = "$($ns.Trim())/$Repo"
+}
+
+# Per-model include globs (HF filtering is fnmatch-style; '*' spans '/').
+$includes = @()
+if ($Models -contains "fakeaudio") {
+    # GAD model + the labeled real/deepfake clips its validator scores against.
+    $includes += "deepfake/fakeaudio/*"
+    $includes += "deepfake/audio-samples/*"
+}
+if ($Models -contains "tsc") {
+    # DistilBERT/RoBERTa-tokenized scam classifier: model + vocab/merges +
+    # the validation_samples/{scam,clean}.txt the validator scores against.
+    $includes += "deepfake/tsc/*"
+}
+
+Write-Host "Downloading $($Models -join ', ') from $repoId -> $outRoot ..." -ForegroundColor Cyan
+$dlArgs = @($repoId, "--repo-type", "model", "--local-dir", $outDir)
+foreach ($p in $includes) { $dlArgs += @("--include", $p) }
+& $hf download @dlArgs
+if ($LASTEXITCODE -ne 0) { Write-Host "Download failed." -ForegroundColor Red; exit 1 }
 
 function Get-Size {
     param([string]$Dir)
@@ -56,40 +82,9 @@ function Get-Size {
 }
 
 if ($Models -contains "fakeaudio") {
-    # "Generated Audio Detector" (GAD): MS-CLAP audio embedder + classifier head,
-    # trained/exported 2025-05. CPU/GPU-validated in production; NPU untested.
-    $dir = Join-Path $outRoot "fakeaudio"
-    Get-File "$base/audio-detector-model-onnx/1/model.onnx" (Join-Path $dir "model.onnx")
-    Write-Host "FakeAudio (GAD) ready: $dir ($(Get-Size $dir) MB)" -ForegroundColor Green
+    Write-Host "FakeAudio (GAD) ready: $(Join-Path $outRoot 'fakeaudio') ($(Get-Size (Join-Path $outRoot 'fakeaudio')) MB)" -ForegroundColor Green
 }
-
 if ($Models -contains "tsc") {
-    # Text Scam Classifier: DistilBERT-based, ONNX export v2 (latest). Targets
-    # NPU on ARM (QNN) and Intel NPU via C++.
-    $dir = Join-Path $outRoot "tsc"
-    Get-File "$base/text-scam-classifier-model-onnx/2/model.onnx" (Join-Path $dir "model.onnx")
-    Get-File "$base/text-scam-classifier-model-onnx/2/vocab.json" (Join-Path $dir "vocab.json")
-    Get-File "$base/text-scam-classifier-model-onnx/2/merges.txt" (Join-Path $dir "merges.txt")
-    Write-Host "TSC ready: $dir ($(Get-Size $dir) MB)" -ForegroundColor Green
+    Write-Host "TSC ready: $(Join-Path $outRoot 'tsc') ($(Get-Size (Join-Path $outRoot 'tsc')) MB)" -ForegroundColor Green
 }
-
-if ($Models -contains "whisper") {
-    # sherpa-onnx export of whisper-tiny.en used by the deepfake pipeline (distinct
-    # from this repo's own OpenVINO GenAI IR export under models/variants/) --
-    # the overview calls this the strongest NPU candidate of the three models.
-    $dir = Join-Path $outRoot "whisper-tiny-en-sherpa"
-    Get-File "$base/whisper-tiny-en-model-onnx/2/tiny.en-encoder.onnx" (Join-Path $dir "tiny.en-encoder.onnx")
-    Get-File "$base/whisper-tiny-en-model-onnx/2/tiny.en-decoder.onnx" (Join-Path $dir "tiny.en-decoder.onnx")
-    Get-File "$base/whisper-tiny-en-model-onnx/2/tiny.en-tokens.txt" (Join-Path $dir "tiny.en-tokens.txt")
-    Write-Host "Whisper tiny.en (sherpa, fp32) ready: $dir ($(Get-Size $dir) MB)" -ForegroundColor Green
-
-    if (-not $SkipInt8) {
-        $dirInt8 = Join-Path $outRoot "whisper-tiny-en-sherpa-int8"
-        Get-File "$base/whisper-tiny-en-int8-model-onnx/2/tiny.en-encoder.int8.onnx" (Join-Path $dirInt8 "tiny.en-encoder.int8.onnx")
-        Get-File "$base/whisper-tiny-en-int8-model-onnx/2/tiny.en-decoder.int8.onnx" (Join-Path $dirInt8 "tiny.en-decoder.int8.onnx")
-        Get-File "$base/whisper-tiny-en-int8-model-onnx/2/tiny.en-tokens.txt" (Join-Path $dirInt8 "tiny.en-tokens.txt")
-        Write-Host "Whisper tiny.en (sherpa, int8) ready: $dirInt8 ($(Get-Size $dirInt8) MB)" -ForegroundColor Green
-    }
-}
-
 Write-Host "Total models/deepfake: $(Get-Size $outRoot) MB" -ForegroundColor Green
