@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Benchmark the portable static-KV ONNX pipeline on NPU/GPU/CPU via OpenVINO.
 
+REFERENCE / BACKGROUND ONLY -- this is NOT the benchmark of record.
+The benchmark of record is the C++ app driven by scripts/benchmark-onnx.ps1.
+This script is kept purely as the OpenVINO-native reference for the portable
+static-KV graph until that path is plumbed into the C++ ort backend, which will
+then supersede these numbers. Do not cite its latency as authoritative -- it
+bypasses the HAL/app and only sees the EPs the local Python wheel ships.
+
 Pipeline (all static shapes, plain ONNX ops -- see export_static_kv.py):
   encoder_model.onnx        [1,80,3000] -> [1,1500,384]
   crosskv_init.onnx         enc_hidden  -> cross_k/v[L] (once)

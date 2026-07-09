@@ -1,12 +1,12 @@
 # Device comparison harness: runs ONE model variant across NPU / GPU / CPU and
 # produces a device-pivoted report (latency, RTF, tok/s, confidence, WER/CER, plus
-# a speedup-vs-CPU column). Complements benchmark.ps1 (which pivots on quantization
+# a speedup-vs-CPU column). Complements benchmark-quant.ps1 (which pivots on quantization
 # variant); this pivots on device so "is the NPU worth it vs. just running on CPU"
 # is a single glance instead of grepping a variant x device matrix.
 #
 # Unsupported combos (no NPU/Intel-GPU present, model too small to compile, etc.)
 # are recorded as failures, not fatal -- same backend-neutral contract as
-# benchmark.ps1. Reads/writes the same manifest.json + eval.jsonl.
+# benchmark-quant.ps1. Reads/writes the same manifest.json + eval.jsonl.
 #
 #   .\compare-devices.ps1                                # fp16 variant, NPU/GPU/CPU
 #   .\compare-devices.ps1 -Variant wten-ov-int8

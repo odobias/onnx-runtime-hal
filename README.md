@@ -60,6 +60,8 @@ app/main.cpp                             CLI runner: cold/hot start, inference b
 msbuild/*.props                          Shared + per-backend build settings
 projects/*/*.vcxproj, WhisperNpuHal.sln  MSBuild projects (Core static lib + App exe)
 scripts/                                 setup / build / run / export / benchmark helpers
+scripts/benchmark-onnx.ps1               DEFAULT benchmark: portable ONNX models via the C++ app
+scripts/benchmark-quant.ps1              quantization research sweep (OV-IR precision variants)
 scripts/compare-devices.ps1              NPU vs GPU vs CPU comparison for one variant
 ```
 
@@ -179,6 +181,27 @@ requires **write** access (owner). This is an alternative to reproducing models 
 `get-model.ps1` / `get-amd-model.ps1` / `export-variants.ps1` — pull the exact pinned
 artifacts instead of re-running the export toolchain.
 
+## Benchmark (default, portable)
+
+`scripts\benchmark-onnx.ps1` is **the benchmark of record.** One command runs the three
+portable ONNX models this project ships — Whisper tiny.en (ASR), the Text Scam Classifier,
+and the FakeAudio / Generated Audio Detector — through the **same C++ app on the same ONNX
+Runtime**, so the numbers are directly comparable on any host (x64 or ARM64, CPU/GPU/NPU)
+and go through the real vendor NPU EPs (VitisAI / QNN / OpenVINO), not a wheel-limited
+Python probe.
+
+```powershell
+.\scripts\benchmark-onnx.ps1                  # cpu, all three models
+.\scripts\benchmark-onnx.ps1 -Device npu,cpu  # sweep several devices
+.\scripts\benchmark-onnx.ps1 -Only whisper    # just the ASR model
+```
+
+Whisper runs as two flavors of the *same* model: `onnx-static` (fixed-shape no-KV
+recompute — NPU-compilable) and `onnx-dynamic` (with-past KV cache — faster on CPU/GPU, but
+its dynamic shapes are rejected by the NPU compilers, so it is skipped on NPU by design
+rather than silently demoted to CPU). ASR rows append to `results\benchmark-results.csv`;
+classifier rows to `results\deepfake-benchmark-cpp.csv`.
+
 **The benchmark depends only on this HF repo — no Avast internal repository is involved.**
 Everything the C++ benchmark consumes comes from the private HF snapshot above:
 `get-models.ps1` pulls the Whisper ONNX packages, eval set, and sample audio, and
@@ -192,7 +215,10 @@ models) is absent, the ONNX benchmark simply **skips** the classifiers and runs 
 HF-hosted Whisper matrix. So an HF-only checkout benchmarks everything reachable without ever
 reaching for an internal repo.
 
-## Quantization benchmark (confidence + performance + accuracy)
+The quantization sweep below (`benchmark-quant.ps1`) is a separate **research** tool for
+comparing OV-IR precision variants — not the default path.
+
+## Quantization benchmark — research sweep (`benchmark-quant.ps1`)
 
 The runner reports three axes per run, all backend-neutral (any backend fills what it
 can; missing values are simply omitted):
@@ -210,7 +236,7 @@ Compare every manifest entry across its declared `variant × device × clip` mat
 .\scripts\export-variants.ps1     # fp32 OV-IR baseline -> models/manifest.json
 .\scripts\get-amd-model.ps1       # AMD ONNX variant + merged models/manifest.json (on AMD machines)
 .\scripts\get-eval-set.ps1        # small labeled LibriSpeech sample -> models/eval/eval.jsonl
-.\scripts\benchmark.ps1 -Runs 3   # -> results/quantization-benchmark.{md,csv}
+.\scripts\benchmark-quant.ps1 -Runs 3   # -> results/quantization-benchmark.{md,csv}
 ```
 
 > **Quantized models are research-only.** The product targets one portable static ONNX
@@ -218,7 +244,7 @@ Compare every manifest entry across its declared `variant × device × clip` mat
 > product path. `export-variants.ps1 -Formats fp16,int8,int4` still exports them, but writes
 > to `models/manifest.research.json` (not the product `manifest.json`), so they never enter
 > the default benchmark. Sweep them deliberately with
-> `benchmark.ps1 -Manifest models\manifest.research.json`. The historical quantization
+> `benchmark-quant.ps1 -Manifest models\manifest.research.json`. The historical quantization
 > tables below are kept as prior measurements, not as a supported configuration.
 
 `manifest.json` is the backend-neutral contract: each entry has `backend`, `precision`,
@@ -279,12 +305,12 @@ Python; the app copies the RyzenAI ONNX Runtime / VitisAI DLLs next to the exe.
 ```powershell
 .\scripts\run.ps1 -Backend amd -Device npu
 .\scripts\run.ps1 -Backend intel -Device npu
-.\scripts\benchmark.ps1 -Runs 3               # manifest-driven all-clip sweep (host NPU only)
-.\scripts\benchmark.ps1 -NpuVendor all        # attempt every vendor's variants
-.\scripts\benchmark.ps1 -NpuVendor intel      # force a specific vendor
+.\scripts\benchmark-quant.ps1 -Runs 3               # manifest-driven all-clip sweep (host NPU only)
+.\scripts\benchmark-quant.ps1 -NpuVendor all        # attempt every vendor's variants
+.\scripts\benchmark-quant.ps1 -NpuVendor intel      # force a specific vendor
 ```
 
-`benchmark.ps1` autodetects the host NPU vendor (a machine has one brand — Intel AI
+`benchmark-quant.ps1` autodetects the host NPU vendor (a machine has one brand — Intel AI
 Boost, AMD XDNA/IPU, or Snapdragon Hexagon) and **skips variants targeting a different
 vendor** instead of wasting a compile on hardware that can't run them. Vendor-neutral
 static-ONNX variants always run. Override with `-NpuVendor all` (no filter) or a forced
@@ -316,8 +342,8 @@ count is not a cosmetic knob, it's the main lever you have.
 
 `compare-devices.ps1` runs a single variant (fp16 by default) across every requested
 device and pivots the report on *device* instead of *quantization method* (that's
-`benchmark.ps1`'s job). It reads `backend` from the same manifest entry as the canonical
-benchmark. When no `-Variant` is given it autodetects the host NPU vendor and defaults to
+`benchmark-quant.ps1`'s job). It reads `backend` from the same `manifest.json` entry as the
+quantization sweep. When no `-Variant` is given it autodetects the host NPU vendor and defaults to
 a variant this machine can actually run (override with `-NpuVendor`); an explicitly
 requested cross-vendor variant still runs, with a warning. Unsupported combos — no NPU
 present, GPU not wired for a backend, etc. — are recorded as failures, not crashes.
@@ -391,7 +417,7 @@ foreach ($id in (Get-Content .\models\manifest.json | ConvertFrom-Json).variants
 }
 ```
 
-Swap `cpu` for `npu`/`gpu` on hardware that has them. `benchmark.ps1` is deliberately
+Swap `cpu` for `npu`/`gpu` on hardware that has them. `benchmark-quant.ps1` is deliberately
 **not** used for this — it overwrites (not appends) `results/quantization-benchmark.*`,
 which would blow away the other machine's NPU/GPU sweep already committed there;
 `results/benchmark-results.csv` is the only file in `results/` designed to be

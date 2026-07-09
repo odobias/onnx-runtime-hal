@@ -124,9 +124,9 @@ $researchEntries = @($entries | Where-Object { $_.precision -ne "fp32" })
 Write-Manifest $manifestPath $productEntries `
     "Backend-neutral variant manifest. Each platform appends entries with its own backend/model_dir/devices."
 Write-Manifest $researchPath $researchEntries `
-    "RESEARCH-ONLY quantized OV-IR variants. Not part of the product; not run by the default benchmark. Point benchmark.ps1 -Manifest here to sweep them."
+    "RESEARCH-ONLY quantized OV-IR variants. Not part of the product; not run by the default benchmark. Point benchmark-quant.ps1 -Manifest here to sweep them."
 
 if ($researchEntries.Count -gt 0) {
     Write-Host "`nNote: quantized variants are research-only (manifest.research.json)." -ForegroundColor Yellow
-    Write-Host "      Benchmark them explicitly: .\scripts\benchmark.ps1 -Manifest models\manifest.research.json" -ForegroundColor DarkGray
+    Write-Host "      Benchmark them explicitly: .\scripts\benchmark-quant.ps1 -Manifest models\manifest.research.json" -ForegroundColor DarkGray
 }

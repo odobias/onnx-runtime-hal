@@ -1,5 +1,15 @@
 # Deepfake classifier experiments (ONNX Runtime)
 
+> **Benchmark of record: `scripts\benchmark-onnx.ps1` (the C++ app).** All
+> serious/comparable performance numbers come from the C++ ONNX Runtime path —
+> it is the only one that reaches the real vendor NPU EPs (VitisAI / QNN /
+> OpenVINO). Everything in *this* directory is **reference / background
+> tooling**: fixture generators (`dump_fixtures.py`, still required by the C++
+> benchmark), correctness validators (`validate_*.py`), model exporters, and
+> the two wheel-limited Python latency probes (`benchmark_deepfake_onnx.py`,
+> `bench_static_kv_ov.py`). The Python probes are handy sanity checks but their
+> latency is **not** authoritative — cite the C++ harness instead.
+
 Standalone ONNX Runtime harness for the deepfake pipeline's two classifier
 models. These are plain ORT classifiers (not OpenVINO GenAI, not the C++
 `IWhisperEngine` HAL contract), so they live here rather than in the app.
