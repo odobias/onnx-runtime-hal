@@ -1,4 +1,4 @@
-// Generic static ONNX backend: runs the unchanged whisper-tiny-en-static-onnx
+// Generic static ONNX backend: runs the unchanged whisper/en-static-onnx
 // package through ONNX Runtime providers. The model contract is fixed-shape,
 // no-KV recompute: encoder [1,80,3000] -> [1,1500,384], decoder consumes
 // input_ids [1,128] + encoder_hidden_states [1,1500,384] and returns logits.

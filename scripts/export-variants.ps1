@@ -24,7 +24,7 @@ $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path $PSScriptRoot -Parent
 $models = Join-Path $root "models"
-$variants = Join-Path $models "variants"
+$variants = Join-Path $models "whisper\variants-ov"
 New-Item -ItemType Directory -Force -Path $variants | Out-Null
 $manifestPath = Join-Path $models "manifest.json"
 
@@ -58,7 +58,7 @@ $methodOf = @{
 $entries = @()
 foreach ($fmt in $Formats) {
     $id = "$Prefix-ov-$fmt"
-    $outDir = Join-Path $variants $id
+    $outDir = Join-Path $variants $fmt
     if (Test-Path (Join-Path $outDir "openvino_encoder_model.xml")) {
         Write-Host "[$fmt] already exported -> $outDir" -ForegroundColor Green
     }
@@ -85,7 +85,7 @@ foreach ($fmt in $Formats) {
         backend    = "intel"
         precision  = $fmt
         method     = $methodOf[$fmt]
-        model_dir  = "models/variants/$id"   # repo-relative for portability
+        model_dir  = "models/whisper/variants-ov/$fmt"   # repo-relative for portability
         devices    = $Devices
         size_mb    = $sizeMb
     }

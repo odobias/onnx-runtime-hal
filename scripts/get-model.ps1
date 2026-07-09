@@ -2,14 +2,14 @@
 # Self-contained: creates an isolated Python venv and uses optimum-cli. The output
 # is gitignored, so a fresh clone reproduces the model instead of committing blobs.
 #
-#   .\get-model.ps1                       # openai/whisper-tiny.en -> models\whisper-tiny-en-ov
+#   .\get-model.ps1                       # openai/whisper-tiny.en -> models\whisper\en-ov
 #   .\get-model.ps1 -Model openai/whisper-tiny -Out whisper-tiny-ov
 #   .\get-model.ps1 -WeightFormat int8    # NNCF weight-only INT8
 
 [CmdletBinding()]
 param(
     [string]$Model = "openai/whisper-tiny.en",
-    [string]$Out = "whisper-tiny-en-ov",
+    [string]$Out = "whisper/en-ov",
     [ValidateSet("fp32", "fp16", "int8")][string]$WeightFormat = "fp32"
 )
 

@@ -7,7 +7,7 @@ hardware-independent runner with swappable per-platform backends.
 ## Build once, self-select everywhere
 
 The headline path is the **unified ONNX Runtime backend** (`src/backends/ort_static`): a
-single C++ source that runs the one portable `whisper-tiny-en-static-onnx` model and
+single C++ source that runs the one portable `whisper/en-static-onnx` model and
 **self-selects its execution provider at runtime**. Every vendor EP is compiled into the
 same binary — their `Append*` calls resolve through the ORT API table at runtime, so they
 cost nothing until tried and fail gracefully on the wrong host. The constructor walks a
@@ -100,9 +100,9 @@ individually):
 | `setup-intel.ps1` | intel | OpenVINO GenAI C++ SDK (download or link) | `third_party/` |
 | `setup-amd.ps1` | amd | Ryzen AI SDK + NPU driver (vendor installers, elevated) | `C:\Program Files\RyzenAI\...`, conda env |
 | `setup-qualcomm.ps1` | qualcomm | ONNX Runtime + Plugin QNN EP (pip + NuGet headers) | `third_party/onnxruntime`, `third_party/qnn-ep` |
-| `get-model.ps1` | intel | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper-tiny-en-ov/` |
-| `get-amd-model.ps1` | amd | download AMD ONNX Tiny + OpenAI tokenizer/config sidecars | `models/whisper-tiny-amd/` |
-| `get-audio.ps1` | all | public-domain 16 kHz sample | `models/jfk.wav` |
+| `get-model.ps1` | intel | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper/en-ov/` |
+| `get-amd-model.ps1` | amd | download AMD ONNX Tiny + OpenAI tokenizer/config sidecars | `models/whisper/amd/` |
+| `get-audio.ps1` | all | public-domain 16 kHz sample | `models/audio/jfk.wav` |
 | `build.ps1` | all | MSBuild Release\|x64 (prefers VS 2026), right backend enabled | `build/` |
 
 If VS Build Tools is installed for the first time, reboot and re-run `bootstrap.ps1`.
@@ -150,10 +150,10 @@ ARM64 binary that self-selects QNN NPU -> (GPU) -> CPU:
 ```powershell
 .\scripts\setup-qualcomm.ps1 -Platform ARM64        # stages native win-arm64 ORT + QNN
 .\scripts\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel   # -> build/ARM64/Release
-.\build\ARM64\Release\WhisperNpuHal.App.exe models\whisper-tiny-en-static-onnx models\jfk.wav onnx-static npu 5
+.\build\ARM64\Release\WhisperNpuHal.App.exe models\whisper\en-static-onnx models\audio\jfk.wav onnx-static npu 5
 ```
 
-Uses the same `models/whisper-tiny-en-static-onnx` package as `onnx-static`. First load
+Uses the same `models/whisper/en-static-onnx` package as `onnx-static`. First load
 compiles graphs to the Hexagon NPU (~15 s); inference on the JFK sample is ~0.5 s
 (~22x real time) on Snapdragon X Elite. Requesting `gpu` falls back to CPU (DirectML is
 dormant on ARM64 — see caveats).
@@ -370,11 +370,11 @@ merged, git-diff-and-commit into) `results/benchmark-results.csv`:
 ```powershell
 .\scripts\export-variants.ps1
 .\scripts\get-eval-set.ps1
-foreach ($id in (Get-Content .\models\manifest.json | ConvertFrom-Json).variants.id) {
-    .\build\x64\Release\WhisperNpuHal.App.exe .\models\variants\$id .\models\eval\ls_000.wav `
-        intel cpu 2 --cache ".\cache\$id-CPU" `
+foreach ($v in (Get-Content .\models\manifest.json | ConvertFrom-Json).variants) {
+    .\build\x64\Release\WhisperNpuHal.App.exe ".\$($v.model_dir)" .\models\eval\ls_000.wav `
+        intel cpu 2 --cache ".\cache\$($v.id)-CPU" `
         --ref "MISTER QUILTER IS THE APOSTLE OF THE MIDDLE CLASSES AND WE ARE GLAD TO WELCOME HIS GOSPEL" `
-        --results .\results\benchmark-results.csv --label $id
+        --results .\results\benchmark-results.csv --label $v.id
 }
 ```
 

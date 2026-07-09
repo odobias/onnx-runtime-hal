@@ -1,4 +1,4 @@
-// Qualcomm backend: whisper-tiny-en-static-onnx on Snapdragon Hexagon NPU via the
+// Qualcomm backend: whisper/en-static-onnx on Snapdragon Hexagon NPU via the
 // ONNX Runtime Plugin QNN EP (onnxruntime-qnn >= 2.x). Uses the same static no-KV
 // decode loop as ort_static / intel_onnx.
 #include "backends/backend_registry.hpp"

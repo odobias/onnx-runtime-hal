@@ -24,7 +24,7 @@ def io(s):
 
 
 def main():
-    d = sys.argv[1] if len(sys.argv) > 1 else "models/whisper-tiny-en-onnx"
+    d = sys.argv[1] if len(sys.argv) > 1 else "models/whisper/en-onnx"
     th = os.cpu_count()
     print(f"ORT {ort.__version__}  threads={th}\n")
 

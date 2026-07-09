@@ -24,9 +24,9 @@ Write-Host "Scrubbed PATH = $cleanPath" -ForegroundColor DarkGray
 Write-Host ("RYZEN_AI_INSTALLATION_PATH (proc) = {0}" -f $env:RYZEN_AI_INSTALLATION_PATH) -ForegroundColor DarkGray
 Write-Host ""
 
-$staticModel = Join-Path $pkg "models\whisper-tiny-en-static-onnx"
-$amdModel    = Join-Path $pkg "models\whisper-tiny-amd"
-$audio       = Join-Path $pkg "models\jfk.wav"
+$staticModel = Join-Path $pkg "models\whisper\en-static-onnx"
+$amdModel    = Join-Path $pkg "models\whisper\amd"
+$audio       = Join-Path $pkg "models\audio\jfk.wav"
 
 # (backend, device, model, cacheSubdir). -HotOnly skips CPU/GPU and reuses the NPU
 # caches a prior full run compiled, so it's fast and free of the VitisAI compile spam.

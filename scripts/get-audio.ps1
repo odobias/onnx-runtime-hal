@@ -10,9 +10,9 @@ chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path $PSScriptRoot -Parent
-$models = Join-Path $root "models"
-New-Item -ItemType Directory -Force -Path $models | Out-Null
-$dest = Join-Path $models "jfk.wav"
+$audioDir = Join-Path $root "models\audio"
+New-Item -ItemType Directory -Force -Path $audioDir | Out-Null
+$dest = Join-Path $audioDir "jfk.wav"
 
 if (Test-Path $dest) {
     Write-Host "Audio already present: $dest" -ForegroundColor Green

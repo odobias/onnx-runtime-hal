@@ -366,8 +366,8 @@ function Add-BenchmarkUnifiedAutoVariant {
         [Parameter(Mandatory)] [string]$Manifest,
         [Parameter(Mandatory)] [string]$Models
     )
-    $modelRel = "models/whisper-tiny-en-static-onnx"
-    $modelDir = Join-Path $Models "whisper-tiny-en-static-onnx"
+    $modelRel = "models/whisper/en-static-onnx"
+    $modelDir = Join-Path $Models "whisper\en-static-onnx"
     if (-not (Test-Path $Manifest) -or -not (Test-Path $modelDir)) { return $false }
 
     $sizeMb = [math]::Round(((Get-ChildItem $modelDir -Recurse -File -ErrorAction SilentlyContinue |
@@ -460,7 +460,7 @@ function Initialize-BenchmarkEnvironment {
     }
 
     # 2) Sample audio (public) -- also the fallback clip for the eval set.
-    if (-not (Test-Path (Join-Path $models "jfk.wav"))) {
+    if (-not (Test-Path (Join-Path $models "audio\jfk.wav"))) {
         Write-Host "  - fetch sample audio" -ForegroundColor DarkCyan
         Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-audio.ps1") | Out-Null
     }
@@ -468,7 +468,7 @@ function Initialize-BenchmarkEnvironment {
     # 3) Models for this host's runnable variants. The private snapshot
     #    (get-models.ps1) carries the neutral onnx-static model + base manifest;
     #    the public per-vendor scripts fill in vendor models and merge their entry.
-    $staticEnc = Join-Path $models "whisper-tiny-en-static-onnx\encoder_model.onnx"
+    $staticEnc = Join-Path $models "whisper\en-static-onnx\encoder_model.onnx"
     if (-not (Test-Path $Manifest) -or -not (Test-Path $staticEnc)) {
         if (Get-Command hf -ErrorAction SilentlyContinue) {
             Write-Host "  - fetch model snapshot (private HF; best-effort)" -ForegroundColor DarkCyan
@@ -479,7 +479,7 @@ function Initialize-BenchmarkEnvironment {
     }
     switch ($vendor) {
         'AMD' {
-            if (-not (Test-Path (Join-Path $models "whisper-tiny-amd\tiny_encoder.onnx")) -or -not (Test-Path $Manifest)) {
+            if (-not (Test-Path (Join-Path $models "whisper\amd\tiny_encoder.onnx")) -or -not (Test-Path $Manifest)) {
                 Write-Host "  - fetch AMD model + merge manifest" -ForegroundColor DarkCyan
                 Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-amd-model.ps1") | Out-Null
             }

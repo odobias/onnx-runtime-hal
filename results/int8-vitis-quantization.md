@@ -1,12 +1,12 @@
 # INT8 quantization of the neutral Whisper-tiny.en ONNX (VitisAI attempt)
 
-Goal: produce an INT8 **QDQ** copy of our vendor-neutral `whisper-tiny-en-onnx`
+Goal: produce an INT8 **QDQ** copy of our vendor-neutral `whisper/en-onnx`
 (encoder + decoder) that AMD's Ryzen AI / VitisAI EP can offload to the XDNA NPU,
 *without* touching the FP32 model Intel/OpenVINO already runs. The INT8 file lives
 in a separate variant dir; Intel keeps eating FP32.
 
 > **CORRECTION (read first).** The premise that AMD *needs* INT8 was wrong.
-> Inspecting `models/whisper-tiny-amd/` shows AMD ships a **pure FP32** model
+> Inspecting `models/whisper/amd/` shows AMD ships a **pure FP32** model
 > (all `float32` initializers, **zero** QuantizeLinear/DequantizeLinear nodes) and
 > runs it on XDNA via the **VAIML partitioner** (`vaip-pass_vaiml_partition` in the
 > `vitisai_config_*.json`), which compiles the FP32 graph to the AI Engine. So
@@ -68,7 +68,7 @@ quantization, not a runtime bug (same script's FP32 path decodes perfectly).
 
 ## FP32 is the real AMD path (correcting the premise)
 
-Inspection of `models/whisper-tiny-amd/` (via `scripts/experiments/_inspect_amd.py`):
+Inspection of `models/whisper/amd/` (via `scripts/experiments/_inspect_amd.py`):
 
 | file | initializer dtypes | QDQ nodes | I/O | notes |
 |---|---|---|---|---|
