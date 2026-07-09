@@ -62,11 +62,17 @@ if ($Models -contains "fakeaudio") {
     # GAD model + the labeled real/deepfake clips its validator scores against.
     $includes += "deepfake/fakeaudio/*"
     $includes += "deepfake/audio-samples/*"
+    # Pre-baked C++ benchmark fixtures (model-ready tensors + CPU reference p), if
+    # present on HF, so benchmark-onnx.ps1 can run this classifier WITHOUT the Python
+    # .venv. They are a snapshot of the validated preprocessing -- stale if the model
+    # or preprocessing changes; regenerate with benchmark-onnx.ps1 -RegenerateFixtures.
+    $includes += "deepfake/fixtures/fakeaudio/*"
 }
 if ($Models -contains "tsc") {
     # DistilBERT/RoBERTa-tokenized scam classifier: model + vocab/merges +
     # the validation_samples/{scam,clean}.txt the validator scores against.
     $includes += "deepfake/tsc/*"
+    $includes += "deepfake/fixtures/tsc/*"   # pre-baked C++ fixtures (see note above)
 }
 
 Write-Host "Downloading $($Models -join ', ') from $repoId -> $outRoot ..." -ForegroundColor Cyan
