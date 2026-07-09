@@ -46,28 +46,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 TSC_DIR = os.path.join(ROOT, "models", "deepfake", "tsc")
 MODEL_PATH = os.path.join(TSC_DIR, "model.onnx")
 
-# Pulled verbatim from git.int.avast.com/ai-research/wanna-media-nlp
+# Labeled samples live beside the model in validation_samples/{scam,clean}.txt --
+# gitignored and synced via HF (get-models.ps1), NOT committed to git, mirroring
+# the FakeAudio audio-samples policy. Pulled verbatim from
+# git.int.avast.com/ai-research/wanna-media-nlp
 # src/wanna_media_nlp/core/validation_samples/{scam,clean}.txt
-SCAM_SAMPLES = [
-    "send me 8 bitcoins and I will send you 16 bitcoins back",
-    "Today I have decided to give away a small portion of my Bitcoins. You can enter the competition by scanning this QR code.",
-    "I want to share a secret of how to get rich extremely fast. This is my way of giving back to the community.",
-    "I want to share a secret of how to get rich extremely fast. This is my way of giving back to the community. The secret is to use a new trading platform, you should see the link on the screen",
-    "I want to show you how to code an Ethereum sniping bot. Anybody can do it and you can start earning passive income in couple of days",
-    "Follow this simple trick to get rich fast and have a passive income in no time.",
-    "This investment opportunity guarantees you 100% profit in 24 hours. Just send me your wallet address and I will send you the details.",
-    "This investment will create a passive income stream in a week and will last for years",
-]
-
-CLEAN_SAMPLES = [
-    "hi",
-    "hello world",
-    "this is a test",
-    "music music music music music music music music music",
-    "You can buy Bitcoins on an online cryptocurrency exchange or store them directly into your physical wallet.",
-    "In this video I want to show you an example of how a friend of mine got scammed on the Internet.",
-    "Make sure to leave a like in this video. Subscribe to help me reach 15,000",
-]
+SAMPLES_DIR = os.path.join(TSC_DIR, "validation_samples")
 
 
 # Positive class = "scam" (class 1), per TTSCLabel convention in wanna-media-nlp.
@@ -102,10 +86,19 @@ def build_tokenizer(max_length: int):
     return tokenizer
 
 
+def _read_samples(name):
+    path = os.path.join(SAMPLES_DIR, f"{name}.txt")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
+
+
 def labeled_samples():
-    """The model's own post-training sanity set: (text, label) pairs."""
-    return ([(t, POSITIVE_LABEL) for t in SCAM_SAMPLES]
-            + [(t, NEGATIVE_LABEL) for t in CLEAN_SAMPLES])
+    """The model's own post-training sanity set: (text, label) pairs, loaded from
+    validation_samples/{scam,clean}.txt beside the model (synced via HF)."""
+    return ([(t, POSITIVE_LABEL) for t in _read_samples("scam")]
+            + [(t, NEGATIVE_LABEL) for t in _read_samples("clean")])
 
 
 def build_feeds(sess):
@@ -143,6 +136,9 @@ def main() -> int:
 
     sess = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
     items = build_feeds(sess)
+    if not items:
+        print(f"No labeled samples in {SAMPLES_DIR} -- run scripts\\get-models.ps1 to fetch them.")
+        return 1
     print(f"ONNX inputs: {[i.name for i in sess.get_inputs()]}  "
           f"max_length={max_length_from_session(sess)}\n")
 
@@ -157,7 +153,7 @@ def main() -> int:
         print(f"{item['label']:6s} {p:8.4f}  [{'OK' if ok else 'MISS'}] {item['text'][:70]}")
 
     total = len(items)
-    scam_total = len(SCAM_SAMPLES)
+    scam_total = sum(1 for it in items if it["label"] == POSITIVE_LABEL)
     print(f"\n{correct}/{total} correct  (scam: {scam_correct}/{scam_total}, "
           f"clean: {correct - scam_correct}/{total - scam_total})")
     print(f"Note: {CAVEAT}.")
