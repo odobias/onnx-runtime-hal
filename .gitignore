@@ -23,7 +23,7 @@ cache/
 original-info-signature.txt
 original-model-signature.txt
 
-# Regenerated benchmark report artifacts (overwritten by scripts/benchmark.ps1 each
+# Regenerated benchmark report artifacts (overwritten by scripts/benchmark-quant.ps1 each
 # run; the canonical ledger is results/benchmark-results.csv, which IS tracked).
 results/quantization-benchmark.csv
 results/quantization-benchmark-detail.csv

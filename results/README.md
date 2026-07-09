@@ -5,7 +5,7 @@ Benchmark runs append rows to `benchmark-results.csv` by default:
 ```powershell
 .\scripts\run.ps1 -Backend amd -Device npu
 .\scripts\run.ps1 -Backend intel -Device npu
-.\scripts\benchmark.ps1 -Runs 3
+.\scripts\benchmark-quant.ps1 -Runs 3
 ```
 
 Each platform should execute only the manifest entries it can run locally. The shared CLI
@@ -52,7 +52,7 @@ all three in sync when adding or reordering columns.
 - `transcription`: final transcription text from the last measured run.
 - `cold_start_seconds`: first engine creation after the harness deletes that variant/device cache.
 - `hot_start_seconds`: second engine creation in the same process after the compiled cache has been populated.
-- `eval_clips`: number of clips aggregated into this row. C++ single-clip runs = `1`; `benchmark.ps1` aggregate rows use the number of eval clips that completed.
+- `eval_clips`: number of clips aggregated into this row. C++ single-clip runs = `1`; `benchmark-quant.ps1` aggregate rows use the number of eval clips that completed.
 - `status`: `ok`, or a short failure reason for unsupported/missing configurations.
 - `runtime`: execution stack that actually ran the model, e.g. `openvino-genai`, `onnxruntime`, `onnxruntime-qnn`, `onnxruntime-vitisai`. Always populated (from the backend or manifest lookup).
 - `model_format`: `onnx` (vendor-neutral) or `ov-ir` (Intel OpenVINO IR). Always populated when inferable.
@@ -69,7 +69,7 @@ inference warmup; those are different measurements and pretending otherwise is h
 benchmarks are born.
 
 These trailing columns are appended after `transcription`, so tools that read the original
-schema by position are unaffected. `benchmark.ps1` upgrades an older local CSV header before
+schema by position are unaffected. `benchmark-quant.ps1` upgrades an older local CSV header before
 appending aggregate rows.
 
 The trailing metric columns are backend-neutral and optional: each backend fills only what
@@ -78,7 +78,7 @@ it can measure. This keeps one schema across machines so files concatenate clean
 ## Host hardware
 
 Each benchmark run emits a detailed inventory of the chips it ran on to
-`host-info.json` (next to the report: `results/` for `benchmark.ps1`,
+`host-info.json` (next to the report: `results/` for `benchmark-quant.ps1`,
 `build/reports/` for `compare-devices.ps1`) and a **Host hardware** section in the
 Markdown report. It captures CPU (name, vendor, cores/threads, clock), every display
 adapter (name, driver, approximate VRAM), and the NPU (name, architecture, PCI id,
@@ -91,7 +91,7 @@ name like "NPU Compute Accelerator Device" — so verify it against the raw `pci
 
 ## Manifest sweep
 
-`scripts\benchmark.ps1` compares entries from `models\manifest.json` across
+`scripts\benchmark-quant.ps1` compares entries from `models\manifest.json` across
 `variant × device × clip` and writes an aggregate report to
 `results\quantization-benchmark.{md,csv}` (micro-averaged WER/CER, confidence, startup,
 and latency). It also appends one canonical aggregate row per `variant × device` to
@@ -111,7 +111,7 @@ before measuring, so the first `-HotOnly` run on a fresh cache still pays a sing
 The underlying CLI exposes the same via `whisper_hal ... --cache <dir> --hot-only`. This is
 the fast path for iterating on inference latency/accuracy without re-paying the NPU compile.
 
-**Self-bootstrapping.** `benchmark.ps1` runs from a fresh checkout: before the sweep it
+**Self-bootstrapping.** `benchmark-quant.ps1` runs from a fresh checkout: before the sweep it
 detects the host NPU vendor, builds the app for that host's backends, and fetches any
 missing models / eval set / sample audio. Every step is idempotent (present artifacts are
 skipped). It assumes the toolchain and vendor SDK are already installed — that is
@@ -128,7 +128,7 @@ instead of overwriting other platforms.
 **Quantized OV-IR variants (fp16/int8/int4) are research-only** and live in
 `models\manifest.research.json`, not the product `manifest.json`. The default benchmark
 never touches them. To sweep them for research, point the harness at that manifest:
-`benchmark.ps1 -Manifest models\manifest.research.json`.
+`benchmark-quant.ps1 -Manifest models\manifest.research.json`.
 
 ## Neutral ONNX portability
 

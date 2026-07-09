@@ -1,14 +1,17 @@
-# Benchmark harness: runs every (variant x device x clip) from the manifest against
-# the labeled eval set and produces CSV + Markdown reports comparing performance,
-# self-confidence, and accuracy (WER/CER) per quantization method.
+# Quantization RESEARCH sweep (formerly benchmark.ps1): runs every
+# (variant x device x clip) from the manifest against the labeled eval set and produces
+# CSV + Markdown reports comparing performance, self-confidence, and accuracy (WER/CER)
+# per quantization method. This is NOT the default benchmark -- that is the portable
+# benchmark-onnx.ps1 (C++ app). Use this to sweep OV-IR precision variants (fp16/int8/int4).
 #
 # Backend-agnostic by construction: it reads `backend` from each manifest entry and
 # passes it straight to the runner, so AMD/Qualcomm variants drop in with no changes
-# here. Unsupported (variant x device) combos are recorded, not fatal.
+# here (it autodetects the host NPU vendor and skips other vendors' variants). Unsupported
+# (variant x device) combos are recorded, not fatal.
 #
-#   .\benchmark.ps1                       # all variants, their listed devices
-#   .\benchmark.ps1 -Devices NPU          # restrict devices
-#   .\benchmark.ps1 -Runs 5 -MaxClips 10
+#   .\benchmark-quant.ps1                       # all variants, their listed devices
+#   .\benchmark-quant.ps1 -Devices NPU          # restrict devices
+#   .\benchmark-quant.ps1 -Runs 5 -MaxClips 10
 
 [CmdletBinding()]
 param(

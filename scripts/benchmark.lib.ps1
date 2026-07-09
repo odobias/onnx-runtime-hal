@@ -1,5 +1,5 @@
 # Shared benchmark harness library. This is the single home for the concerns that
-# every benchmark entry point (benchmark.ps1, compare-devices.ps1, run.ps1) needs:
+# every benchmark entry point (benchmark-onnx.ps1, benchmark-quant.ps1, compare-devices.ps1, run.ps1) needs:
 # the canonical results-CSV schema, the app invocation + JSON parse, clip aggregation
 # math, and best-effort power-source detection.
 #
@@ -389,7 +389,7 @@ function Add-BenchmarkUnifiedAutoVariant {
 }
 
 # Ensure everything a sweep needs exists, building the app and fetching
-# models/eval/audio on demand so `benchmark.ps1` works from a fresh checkout.
+# models/eval/audio on demand so `benchmark-quant.ps1` works from a fresh checkout.
 # Idempotent: every step is skipped when its output is already present. This
 # assumes the toolchain + vendor SDK are installed (that is bootstrap.ps1's job);
 # if the build can't run it says exactly that. Model fetches for the neutral

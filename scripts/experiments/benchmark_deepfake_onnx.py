@@ -4,6 +4,14 @@ models (FakeAudio / Generated Audio Detector, Text Scam Classifier) across
 ONNX Runtime execution providers -- built to be re-run and compared across
 platforms (x64 CPU/DirectML/VitisAI, ARM64 CPU/QNN).
 
+REFERENCE / BACKGROUND ONLY -- this is NOT the benchmark of record. The
+benchmark of record is the C++ app driven by scripts/benchmark-onnx.ps1, whose
+--classify path replays these same fixtures through ONNX Runtime and is the
+only one that reaches the real vendor NPU EPs (VitisAI / QNN / OpenVINO). This
+Python harness is a quick, wheel-limited latency/correctness probe; treat its
+latency as indicative, not authoritative. (Its correctness scoring is still
+useful as the labeled-data source of truth -- see the sibling validators.)
+
 These are plain ONNX Runtime classifiers (not OpenVINO GenAI, not the
 whisper_engine IWhisperEngine contract), so they get their own small
 benchmark harness rather than going through the C++ HAL/app -- same
