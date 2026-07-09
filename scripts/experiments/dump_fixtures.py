@@ -131,6 +131,9 @@ def main() -> int:
                     choices=["tsc", "fakeaudio"])
     args = ap.parse_args()
 
+    from _models import ensure_deepfake_models
+    ensure_deepfake_models(args.models)  # auto-fetch from HF if missing
+
     mods = {
         "tsc": "validate_tsc_onnx",
         "fakeaudio": "validate_fakeaudio_onnx",

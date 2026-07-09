@@ -361,6 +361,9 @@ def main():
     ap.add_argument("--warmup", type=int, default=3)
     args = ap.parse_args()
 
+    from _models import ensure_deepfake_models
+    ensure_deepfake_models(args.models)  # auto-fetch from HF if missing
+
     available = set(ort.get_available_providers())
     print(f"ONNX Runtime {ort.__version__} on {platform.machine()} "
           f"({platform.system()})\n  available providers: {sorted(available)}\n")

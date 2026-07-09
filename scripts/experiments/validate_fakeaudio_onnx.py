@@ -112,6 +112,10 @@ def predict(outputs):
 
 
 def main() -> int:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _models import ensure_deepfake_models
+    ensure_deepfake_models(["fakeaudio"])  # auto-fetch from HF if missing
+
     if not os.path.exists(MODEL_PATH):
         print(f"Model not found: {MODEL_PATH} (run scripts\\get-deepfake-models.ps1 first)")
         return 1
