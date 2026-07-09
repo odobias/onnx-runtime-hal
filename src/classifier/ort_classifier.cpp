@@ -150,7 +150,6 @@ Fixture load_fixture(const fs::path& dir) {
 
     std::unordered_map<std::string, Sample> by_id;
     std::vector<std::string> order;
-    for (size_t r = 1; r < read_lines(dir / "samples.tsv").size() + 1; ++r) { /* placeholder */ }
 
     const auto samples = read_lines(dir / "samples.tsv");
     for (size_t r = 1; r < samples.size(); ++r) {  // skip header

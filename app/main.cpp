@@ -795,9 +795,6 @@ int main(int argc, char* argv[]) {
     ErrorRate er;
     if (have_ref) er = compute_error_rate(reference, text);
 
-    const auto bench_meta =
-        whisper_npu::benchmark_meta::resolve(opt.model_dir, label, *engine, last);
-
     if (!results_csv.empty()) {
         try {
             append_result_csv(results_csv, requested_backend, *engine, opt.device, opt.model_dir,
@@ -810,6 +807,10 @@ int main(int argc, char* argv[]) {
     }
 
     if (json_out) {
+        // Only the JSON payload needs the resolved metadata; append_result_csv
+        // resolves its own copy internally, so keep this off the text-output path.
+        const auto bench_meta =
+            whisper_npu::benchmark_meta::resolve(opt.model_dir, label, *engine, last);
         std::ostringstream js;
         js << std::fixed << std::setprecision(6);
         js << "{";
