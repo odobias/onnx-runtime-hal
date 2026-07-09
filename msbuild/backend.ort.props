@@ -21,8 +21,6 @@
     <ClCompile>
       <AdditionalIncludeDirectories>$(OrtInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WHISPER_HAL_ORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <!-- Route the unified backend's NPU/GPU/CPU through the OpenVINO EP. -->
-      <PreprocessorDefinitions Condition="'$(EnableOvep)'=='true'">WHISPER_HAL_OPENVINO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(OrtLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
