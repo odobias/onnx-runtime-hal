@@ -8,6 +8,7 @@
 #ifdef WHISPER_HAL_INTEL
 #include <memory>
 
+#include "openvino/core/version.hpp"
 #include "openvino/genai/whisper_pipeline.hpp"
 #include "openvino/runtime/core.hpp"
 #include "openvino/runtime/properties.hpp"
@@ -107,6 +108,7 @@ public:
     std::string backend_name() const override { return "Intel OpenVINO GenAI"; }
     std::string device_name() const override { return device_; }
     std::string full_device_name() const override { return full_device_name_; }
+    std::string runtime_version() const override { return ov::get_openvino_version().buildNumber; }
     double load_seconds() const override { return load_seconds_; }
 
 private:

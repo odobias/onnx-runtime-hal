@@ -437,6 +437,7 @@ public:
     std::string device_name() const override {
         return options_.device == Device::NPU ? "XDNA NPU (VitisAI EP)" : "CPUExecutionProvider";
     }
+    std::string runtime_version() const override { return Ort::GetVersionString(); }
     double load_seconds() const override { return load_seconds_; }
 
 private:

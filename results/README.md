@@ -59,6 +59,9 @@ all three in sync when adding or reordering columns.
 - `decode_strategy`: how the autoregressive loop runs — `genai-bounded-kv` (OV GenAI), `static-no-kv` (fixed-context recompute, NPU-compilable), etc. Always populated for ONNX static backends.
 - `max_context`: static decoder context length for `static-no-kv`; blank when the shape is dynamic or N/A.
 - `power_source`: whether the machine was on wall power or battery when the run was recorded — `ac`, `battery`, or `unknown`. Read from `GetSystemPowerStatus` (C++) / `SystemInformation.PowerStatus` (PowerShell) at run time. Battery means throttled CPU/NPU clocks, so **do not compare an `ac` row against a `battery` row and pretend the delta is architectural.** Rows written before this column existed are blank (state unknown).
+- `host_arch`: ISA of the runner binary that produced the row — `x64`, `arm64`, `x86`, or `unknown`. This is the axis that decides which vendor DLL pack a build ships (x64 = Intel/AMD; arm64 = Qualcomm/QNN), so it keeps cross-ISA rows attributable. Compile-time on the C++ side; `RuntimeInformation`/`PROCESSOR_ARCHITECTURE` on the PowerShell side. Blank for pre-existing rows.
+- `host_os`: OS identity of the runner, e.g. `Windows 11 (build 26100)`. From `RtlGetVersion` (C++) / `[Environment]::OSVersion` (PowerShell). Blank for pre-existing rows.
+- `runtime_version`: version of the underlying inference runtime that produced the row — the ONNX Runtime version (`Ort::GetVersionString()`, e.g. `1.24.4`) for the ORT backends, or the OpenVINO build number for the Intel backends. Empty when the backend can't report one or for rows written before this column existed. Combined with `runtime`/`execution_provider` this pins down exactly which runtime build a number came from.
 
 The `cold_load_seconds`/`warm_load_seconds` columns are retained for compatibility, but new
 analysis should use `cold_start_seconds`/`hot_start_seconds`. Do not mix startup time with

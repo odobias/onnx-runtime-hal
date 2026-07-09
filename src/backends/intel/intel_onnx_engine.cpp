@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "openvino/core/version.hpp"
 #include "openvino/runtime/core.hpp"
 #include "openvino/runtime/properties.hpp"
 #include "whisper_npu/whisper_frontend.hpp"
@@ -239,6 +240,7 @@ public:
     std::string backend_name() const override { return "Intel ONNX (OpenVINO, static)"; }
     std::string device_name() const override { return device_; }
     std::string full_device_name() const override { return full_device_name_; }
+    std::string runtime_version() const override { return ov::get_openvino_version().buildNumber; }
     double load_seconds() const override { return load_seconds_; }
 
 private:
