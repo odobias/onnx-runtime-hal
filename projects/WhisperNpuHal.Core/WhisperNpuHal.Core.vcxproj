@@ -59,6 +59,7 @@
     <ClCompile Include="$(WhisperHalRoot)src\backends\intel\intel_openvino_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\intel\intel_onnx_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\ort_static\ort_static_engine.cpp" />
+    <ClCompile Include="$(WhisperHalRoot)src\backends\ort_dynamic\ort_dynamic_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\amd\amd_ryzenai_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\backends\qualcomm\qualcomm_qnn_engine.cpp" />
     <ClCompile Include="$(WhisperHalRoot)src\classifier\ort_classifier.cpp" />
@@ -70,6 +71,7 @@
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\metrics.hpp" />
     <ClInclude Include="$(WhisperHalRoot)include\whisper_npu\whisper_frontend.hpp" />
     <ClInclude Include="$(WhisperHalRoot)src\backends\backend_registry.hpp" />
+    <ClInclude Include="$(WhisperHalRoot)src\backends\ort_common\ort_ep.hpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

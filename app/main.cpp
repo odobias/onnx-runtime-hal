@@ -60,6 +60,9 @@ bool parse_backend(const std::string& s, whisper_npu::Backend& out) {
     if (v == "onnx" || v == "onnx-static" || v == "ort" || v == "ort-static") {
         out = whisper_npu::Backend::OnnxRuntimeStatic; return true;
     }
+    if (v == "onnx-dynamic" || v == "onnx-dyn" || v == "ort-dynamic") {
+        out = whisper_npu::Backend::OnnxRuntimeDynamic; return true;
+    }
     if (v == "amd")   { out = whisper_npu::Backend::AmdRyzenAI; return true; }
     if (v == "qualcomm" || v == "qnn") { out = whisper_npu::Backend::QualcommQNN; return true; }
     return false;
@@ -659,7 +662,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0]
                   << " <model_dir> <audio.wav> [backend] [device] [runs]"
                      " [--cache <dir>] [--ref \"text\"] [--threads N] [--provider <ort-ep>] [--json] [--results <csv>]\n"
-                  << "  backend: auto | intel | intel-onnx | onnx-static | amd | qualcomm   (default auto)\n"
+                  << "  backend: auto | intel | intel-onnx | onnx-static | onnx-dynamic | amd | qualcomm   (default auto)\n"
                   << "  device : npu | gpu | cpu                 (default npu)\n"
                   << "  runs   : timed iterations                (default 5)\n"
                   << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"

@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "whisper_npu/whisper_frontend.hpp"
+#include "backends/ort_common/ort_ep.hpp"
 
 #ifdef WHISPER_HAL_ORT
 #include <onnxruntime_cxx_api.h>
@@ -42,16 +43,11 @@ namespace {
 
 namespace fs = std::filesystem;
 namespace fe = whisper_npu::frontend;
+namespace ep = whisper_npu::ort_common;
 
 constexpr int64_t kEncSeq = 1500;
 constexpr int64_t kDModel = 384;
 constexpr int64_t kStaticMaxTokens = 128;
-constexpr const char* kQnnEpName = "QNNExecutionProvider";
-
-std::string env_or(const char* key, const std::string& fallback) {
-    const char* v = std::getenv(key);
-    return (v && *v) ? std::string(v) : fallback;
-}
 
 int64_t env_max_tokens() {
     const char* v = std::getenv("WHISPER_HAL_ORT_MAX_TOKENS");
@@ -70,59 +66,6 @@ Ort::Value tensor_int64(std::vector<int64_t>& data, const std::vector<int64_t>& 
     return Ort::Value::CreateTensor<int64_t>(mem, data.data(), data.size(), shape.data(), shape.size());
 }
 
-std::string lower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return s;
-}
-
-// Ordered EP candidates for a logical device. Every vendor EP is compiled into
-// the same binary (their Append* calls resolve through the ORT API table at
-// runtime, so they cost nothing until tried and simply throw "provider not
-// available" on the wrong host). That is what makes ONE build self-select across
-// Intel / AMD / Qualcomm / any-DX12-GPU: the constructor walks these candidates
-// and keeps the first that actually builds a session. Only the QNN plugin path
-// is compile-gated, because it needs the newer plugin-EP API that ships in the
-// ARM64/1.27 ORT and is not present in the older x64 vendor ORT builds.
-std::vector<std::string> providers_for(Device device) {
-    switch (device) {
-        case Device::NPU: {
-            std::vector<std::string> v;
-#ifdef WHISPER_HAL_QUALCOMM
-            v.push_back(kQnnEpName);              // Qualcomm Hexagon (Snapdragon)
-#endif
-            v.push_back("VitisAIExecutionProvider");  // AMD XDNA (Ryzen AI)
-            v.push_back("openvino:NPU");              // Intel AI Boost
-            return v;
-        }
-        case Device::GPU:
-            // Portable GPU: DirectML drives any DX12 GPU (Intel/AMD/NVIDIA/Adreno);
-            // OpenVINO GPU is the Intel-specific alternative when DML is absent.
-            return {"DmlExecutionProvider", "openvino:GPU"};
-        case Device::CPU:
-        default:
-            // Portable CPU baseline: the same EP on every vendor keeps CPU numbers
-            // directly comparable across machines.
-            return {"CPUExecutionProvider"};
-    }
-}
-
-// Human-facing runtime tag for the shared benchmark schema, derived from the EP
-// that actually built the session.
-std::string runtime_for(const std::string& provider) {
-    const std::string p = lower(provider);
-    if (p.find("openvino") != std::string::npos) return "onnxruntime-openvino";
-    if (p.find("qnn") != std::string::npos) return "onnxruntime-qnn";
-    if (p.find("vitis") != std::string::npos) return "onnxruntime-vitisai";
-    if (p.find("dml") != std::string::npos || p.find("directml") != std::string::npos)
-        return "onnxruntime-directml";
-    return "onnxruntime";
-}
-
-bool is_qnn(const std::string& provider) {
-    return lower(provider).find("qnn") != std::string::npos;
-}
-
 std::string cache_safe(std::string s) {
     if (s.empty()) s = "static_onnx";
     for (char& c : s) {
@@ -131,161 +74,6 @@ std::string cache_safe(std::string s) {
         if (!ok) c = '_';
     }
     return s;
-}
-
-// The runtime EP fallback chain for a requested device. An explicit provider
-// override is honored verbatim (single attempt, no fallback). Otherwise a failed
-// NPU walks down to GPU then CPU, and GPU walks down to CPU, so a single binary
-// always produces a result on whatever hardware/drivers are actually present.
-std::vector<std::string> fallback_chain(const EngineOptions& options) {
-    if (!options.device_override.empty()) return {options.device_override};
-    std::vector<std::string> chain;
-    const auto add = [&](Device d) {
-        for (auto& p : providers_for(d)) chain.push_back(p);
-    };
-    switch (options.device) {
-        case Device::NPU:
-            add(Device::NPU);
-            add(Device::GPU);
-            add(Device::CPU);
-            break;
-        case Device::GPU:
-            add(Device::GPU);
-            add(Device::CPU);
-            break;
-        case Device::CPU:
-        default:
-            add(Device::CPU);
-            break;
-    }
-    return chain;
-}
-
-#ifdef WHISPER_HAL_QUALCOMM
-std::string qnn_ep_library_path() {
-    return env_or("WHISPER_QNN_EP_DLL", "onnxruntime_providers_qnn.dll");
-}
-
-std::string qnn_backend_path(Device device) {
-    switch (device) {
-        case Device::GPU: return env_or("WHISPER_QNN_GPU_DLL", "QnnGpu.dll");
-        case Device::CPU: return env_or("WHISPER_QNN_CPU_DLL", "QnnCpu.dll");
-        case Device::NPU:
-        default:          return env_or("WHISPER_QNN_HTP_DLL", "QnnHtp.dll");
-    }
-}
-
-#ifdef _WIN32
-std::wstring ort_tstring(const std::string& value) {
-    if (value.empty()) return {};
-    const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-    if (size <= 0) throw std::runtime_error("Failed to convert path to UTF-16: " + value);
-    std::wstring out(static_cast<size_t>(size - 1), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, out.data(), size);
-    return out;
-}
-#endif
-
-void register_qnn_library(Ort::Env& env) {
-    // EP-library registration lives on the ORT environment. We may call this more
-    // than once (probe env + engine env, encoder + decoder), so swallow the
-    // "already registered" error rather than gating on a process-wide flag that
-    // would leave a fresh env unregistered.
-    try {
-#ifdef _WIN32
-        env.RegisterExecutionProviderLibrary(kQnnEpName, ort_tstring(qnn_ep_library_path()));
-#else
-        env.RegisterExecutionProviderLibrary(kQnnEpName, qnn_ep_library_path());
-#endif
-    } catch (const Ort::Exception&) {
-        // Already registered on this (or a shared) environment -- fine.
-    }
-}
-
-Ort::ConstEpDevice find_qnn_device(Ort::Env& env) {
-    for (Ort::ConstEpDevice ep_device : env.GetEpDevices()) {
-        if (std::strcmp(ep_device.EpName(), kQnnEpName) == 0) return ep_device;
-    }
-    throw std::runtime_error("QNNExecutionProvider device not found after registration");
-}
-#endif  // WHISPER_HAL_QUALCOMM
-
-void append_provider(Ort::Env& env, Ort::SessionOptions& so, const EngineOptions& options,
-                     const std::string& provider, const fs::path& model_dir,
-                     const std::string& cache_key) {
-    const std::string p = lower(provider);
-
-    // Intel native path: OpenVINO EP. Accepts "openvino", "openvinoexecutionprovider",
-    // or an "openvino:<DEVICE>" token from the fallback chain. The OpenVINO
-    // device_type comes from the token suffix when present, else from options.device.
-    if (p.rfind("openvino", 0) == 0) {
-        std::string device_type;
-        const auto colon = provider.find(':');
-        if (colon != std::string::npos) {
-            device_type = provider.substr(colon + 1);
-        } else {
-            device_type = options.device == Device::NPU   ? "NPU"
-                          : options.device == Device::GPU ? "GPU"
-                                                          : "CPU";
-        }
-        std::unordered_map<std::string, std::string> ov_opts{{"device_type", device_type}};
-        // OpenVINO EP blob caching: persist the device-compiled model so reruns skip
-        // the (10-15s on NPU/GPU) compile. This is the cold-vs-hot lever for OVEP.
-        if (!options.cache_dir.empty()) ov_opts["cache_dir"] = options.cache_dir;
-        so.AppendExecutionProvider_OpenVINO_V2(ov_opts);
-        return;
-    }
-
-    if (p == "cpu" || p == "cpuexecutionprovider") {
-        if (options.cpu_threads > 0) {
-            so.SetIntraOpNumThreads(options.cpu_threads);
-            so.SetInterOpNumThreads(1);
-        }
-        return;  // CPU EP is the default ORT fallback.
-    }
-
-    if (p == "qnn" || p == "qnnexecutionprovider") {
-#ifdef WHISPER_HAL_QUALCOMM
-        register_qnn_library(env);
-        const Ort::ConstEpDevice qnn_device = find_qnn_device(env);  // throws if absent
-        std::vector<Ort::ConstEpDevice> selected{qnn_device};
-        std::unordered_map<std::string, std::string> opts{
-            {"backend_path", qnn_backend_path(options.device)}};
-        if (options.device == Device::NPU) opts.emplace("htp_performance_mode", "burst");
-        Ort::KeyValuePairs ep_options(opts);
-        so.AppendExecutionProvider_V2(env, selected, ep_options);
-        return;
-#else
-        throw std::runtime_error("QNN execution provider not compiled into this build");
-#endif
-    }
-
-    if (p == "vitisai" || p == "vitisaiexecutionprovider") {
-        std::unordered_map<std::string, std::string> vitis_opts;
-        const fs::path config = model_dir / "vitisai_config.json";
-        if (fs::exists(config)) vitis_opts["config_file"] = config.string();
-        if (!options.cache_dir.empty()) {
-            vitis_opts["cache_dir"] = options.cache_dir;
-            vitis_opts["cache_key"] = cache_key;
-        }
-        so.AppendExecutionProvider_VitisAI(vitis_opts);
-        return;
-    }
-
-    if (p == "dml" || p == "directml" || p == "dmlexecutionprovider") {
-#ifdef WHISPER_HAL_ORT_HAS_DML
-        Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(so, 0));
-        return;
-#else
-        throw std::runtime_error(
-            "generic ONNX Runtime static backend was built without DirectML provider headers; use CPU/NPU");
-#endif
-    }
-
-    throw std::runtime_error(
-        "unsupported ONNX Runtime provider override for static backend: " + provider +
-        " (supported: OpenVINOExecutionProvider[:NPU|GPU|CPU], CPUExecutionProvider, "
-        "QNNExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
 }
 
 // Build one ORT session for `provider`, adding QNN context-binary caching when a
@@ -299,14 +87,14 @@ std::unique_ptr<Ort::Session> build_session(Ort::Env& env, const EngineOptions& 
                                             const fs::path& model_path, const fs::path& model_dir,
                                             const std::string& cache_key) {
     fs::path ctx_path;
-    if (is_qnn(provider) && !options.cache_dir.empty()) {
+    if (ep::is_qnn(provider) && !options.cache_dir.empty()) {
         ctx_path = fs::path(options.cache_dir) / (cache_key + "_qnn_ctx.onnx");
     }
 
     auto make_so = [&](bool generate_ctx) {
         Ort::SessionOptions so;
         so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-        append_provider(env, so, options, provider, model_dir, cache_key);
+        ep::append_provider(env, so, options, provider, model_dir, cache_key);
         if (generate_ctx) {
             const std::string p = ctx_path.string();
             so.AddConfigEntry("ep.context_enable", "1");
@@ -365,7 +153,7 @@ public:
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
         const std::string cache_base = cache_safe(dir.filename().string());
-        const std::vector<std::string> chain = fallback_chain(options_);
+        const std::vector<std::string> chain = ep::fallback_chain(options_);
 
         // Try each EP in the fallback chain until both sessions build. This is
         // what lets one binary self-select CPU/GPU/NPU at runtime on whatever
@@ -423,7 +211,7 @@ public:
         const char* dec_in[] = {"input_ids", "encoder_hidden_states"};
         const char* dec_out[] = {"logits"};
         Ort::RunOptions run_opts;
-        if (options_.device == Device::NPU && is_qnn(active_provider_)) {
+        if (options_.device == Device::NPU && ep::is_qnn(active_provider_)) {
             run_opts.AddConfigEntry("qnn.perf_mode", "burst");
         }
         while (cur < max_tokens_) {
@@ -483,7 +271,7 @@ public:
         }
         out.ttft_ms = -1.0;
         out.has_token_metrics = true;
-        out.runtime = runtime_for(active_provider_);
+        out.runtime = ep::runtime_for(active_provider_);
         out.model_format = "onnx";
         out.decode_strategy = "static-no-kv";
         out.max_context = static_cast<long>(kStaticMaxTokens);
@@ -534,9 +322,9 @@ Device best_available_device() {
     // is dormant on ARM64, so it is NPU-or-CPU here.
     try {
         Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "whisper_hal_probe");
-        register_qnn_library(env);
+        ep::register_qnn_library(env);
         for (Ort::ConstEpDevice d : env.GetEpDevices()) {
-            if (std::strcmp(d.EpName(), kQnnEpName) == 0 &&
+            if (std::strcmp(d.EpName(), ep::kQnnEpName) == 0 &&
                 d.Device().Type() == OrtHardwareDeviceType_NPU) {
                 return Device::NPU;
             }
@@ -561,14 +349,14 @@ Device best_available_device() {
         const std::vector<std::string> providers = Ort::GetAvailableProviders();
         auto has = [&](const char* needle) {
             for (const std::string& p : providers) {
-                if (lower(p).find(needle) != std::string::npos) return true;
+                if (ep::lower(p).find(needle) != std::string::npos) return true;
             }
             return false;
         };
         const bool has_vitisai = has("vitisai");
         const bool has_openvino = has("openvino");
         const bool can_gpu = has_openvino || has("dml") || has("directml");
-        const bool log_probe = !env_or("WHISPER_HAL_LOG_PROBE", "").empty();
+        const bool log_probe = !ep::env_or("WHISPER_HAL_LOG_PROBE", "").empty();
 
         // Hardware enumeration (authoritative for CPU, DirectML GPUs, and OpenVINO
         // NPU/GPU; blind to VitisAI). The EP-device API landed in ORT 1.22

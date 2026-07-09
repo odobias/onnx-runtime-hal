@@ -7,6 +7,7 @@
 #   .\run.ps1 -Device cpu -Threads 8            # pin OpenVINO CPU inference threads
 #   .\run.ps1 -Backend amd                      # NPU, AMD ONNX model, cache demo
 #   .\run.ps1 -Backend onnx-static -Device cpu  # unchanged static ONNX via ONNX Runtime
+#   .\run.ps1 -Backend onnx-dynamic -Device gpu # with-past KV-cache ONNX (CPU/GPU only; NPU rejects it)
 #   .\run.ps1 -Backend onnx-static -Device npu -Provider VitisAIExecutionProvider
 #   .\run.ps1 -Backend qualcomm -Device npu   # static ONNX via Plugin QNN EP (Snapdragon)
 #   .\run.ps1 -Model <model_dir> -Audio <wav> -NoCache -NoResults
@@ -15,7 +16,7 @@
 param(
     [string]$Model = "",
     [string]$Audio = "",
-    [ValidateSet("auto", "intel", "intel-onnx", "onnx-static", "amd", "qualcomm")][string]$Backend = "intel",
+    [ValidateSet("auto", "intel", "intel-onnx", "onnx-static", "onnx-dynamic", "amd", "qualcomm")][string]$Backend = "intel",
     [ValidateSet("npu", "gpu", "cpu")][string]$Device = "npu",
     [int]$Runs = 5,
     [int]$Threads = 0,
@@ -38,6 +39,7 @@ if (-not $Model) {
         "amd" { $Model = Join-Path $root "models\whisper-tiny-amd" }
         "intel-onnx" { $Model = Join-Path $root "models\whisper-tiny-en-onnx" }
         "onnx-static" { $Model = Join-Path $root "models\whisper-tiny-en-static-onnx" }
+        "onnx-dynamic" { $Model = Join-Path $root "models\whisper-tiny-en-onnx" }
         "qualcomm" { $Model = Join-Path $root "models\whisper-tiny-en-static-onnx" }
         default { $Model = Join-Path $root "models\whisper-tiny-en-ov" }
     }
