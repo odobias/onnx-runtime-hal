@@ -160,7 +160,9 @@ and tallies the per-node provider assignment (deduped across iterations). Column
 - `ep_nodes` — distinct nodes that ran on the requested EP (the accelerator EPs fuse
   their supported subgraph into a single node, so `ep_nodes=1` means "fully fused").
 - `cpu_nodes` — distinct nodes that fell back to `CPUExecutionProvider`.
-- `cpu_offload_pct` — `cpu_nodes / (ep_nodes + cpu_nodes) * 100`.
+- `cpu_offload_pct` — `cpu_nodes / (ep_nodes + cpu_nodes) * 100`. This is a
+  distinct-profiler-node ratio, **not** an estimate of CPU compute or elapsed time:
+  one accelerator node may contain hundreds of fused ONNX operations.
 - `cpu_offload_ops` — histogram of the fallback op types (e.g. `Gather x3, Cast x2`).
 
 Interpretation: on an accelerator run, `cpu_offload_pct = 0` (and `ep_nodes = 1`) is
@@ -168,3 +170,10 @@ the goal. A CPU-device run reads `100%` by definition — that's the baseline, n
 regression (check `requested_device`). Empty cells mean the audit couldn't run (e.g.
 profiling unavailable). Measured on Lunar Lake: both `tsc` and the `fakeaudio`
 backbone report `0%` offload on the NPU (fully fused).
+
+On AMD VitisAI, TSC reports one fused NPU partition plus 13 CPU shape/control
+nodes (`Gather`, `Cast`, `Unsqueeze`, and similar). It preserves 14/15 fixture
+accuracy and runs in 32.6 ms, so the `92.9%` node ratio must not be reported as
+92.9% of the workload running on CPU. A fixed-shape `onnxsim` experiment reduced
+the host set by only one `Unsqueeze`, with no latency or numerical improvement;
+the original graph is retained.

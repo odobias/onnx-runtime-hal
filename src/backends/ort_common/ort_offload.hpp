@@ -27,7 +27,9 @@ struct OffloadStats {
     int cpu_nodes = -1;   // distinct nodes that ran on CPUExecutionProvider
     std::string cpu_ops;  // histogram of the fallback op types, e.g. "Gather x3, Cast x2"
 
-    // -1 when unmeasured; 0..100 fraction of executed nodes that ran on the CPU EP.
+    // -1 when unmeasured; 0..100 fraction of distinct profiler nodes assigned to CPU.
+    // This is NOT a compute/time share: one accelerator node may represent a fused
+    // partition containing hundreds of original ONNX operations.
     double cpu_offload_pct() const {
         if (!measured) return -1.0;
         const int total = ep_nodes + cpu_nodes;

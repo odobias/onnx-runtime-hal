@@ -663,7 +663,8 @@ int run_classify(const std::string& dir, whisper_npu::Device device, const std::
               << (r.max_abs_p_diff < 1e-3 ? "  (matches CPU)" : "  (EP diverges from CPU!)") << "\n";
     if (r.offload_measured) {
         const int total = r.ep_nodes + r.cpu_nodes;
-        std::cout << "cpu offload: " << r.cpu_nodes << " / " << total << " nodes on the CPU EP";
+        std::cout << "cpu offload: " << r.cpu_nodes << " / " << total
+                  << " profiler nodes on the CPU EP";
         if (r.cpu_nodes == 0) {
             std::cout << "  (none -- fully on " << r.execution_provider << ")";
         } else {
@@ -671,6 +672,7 @@ int run_classify(const std::string& dir, whisper_npu::Device device, const std::
                       << (total > 0 ? 100.0 * r.cpu_nodes / total : 0.0) << "%: " << r.cpu_offload_ops
                       << ")";
         }
+        std::cout << " [node ratio, not compute share]";
         std::cout << "\n";
     }
     if (!results_csv.empty()) std::cout << "results csv: " << results_csv << "\n";

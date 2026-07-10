@@ -9,6 +9,7 @@ third_party/
 # Python virtual env (created by scripts/get-model.ps1)
 .venv/
 .venv-ovep/
+.venv-quark*/
 __pycache__/
 
 # Models & audio (fetched/exported by scripts; never committed)
