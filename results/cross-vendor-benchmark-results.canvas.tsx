@@ -29,6 +29,7 @@ const whisperRows = [
 const tscRows = [
   ["Intel", "ORT OpenVINO EP", "NPU", "8.67 ms", "7.87 s", "93.3%", "0.00665", "0% in research audit"],
   ["Qualcomm", "ORT QNN", "NPU", "20.50 ms", "13.96 s", "93.3%", "0.04731", "0 / 1 CPU nodes"],
+  ["AMD", "ORT VitisAI", "NPU", "32.60 ms", "5.69 s", "93.3%", "0.05680", "13 CPU shape/control nodes; compute fused"],
   ["x64", "ORT DirectML", "GPU", "36.64 ms", "1.34 s", "93.3%", "0.0000011", "not recorded"],
   ["x64", "ORT CPU", "CPU", "79.02 ms", "0.27 s", "93.3%", "~0", "CPU baseline"],
 ];
@@ -59,7 +60,8 @@ function Overview() {
 
       <Callout title="Bottom line" tone="info">
         Intel GenAI is the clear Whisper latency leader, but it uses a different bounded-KV
-        decoder; it is not a pure silicon comparison. TSC is healthy on Intel and Qualcomm NPUs.
+        decoder; it is not a pure silicon comparison. TSC preserves accuracy on all three NPUs,
+        though AMD leaves small shape/control operations on CPU and has the largest probability drift.
         FakeAudio only works correctly on an NPU when its fp32 front-end stays on CPU and the
         backbone runs on the NPU.
       </Callout>
@@ -94,7 +96,7 @@ function Overview() {
           <CardBody>
             <Stack gap={12}>
               <Text><Text weight="semibold">Whisper:</Text> all three vendor NPUs have a working path. Intel GenAI is fastest; Qualcomm QNN has the best measured portable-static NPU result.</Text>
-              <Text><Text weight="semibold">TSC:</Text> ship on Intel or Qualcomm NPU. Both preserve the model's 14/15 fixture accuracy.</Text>
+              <Text><Text weight="semibold">TSC:</Text> all three NPUs preserve 14/15 fixture accuracy. AMD is usable, but its host-side shape ops and 0.0568 probability drift need explicit disclosure.</Text>
               <Text><Text weight="semibold">FakeAudio:</Text> ship only as CPU fp32 front-end + NPU backbone on Intel/Qualcomm.</Text>
               <Text><Text weight="semibold">AMD FakeAudio:</Text> no correct VAIML path has been demonstrated.</Text>
               <Text><Text weight="semibold">Naive INT8:</Text> not shippable for Whisper or FakeAudio; accuracy collapses.</Text>
@@ -151,9 +153,9 @@ function Classifiers() {
         <Text size="small" tone="secondary">X-axis: executor/device · Y-axis: mean inference latency in milliseconds (lower is better)</Text>
         <BarChart
           horizontal
-          height={250}
-          categories={["Intel OVEP NPU", "Qualcomm QNN NPU", "DirectML GPU", "ORT CPU"]}
-          series={[{ name: "Mean inference latency", data: [8.67, 20.50, 36.64, 79.02], tone: "success" }]}
+          height={280}
+          categories={["Intel OVEP NPU", "Qualcomm QNN NPU", "AMD VitisAI NPU", "DirectML GPU", "ORT CPU"]}
+          series={[{ name: "Mean inference latency", data: [8.67, 20.50, 32.60, 36.64, 79.02], tone: "success" }]}
           valueSuffix=" ms"
           showValues
         />
@@ -162,7 +164,7 @@ function Classifiers() {
           headers={["Vendor", "Executor", "Device", "Mean", "Load", "Accuracy", "Max probability delta", "CPU fallback"]}
           rows={tscRows}
           columnAlign={["left", "left", "left", "right", "right", "right", "right", "left"]}
-          rowTone={["success", "success", "neutral", "neutral"]}
+          rowTone={["success", "success", "warning", "neutral", "neutral"]}
           striped
         />
       </Stack>
@@ -210,10 +212,14 @@ function Caveats() {
           <CardHeader>Offload counters</CardHeader>
           <CardBody><Text>QNN's “1 EP node” means one fused partition containing hundreds of ONNX ops. Zero CPU nodes proves no fallback outside that partition; it does not mean the model has one operation.</Text></CardBody>
         </Card>
+        <Card>
+          <CardHeader>AMD TSC host shape operations</CardHeader>
+          <CardBody><Text>VitisAI runs the expensive transformer as one fused NPU node but leaves 13 shape/control nodes on CPU. A fixed-shape ONNX simplification reduced this by only one Unsqueeze and did not change latency or probability drift, so the original graph is retained.</Text></CardBody>
+        </Card>
       </Grid>
       <Callout title="Current evidence quality" tone="info">
         The strongest cross-vendor conclusions are qualitative: all three NPUs run Whisper;
-        Intel and Qualcomm correctly run TSC; FakeAudio requires a CPU fp32 front-end plus NPU
+        all three preserve TSC fixture accuracy; FakeAudio requires a CPU fp32 front-end plus NPU
         backbone on Intel/Qualcomm; and AMD FakeAudio remains unresolved. Exact latency rankings
         need a controlled AC-powered, same-clips, same-model, same-runtime rerun.
       </Callout>
