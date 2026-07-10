@@ -40,7 +40,8 @@ function Get-BenchmarkResultColumns {
         "wer", "cer", "transcription",
         "runtime", "model_format", "decode_strategy", "max_context", "eval_clips", "status",
         "cold_start_seconds", "hot_start_seconds", "power_source",
-        "host_arch", "host_os", "runtime_version"
+        "host_arch", "host_os", "runtime_version",
+        "ep_nodes", "cpu_nodes", "cpu_offload_pct", "cpu_offload_ops"
     )
 }
 

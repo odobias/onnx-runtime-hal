@@ -40,6 +40,12 @@ param(
     [string]$Configuration = "Release",
     [string]$Provider = "openvino",
     [string]$Audio = "",
+    # Labeled eval set (JSONL). When present, Whisper is benchmarked over EVERY clip
+    # and aggregated into ONE row per variant/device (WER/CER micro-averaged, RTF/latency
+    # meaned) -- the same multi-clip basis the vendor rows use. Falls back to the single
+    # -Audio clip if the eval set is missing. Empty = models\eval\eval.jsonl.
+    [string]$EvalSet = "",
+    [int]$MaxClips = 0,   # 0 = all clips in the eval set
     [string]$Results = "",
     [string]$ClassifierResults = "",
     [switch]$RegenerateFixtures,
@@ -96,6 +102,17 @@ if ($Only -contains "all") { $Only = @("whisper", "tsc", "fakeaudio") }
 if (-not $Results) { $Results = Join-Path $root "results\benchmark-results.csv" }
 if (-not $ClassifierResults) { $ClassifierResults = Join-Path $root "results\deepfake-benchmark-cpp.csv" }
 if (-not $Audio) { $Audio = Join-Path $root "models\eval\ls_000.wav" }
+if (-not $EvalSet) { $EvalSet = Join-Path $root "models\eval\eval.jsonl" }
+
+# Load the labeled eval clips once. Each Whisper variant/device is measured over the
+# whole set and aggregated into a single comparable row; if the eval set is absent we
+# degrade to the single -Audio clip so a bare checkout still benchmarks Whisper.
+$evalClips = @()
+if (Test-Path $EvalSet) {
+    $evalClips = @(Get-Content $EvalSet | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+    if ($MaxClips -gt 0 -and $evalClips.Count -gt $MaxClips) { $evalClips = $evalClips[0..($MaxClips - 1)] }
+}
+$cacheRoot = Join-Path $root "cache"
 
 # Whisper ONNX comes in two flavors of the SAME model, both benchmarked here:
 #   static  : no-KV recompute (fixed shapes) -> NPU-compilable, slower.
@@ -156,7 +173,6 @@ foreach ($dev in $Device) {
     Write-Host "`n==================== device: $dev ====================" -ForegroundColor Magenta
 
     if ($Only -contains "whisper") {
-        $ref = Get-EvalRef -AudioPath $Audio
         foreach ($v in $whisperVariants) {
             $tag = "whisper-$($v.Label)/$dev"
             if ($v.Devices -notcontains $dev) {
@@ -171,21 +187,69 @@ foreach ($dev in $Device) {
                 $skipped += $tag
                 continue
             }
-            Write-Host "`n--- Whisper tiny.en ($($v.Label), ASR) ---" -ForegroundColor Cyan
-            $runArgs = @{
-                Backend       = $v.Backend
-                Device        = $dev
-                Runs          = $Runs
-                Model         = $v.Model
-                Audio         = $Audio
-                Configuration = $Configuration
-                Platform      = $platform
+
+            # Clip set: the full labeled eval set (aggregated) when available, else the
+            # single -Audio clip. One shared cache dir per variant/device so the NPU
+            # compiles ONCE and every clip reuses the warm blob.
+            $clips = if ($evalClips.Count) { $evalClips } else {
+                @([pscustomobject]@{ id = [IO.Path]::GetFileNameWithoutExtension($Audio); audio = $Audio; ref = (Get-EvalRef -AudioPath $Audio) })
             }
-            if ($Provider) { $runArgs.Provider = $Provider }
-            if ($NoResults) { $runArgs.NoResults = $true }
-            else { $runArgs.Results = $Results; $runArgs.Label = $v.Label }
-            if ($ref) { $runArgs.Ref = $ref }
-            & (Join-Path $PSScriptRoot "run.ps1") @runArgs
+            $modelRel = ($v.Model.Substring($root.Length).TrimStart('\', '/') -replace '\\', '/')
+            $cacheDir = Join-Path $cacheRoot "onnx-$($v.Label)-$dev"
+            Write-Host ("`n--- Whisper tiny.en ($($v.Label), ASR) | {0} clip(s) on {1} ---" -f $clips.Count, $dev) -ForegroundColor Cyan
+
+            $rows = @()
+            $status = "ok"; $errMsg = ""
+            foreach ($c in $clips) {
+                $clipAudio = if ([IO.Path]::IsPathRooted($c.audio)) { $c.audio } else { Join-Path $root ($c.audio -replace '/', '\') }
+                if (-not (Test-Path $clipAudio)) { continue }
+                $r = Invoke-BenchmarkClip -Exe $exe -ModelDir $v.Model -Audio $clipAudio -Backend $v.Backend `
+                    -Device $dev -Runs $Runs -CacheDir $cacheDir -Ref ([string]$c.ref) -Provider $Provider
+                if (-not $r.ok) { $status = "unsupported/error"; $errMsg = $r.error; Write-Host ("   {0}: {1}" -f $c.id, $r.error) -ForegroundColor Yellow; break }
+                $rows += $r
+                Write-Host ("   {0}: {1} ms | RTF {2}" -f $c.id, [math]::Round($r.mean_ms, 1), [math]::Round($r.rtf, 4)) -ForegroundColor DarkGray
+            }
+
+            if ($rows.Count -eq 0) {
+                Write-Host ("   no clips produced a result ({0})" -f $errMsg) -ForegroundColor Yellow
+                $skipped += $tag
+                continue
+            }
+
+            if (-not $NoResults) {
+                $agg = Measure-BenchmarkClips $rows
+                $firstRow = $agg.first_row; $lastRow = $agg.last_row
+                $load = Get-BenchmarkLoadTimes $firstRow
+                $meta = Get-BenchmarkMeta $null $modelRel $firstRow "openai/whisper-tiny.en"
+                Write-BenchmarkResultRow $Results ([pscustomobject]@{
+                        timestamp_utc      = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+                        requested_backend  = $v.Backend; resolved_backend = $firstRow.backend; device = $dev
+                        device_name        = $firstRow.device; device_full_name = $firstRow.device_full_name
+                        model_package      = $meta.model_package; variant_id = $v.Label; base_model = $meta.base_model
+                        precision          = $meta.precision; quant_method = $meta.quant_method; execution_provider = $meta.execution_provider
+                        model_dir          = $modelRel; audio_path = $EvalSet; audio_seconds = $agg.audio_seconds; runs = $Runs; warmup = 1; cache_dir = $cacheDir
+                        cold_load_seconds  = $load.cold; warm_load_seconds = $load.hot
+                        mean_infer_seconds = ($agg.mean_ms / 1000.0); rtf = $agg.mean_rtf
+                        realtime_factor    = if ($agg.mean_rtf -gt 0) { 1.0 / $agg.mean_rtf } else { "" }
+                        label              = $v.Label; model_size_mb = (Get-BenchmarkRowValue $firstRow 'model_size_mb' ''); avg_logprob = $agg.mean_logprob
+                        ttft_ms            = $agg.mean_ttft_ms; tpot_ms = $agg.mean_tpot_ms; throughput_tps = $agg.mean_tps
+                        wer                = $agg.wer; cer = $agg.cer; transcription = $lastRow.text
+                        cold_start_seconds = $load.cold; hot_start_seconds = $load.hot; eval_clips = $rows.Count; status = "ok"
+                        runtime            = $meta.runtime; model_format = $meta.model_format; decode_strategy = $meta.decode_strategy; max_context = $meta.max_context
+                        power_source       = $(if (($firstRow.PSObject.Properties.Name -contains 'power_source') -and $firstRow.power_source) { $firstRow.power_source } else { Get-BenchmarkPowerSource })
+                        host_arch          = (Get-BenchmarkRowValue $firstRow 'host_arch' (Get-BenchmarkHostArch))
+                        host_os            = (Get-BenchmarkRowValue $firstRow 'host_os' (Get-BenchmarkHostOs))
+                        runtime_version    = (Get-BenchmarkRowValue $firstRow 'runtime_version' '')
+                        ep_nodes           = (Get-BenchmarkRowValue $firstRow 'ep_nodes' '')
+                        cpu_nodes          = (Get-BenchmarkRowValue $firstRow 'cpu_nodes' '')
+                        cpu_offload_pct    = (Get-BenchmarkRowValue $firstRow 'cpu_offload_pct' '')
+                        cpu_offload_ops    = (Get-BenchmarkRowValue $firstRow 'cpu_offload_ops' '')
+                    })
+                Write-Host ("   ok: {0} clips | {1} ms | RTF {2} | WER {3}% | cpu-offload {4}" -f `
+                        $rows.Count, [math]::Round($agg.mean_ms, 1), [math]::Round($agg.mean_rtf, 4),
+                    $(if ($null -ne $agg.wer) { [math]::Round(100.0 * $agg.wer, 2) } else { "n/a" }),
+                    $(Get-BenchmarkRowValue $firstRow 'cpu_offload_pct' 'n/a')) -ForegroundColor Green
+            }
             $ran += $tag
         }
     }

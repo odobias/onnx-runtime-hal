@@ -26,10 +26,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 #include <vector>
+
+#include "backends/ort_common/ort_offload.hpp"
 
 namespace whisper_npu {
 namespace ort_common {
@@ -232,6 +236,46 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
         "unsupported ONNX Runtime provider override: " + provider +
         " (supported: OpenVINOExecutionProvider[:NPU|GPU|CPU], CPUExecutionProvider, "
         "QNNExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
+}
+
+// --- CPU-offload audit -------------------------------------------------------
+
+// Turn on ORT profiling for a session so a later measure_offload() can tell which
+// EP each executed node actually ran on. The prefix must be unique per session
+// (ORT appends a timestamp + ".json"); callers derive it from the cache_key. Kept
+// here so both Whisper engines profile identically.
+inline void enable_offload_profiling(Ort::SessionOptions& so, const std::string& tag) {
+    const std::wstring prefix = (fs::temp_directory_path() / ("whal_ofl_" + tag)).wstring();
+    so.EnableProfiling(prefix.c_str());
+}
+
+// End profiling on each session (built with enable_offload_profiling), parse the
+// emitted traces, and fold them into ONE pipeline-wide OffloadInfo. Call this once,
+// after the first (warmup) inference: profiling stops here, so the timed runs that
+// follow are pristine. Robust to profiling being unavailable (-> unmeasured).
+inline OffloadInfo measure_offload(std::initializer_list<Ort::Session*> sessions) {
+    Ort::AllocatorWithDefaultOptions alloc;
+    OffloadStats agg;
+    for (Ort::Session* s : sessions) {
+        if (!s) continue;
+        try {
+            const std::string path = s->EndProfilingAllocated(alloc).get();
+            if (path.empty()) continue;
+            agg.add(parse_ort_profile(path));
+            std::error_code ec;
+            fs::remove(path, ec);
+        } catch (const std::exception&) {
+            // profiling unavailable / parse failed -> skip this session
+        }
+    }
+    OffloadInfo info;
+    if (agg.measured) {
+        info.measured = true;
+        info.ep_nodes = agg.ep_nodes;
+        info.cpu_nodes = agg.cpu_nodes;
+        info.cpu_ops = agg.cpu_ops;
+    }
+    return info;
 }
 
 }  // namespace ort_common

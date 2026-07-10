@@ -267,7 +267,8 @@ constexpr const char* kBenchmarkCsvHeader =
     "throughput_tps,wer,cer,transcription,"
     "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
     "cold_start_seconds,hot_start_seconds,power_source,"
-    "host_arch,host_os,runtime_version";
+    "host_arch,host_os,runtime_version,"
+    "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops";
 
 // Classifier ledger schema (see append_classifier_csv). Kept as a named constant so
 // the writer and the additive migration below agree on column order.
@@ -447,6 +448,7 @@ void append_result_csv(const std::string& path,
     const long max_context = meta.max_context;
 
     const bool tok = last.has_token_metrics;
+    const whisper_npu::OffloadInfo ofl = engine.offload_info();
     out << csv_escape(utc_now_iso8601()) << ','
         << csv_escape(requested_backend) << ','
         << csv_escape(engine.backend_name()) << ','
@@ -490,7 +492,11 @@ void append_result_csv(const std::string& path,
         << csv_escape(power_source()) << ','
         << csv_escape(host_arch()) << ','
         << csv_escape(host_os()) << ','
-        << csv_escape(engine.runtime_version()) << '\n';
+        << csv_escape(engine.runtime_version()) << ','
+        << (ofl.measured ? std::to_string(ofl.ep_nodes) : std::string()) << ','
+        << (ofl.measured ? std::to_string(ofl.cpu_nodes) : std::string()) << ','
+        << opt_num(ofl.cpu_offload_pct(), ofl.measured, 4) << ','
+        << csv_escape(ofl.cpu_ops) << '\n';
 }
 
 // --- deepfake classifier mode -----------------------------------------------
@@ -892,6 +898,15 @@ int main(int argc, char* argv[]) {
         js << ",\"host_arch\":\"" << json_escape(host_arch()) << "\"";
         js << ",\"host_os\":\"" << json_escape(host_os()) << "\"";
         js << ",\"runtime_version\":\"" << json_escape(engine->runtime_version()) << "\"";
+        {
+            const whisper_npu::OffloadInfo ofl = engine->offload_info();
+            if (ofl.measured) {
+                js << ",\"ep_nodes\":" << ofl.ep_nodes;
+                js << ",\"cpu_nodes\":" << ofl.cpu_nodes;
+                js << ",\"cpu_offload_pct\":" << ofl.cpu_offload_pct();
+                js << ",\"cpu_offload_ops\":\"" << json_escape(ofl.cpu_ops) << "\"";
+            }
+        }
         js << ",\"cpu_threads_requested\":" << cpu_threads;
         js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
@@ -977,6 +992,15 @@ int main(int argc, char* argv[]) {
                       << " ms, " << last.throughput_tps << " tok/s\n";
         }
         if (size_mb >= 0) std::cout << "model size   : " << std::setprecision(1) << size_mb << " MB\n";
+        {
+            const whisper_npu::OffloadInfo ofl = engine->offload_info();
+            if (ofl.measured) {
+                std::cout << "cpu offload  : " << std::setprecision(1) << ofl.cpu_offload_pct()
+                          << "%  (" << ofl.ep_nodes << " EP / " << ofl.cpu_nodes << " CPU nodes)";
+                if (!ofl.cpu_ops.empty()) std::cout << "  [" << ofl.cpu_ops << "]";
+                std::cout << "\n";
+            }
+        }
         if (have_ref) {
             std::cout << "accuracy     : WER " << std::setprecision(2) << er.wer * 100.0 << "%  CER "
                       << er.cer * 100.0 << "%  (ref " << er.ref_words << " words)\n";

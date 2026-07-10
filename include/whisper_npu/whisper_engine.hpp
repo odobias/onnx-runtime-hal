@@ -91,6 +91,26 @@ struct TranscribeResult {
     long max_context = 0;         // static decoder context length (0 = n/a)
 };
 
+// CPU-offload audit for the ORT-based backends: when an accelerator EP is asked to
+// run the model, does any op silently fall back to the ORT CPU EP? The accelerator
+// EPs fuse their supported subgraph into a single node, so `ep_nodes` counts the
+// accelerator subgraph node(s) and `cpu_nodes` the host-side fallbacks (summed over
+// the encoder + decoder sessions). `measured=false` when the backend can't report it
+// (e.g. native OpenVINO/GenAI, which compiles monolithically -> no per-op fallback).
+struct OffloadInfo {
+    bool measured = false;
+    int ep_nodes = -1;
+    int cpu_nodes = -1;
+    std::string cpu_ops;  // fallback op histogram, e.g. "Gather x3, Cast x2"
+
+    // 0..100 fraction of executed nodes that ran on the CPU EP; -1 when unmeasured.
+    double cpu_offload_pct() const {
+        if (!measured) return -1.0;
+        const int total = ep_nodes + cpu_nodes;
+        return total > 0 ? 100.0 * cpu_nodes / total : 0.0;
+    }
+};
+
 // 16 kHz, mono, float PCM normalized to [-1, 1].
 using AudioSamples = std::vector<float>;
 
@@ -122,6 +142,11 @@ public:
     // Wall-clock time spent constructing/compiling this engine (model load +
     // device compile). With a warm cache this should drop dramatically.
     virtual double load_seconds() const = 0;
+
+    // CPU-offload audit (see OffloadInfo). Default = unmeasured; the ORT backends
+    // override it after profiling their first (warmup) inference. Lets the benchmark
+    // ledger record whether a "runs on NPU" row actually kept every op off the CPU.
+    virtual OffloadInfo offload_info() const { return {}; }
 };
 
 // --- Introspection -----------------------------------------------------------

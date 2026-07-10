@@ -277,6 +277,14 @@ public:
         out.model_format = "onnx";
         out.decode_strategy = "dynamic-kv";
         out.max_context = -1;  // grows with the sequence
+
+        // Audit CPU offload once, off the back of this (warmup) inference. Profiling
+        // stops inside measure_offload, so the timed runs that follow are unprofiled.
+        if (!offload_done_) {
+            offload_done_ = true;
+            offload_info_ =
+                ep::measure_offload({encoder_.get(), decoder_.get(), decoder_past_.get()});
+        }
         return out;
     }
 
@@ -284,6 +292,7 @@ public:
     std::string device_name() const override { return active_provider_; }
     std::string runtime_version() const override { return Ort::GetVersionString(); }
     double load_seconds() const override { return load_seconds_; }
+    OffloadInfo offload_info() const override { return offload_info_; }
 
 private:
     std::unique_ptr<Ort::Session> build_session(const std::string& provider, const fs::path& model_path,
@@ -291,6 +300,7 @@ private:
         Ort::SessionOptions so;
         so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
         ep::append_provider(env_, so, options_, provider, model_dir, cache_key);
+        ep::enable_offload_profiling(so, cache_key);  // audited + stopped after warmup
         const std::wstring wpath = model_path.wstring();
         return std::make_unique<Ort::Session>(env_, wpath.c_str(), so);
     }
@@ -315,6 +325,8 @@ private:
     std::vector<float> mel_filters_;
     std::unordered_map<int64_t, std::string> vocab_;
     double load_seconds_ = 0.0;
+    bool offload_done_ = false;
+    OffloadInfo offload_info_;
     std::unique_ptr<Ort::Session> encoder_;
     std::unique_ptr<Ort::Session> decoder_;       // no-past prefill
     std::unique_ptr<Ort::Session> decoder_past_;  // with-past steps

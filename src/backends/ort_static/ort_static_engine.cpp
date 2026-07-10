@@ -95,6 +95,7 @@ std::unique_ptr<Ort::Session> build_session(Ort::Env& env, const EngineOptions& 
         Ort::SessionOptions so;
         so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
         ep::append_provider(env, so, options, provider, model_dir, cache_key);
+        ep::enable_offload_profiling(so, cache_key);  // audited + stopped after warmup
         if (generate_ctx) {
             const std::string p = ctx_path.string();
             so.AddConfigEntry("ep.context_enable", "1");
@@ -275,6 +276,13 @@ public:
         out.model_format = "onnx";
         out.decode_strategy = "static-no-kv";
         out.max_context = static_cast<long>(kStaticMaxTokens);
+
+        // Audit CPU offload once, off the back of this (warmup) inference. Profiling
+        // stops inside measure_offload, so the timed runs that follow are unprofiled.
+        if (!offload_done_) {
+            offload_done_ = true;
+            offload_info_ = ep::measure_offload({encoder_.get(), decoder_.get()});
+        }
         return out;
     }
 
@@ -282,6 +290,7 @@ public:
     std::string device_name() const override { return active_provider_; }
     std::string runtime_version() const override { return Ort::GetVersionString(); }
     double load_seconds() const override { return load_seconds_; }
+    OffloadInfo offload_info() const override { return offload_info_; }
 
 private:
     Ort::Env env_;
@@ -297,6 +306,8 @@ private:
     std::vector<float> mel_filters_;
     std::unordered_map<int64_t, std::string> vocab_;
     double load_seconds_ = 0.0;
+    bool offload_done_ = false;
+    OffloadInfo offload_info_;
     std::unique_ptr<Ort::Session> encoder_;
     std::unique_ptr<Ort::Session> decoder_;
 };

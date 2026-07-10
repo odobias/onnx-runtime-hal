@@ -21,17 +21,43 @@
 namespace whisper_npu {
 namespace ort_common {
 
+// Render a fallback op-count map as "Gather x3, Cast x2" (sorted by op name).
+inline std::string format_op_hist(const std::map<std::string, int>& hist) {
+    std::ostringstream ops;
+    bool first = true;
+    for (const auto& [op, n] : hist) {
+        if (!first) ops << ", ";
+        ops << op << " x" << n;
+        first = false;
+    }
+    return ops.str();
+}
+
 struct OffloadStats {
     bool measured = false;
     int ep_nodes = -1;    // distinct nodes on the requested (non-CPU) EP
     int cpu_nodes = -1;   // distinct nodes that ran on CPUExecutionProvider
     std::string cpu_ops;  // histogram of the fallback op types, e.g. "Gather x3, Cast x2"
+    std::map<std::string, int> cpu_op_counts;  // same data, mergeable across sessions
 
     // -1 when unmeasured; 0..100 fraction of executed nodes that ran on the CPU EP.
     double cpu_offload_pct() const {
         if (!measured) return -1.0;
         const int total = ep_nodes + cpu_nodes;
         return total > 0 ? 100.0 * cpu_nodes / total : 0.0;
+    }
+
+    // Fold another session's stats into this one. An encoder-decoder model is two
+    // (or three, with-past) sessions; the benchmark wants one offload figure for the
+    // whole pipeline, so counts and the op histogram are summed. Unmeasured operands
+    // are ignored; the result becomes measured once any operand was.
+    void add(const OffloadStats& o) {
+        if (!o.measured) return;
+        if (!measured) { measured = true; ep_nodes = 0; cpu_nodes = 0; }
+        ep_nodes += o.ep_nodes;
+        cpu_nodes += o.cpu_nodes;
+        for (const auto& [op, n] : o.cpu_op_counts) cpu_op_counts[op] += n;
+        cpu_ops = format_op_hist(cpu_op_counts);
     }
 };
 
@@ -112,17 +138,11 @@ inline OffloadStats parse_ort_profile(const std::filesystem::path& profile_json)
             ++ep;
         }
     }
-    std::ostringstream ops;
-    bool first = true;
-    for (const auto& [op, n] : cpu_op_hist) {
-        if (!first) ops << ", ";
-        ops << op << " x" << n;
-        first = false;
-    }
     st.measured = true;
     st.ep_nodes = ep;
     st.cpu_nodes = cpu;
-    st.cpu_ops = ops.str();
+    st.cpu_op_counts = cpu_op_hist;
+    st.cpu_ops = format_op_hist(cpu_op_hist);
     return st;
 }
 
