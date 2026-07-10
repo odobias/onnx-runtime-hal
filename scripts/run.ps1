@@ -21,6 +21,7 @@ param(
     [int]$Runs = 5,
     [int]$Threads = 0,
     [string]$Provider = "",
+    [ValidateSet("x64", "x64-ovep", "ARM64", "ARM64-ovep")][string]$Platform = "x64",
     [string]$Configuration = "Release",
     [string]$Results = "",
     [string]$Label = "",
@@ -47,7 +48,7 @@ if (-not $Model) {
 if (-not $Audio) { $Audio = Join-Path $root "models\audio\jfk.wav" }
 if (-not $Results) { $Results = Join-Path $root "results\benchmark-results.csv" }
 
-$exe = Join-Path $root "build\x64\$Configuration\WhisperNpuHal.App.exe"
+$exe = Join-Path $root "build\$Platform\$Configuration\WhisperNpuHal.App.exe"
 if (-not (Test-Path $exe)) { Write-Host "Not built: $exe  (run .\scripts\build.ps1 or bootstrap.ps1)" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Model)) { Write-Host "Model not found: $Model  (run .\scripts\get-model.ps1)" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Audio)) { Write-Host "Audio not found: $Audio  (run .\scripts\get-audio.ps1)" -ForegroundColor Red; exit 1 }
@@ -67,4 +68,14 @@ if (-not $NoResults) {
 }
 if ($Ref) { $extraArgs += @("--ref", $Ref) }
 
+# The ORT OpenVINO EP prints benign warnings to stderr (e.g. "some shape nodes were
+# assigned to CPU"). Under $ErrorActionPreference='Stop', a stderr line from a native
+# command surfaces as a terminating NativeCommandError and would abort before we ever
+# see the transcription/timing. The process exit code is the real success signal, so
+# relax error handling across the native call and gate on $LASTEXITCODE instead.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 & $exe $Model $Audio $Backend $Device $Runs @extraArgs
+$appExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($appExit -ne 0) { Write-Host "App exited with code $appExit ($exe)" -ForegroundColor Yellow; exit $appExit }

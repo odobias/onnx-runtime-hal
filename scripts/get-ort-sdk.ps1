@@ -39,7 +39,11 @@ $ProgressPreference = "SilentlyContinue"
 Invoke-WebRequest -Uri $uri -OutFile $nupkg
 
 $extract = Join-Path $tmp "x"
-Expand-Archive -Path $nupkg -DestinationPath $extract -Force
+# A .nupkg IS a zip, but Windows PowerShell 5.1's Expand-Archive rejects the extension
+# ("only .zip is supported"). Extract via .NET ZipFile so this works on both Windows
+# PowerShell 5.1 and PowerShell 7 regardless of the file extension.
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory($nupkg, $extract)
 
 # NuGet layout: build/native/include/*.h, runtimes/<rid>/native/{onnxruntime.dll,onnxruntime.lib,DirectML.dll}
 $incSrc = Join-Path $extract "build\native\include"
