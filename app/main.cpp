@@ -269,6 +269,50 @@ constexpr const char* kBenchmarkCsvHeader =
     "cold_start_seconds,hot_start_seconds,power_source,"
     "host_arch,host_os,runtime_version";
 
+// Classifier ledger schema (see append_classifier_csv). Kept as a named constant so
+// the writer and the additive migration below agree on column order.
+constexpr const char* kClassifierCsvHeader =
+    "timestamp_utc,model,requested_device,execution_provider,runtime,runtime_version,"
+    "host_arch,host_os,backend_name,runs,load_seconds,mean_infer_ms,median_infer_ms,p90_infer_ms,"
+    "model_size_mb,eval_samples,correct,accuracy,max_abs_p_diff,"
+    "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,power_source,eval_detail";
+
+// Additive, name-keyed CSV upgrade: rewrite `csv_path` under `new_header_line`,
+// mapping each existing row by column name (new columns become empty). Used to fold
+// the CPU-offload columns into a pre-existing classifier ledger without corrupting it.
+void migrate_named_csv_schema(const std::filesystem::path& csv_path,
+                              const std::string& new_header_line) {
+    std::ifstream in(csv_path);
+    if (!in) return;
+    std::string header;
+    std::getline(in, header);
+    if (!header.empty() && header.back() == '\r') header.pop_back();
+    if (header == new_header_line) return;  // already current
+
+    const std::vector<std::string> old_header = split_csv_row(header);
+    const std::vector<std::string> new_header = split_csv_row(new_header_line);
+    std::vector<std::vector<std::string>> rows;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty()) rows.push_back(split_csv_row(line));
+    }
+    in.close();
+
+    std::ofstream out(csv_path, std::ios::trunc);
+    if (!out) throw std::runtime_error("cannot upgrade classifier CSV schema: " + csv_path.string());
+    out << new_header_line << '\n';
+    for (const auto& row : rows) {
+        std::unordered_map<std::string, std::string> by_name;
+        for (size_t i = 0; i < old_header.size() && i < row.size(); ++i) by_name[old_header[i]] = row[i];
+        for (size_t i = 0; i < new_header.size(); ++i) {
+            if (i) out << ',';
+            const auto it = by_name.find(new_header[i]);
+            out << csv_escape(it == by_name.end() ? "" : it->second);
+        }
+        out << '\n';
+    }
+}
+
 void migrate_benchmark_csv_schema(const std::filesystem::path& csv_path) {
     namespace fs = std::filesystem;
     std::ifstream in(csv_path);
@@ -459,14 +503,11 @@ void append_classifier_csv(const std::string& path, const whisper_npu::classifie
     const fs::path csv_path(path);
     if (csv_path.has_parent_path()) fs::create_directories(csv_path.parent_path());
     const bool write_header = !fs::exists(csv_path) || fs::file_size(csv_path) == 0;
+    if (!write_header) migrate_named_csv_schema(csv_path, kClassifierCsvHeader);
     std::ofstream out(csv_path, std::ios::app);
     if (!out) throw std::runtime_error("cannot open classifier results CSV for append: " + path);
 
-    static const char* header =
-        "timestamp_utc,model,requested_device,execution_provider,runtime,runtime_version,"
-        "host_arch,host_os,backend_name,runs,load_seconds,mean_infer_ms,median_infer_ms,p90_infer_ms,"
-        "model_size_mb,eval_samples,correct,accuracy,max_abs_p_diff,power_source,eval_detail";
-    if (write_header) out << header << '\n';
+    if (write_header) out << kClassifierCsvHeader << '\n';
 
     // eval_detail packs per-sample results without CSV-hostile commas: samples
     // separated by ';', fields within a sample by '|' -> id|label|pred|p|expected_p.
@@ -479,6 +520,9 @@ void append_classifier_csv(const std::string& path, const whisper_npu::classifie
     }
 
     const double acc = r.eval_samples ? static_cast<double>(r.correct) / r.eval_samples : 0.0;
+    const double offload_pct = (r.offload_measured && (r.ep_nodes + r.cpu_nodes) > 0)
+                                   ? 100.0 * r.cpu_nodes / (r.ep_nodes + r.cpu_nodes)
+                                   : 0.0;
     out << csv_escape(utc_now_iso8601()) << ','
         << csv_escape(r.model) << ','
         << csv_escape(r.requested_device) << ','
@@ -498,6 +542,10 @@ void append_classifier_csv(const std::string& path, const whisper_npu::classifie
         << r.correct << ','
         << acc << ','
         << r.max_abs_p_diff << ','
+        << (r.offload_measured ? std::to_string(r.ep_nodes) : std::string()) << ','
+        << (r.offload_measured ? std::to_string(r.cpu_nodes) : std::string()) << ','
+        << opt_num(offload_pct, r.offload_measured, 4) << ','
+        << csv_escape(r.cpu_offload_ops) << ','
         << csv_escape(power_source()) << ','
         << csv_escape(detail.str()) << '\n';
 }
@@ -556,6 +604,13 @@ int run_classify(const std::string& dir, whisper_npu::Device device, const std::
         js << ",\"correct\":" << r.correct;
         js << ",\"accuracy_pct\":" << acc;
         js << ",\"max_abs_p_diff\":" << r.max_abs_p_diff;
+        if (r.offload_measured) {
+            const int total = r.ep_nodes + r.cpu_nodes;
+            js << ",\"ep_nodes\":" << r.ep_nodes;
+            js << ",\"cpu_nodes\":" << r.cpu_nodes;
+            js << ",\"cpu_offload_pct\":" << (total > 0 ? 100.0 * r.cpu_nodes / total : 0.0);
+            js << ",\"cpu_offload_ops\":\"" << json_escape(r.cpu_offload_ops) << "\"";
+        }
         js << ",\"samples\":[";
         for (size_t i = 0; i < r.samples.size(); ++i) {
             const auto& s = r.samples[i];
@@ -606,6 +661,18 @@ int run_classify(const std::string& dir, whisper_npu::Device device, const std::
     std::cout << std::setprecision(6);
     std::cout << "agreement  : max |p - cpu_ref_p| = " << r.max_abs_p_diff
               << (r.max_abs_p_diff < 1e-3 ? "  (matches CPU)" : "  (EP diverges from CPU!)") << "\n";
+    if (r.offload_measured) {
+        const int total = r.ep_nodes + r.cpu_nodes;
+        std::cout << "cpu offload: " << r.cpu_nodes << " / " << total << " nodes on the CPU EP";
+        if (r.cpu_nodes == 0) {
+            std::cout << "  (none -- fully on " << r.execution_provider << ")";
+        } else {
+            std::cout << std::setprecision(1) << "  ("
+                      << (total > 0 ? 100.0 * r.cpu_nodes / total : 0.0) << "%: " << r.cpu_offload_ops
+                      << ")";
+        }
+        std::cout << "\n";
+    }
     if (!results_csv.empty()) std::cout << "results csv: " << results_csv << "\n";
     return 0;
 }

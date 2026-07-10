@@ -145,3 +145,26 @@ experiment into the C++ HAL backend (`Backend::IntelOnnx`): which decode strateg
 actually compiles on the NPU, why `maxlen` isn't a latency lever, the mel-FFT win
 (~2× on NPU/GPU), and the GenAI-parity verdict. Read this first before revisiting
 NPU latency.
+
+## Classifier ledger (deepfake) + CPU-offload audit
+
+The deepfake classifiers (`tsc`, `fakeaudio`) have their own ledger,
+`results\deepfake-benchmark-cpp.csv` (one row per model x EP), because they carry a
+different metric set (accuracy + cross-EP probability agreement, not WER/RTF). Each
+row is written directly by the C++ harness (`--classify ... --results`).
+
+Every classifier run now **self-audits CPU offload** — did any op silently fall back
+to the ORT CPU EP when an accelerator was requested? The harness profiles the session
+and tallies the per-node provider assignment (deduped across iterations). Columns:
+
+- `ep_nodes` — distinct nodes that ran on the requested EP (the accelerator EPs fuse
+  their supported subgraph into a single node, so `ep_nodes=1` means "fully fused").
+- `cpu_nodes` — distinct nodes that fell back to `CPUExecutionProvider`.
+- `cpu_offload_pct` — `cpu_nodes / (ep_nodes + cpu_nodes) * 100`.
+- `cpu_offload_ops` — histogram of the fallback op types (e.g. `Gather x3, Cast x2`).
+
+Interpretation: on an accelerator run, `cpu_offload_pct = 0` (and `ep_nodes = 1`) is
+the goal. A CPU-device run reads `100%` by definition — that's the baseline, not a
+regression (check `requested_device`). Empty cells mean the audit couldn't run (e.g.
+profiling unavailable). Measured on Lunar Lake: both `tsc` and the `fakeaudio`
+backbone report `0%` offload on the NPU (fully fused).
