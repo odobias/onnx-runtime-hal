@@ -5,9 +5,12 @@ This answers the "UNVERIFIED on Intel OpenVINO" question left in
 export_fakeaudio_variants.py: unlike AMD's VAIML (where every variant diverged),
 Intel's NPU compiler runs the model correctly -- but only after TWO fixes:
 
-  1. Precision (AMD's toolkit): the log-mel front-end must stay fp32. Whole-graph
-     fp16 underflows the mel-energy MatMul (~2e-17, below fp16's 6.1e-5 floor)
-     -> Log(0) -> the detector flips a real clip to "fake". The NPU has no fp32
+  1. Precision (AMD's toolkit): the log-mel front-end must stay fp32. The
+     power_to_db clamps mel energy to amin=1e-10 (a -100 dB floor) before Log; in
+     fp16 that amin constant is below min-normal (6.1e-5), so the NPU raises the
+     log-mel silence floor from -100 dB to -42 dB. That 58 dB lift flips the one
+     confident-"real" clip (proven in verify_fakeaudio_fp16_underflow.py -- it's a
+     raised floor, NOT a Log(0)/-inf underflow). The NPU has no fp32
      (INFERENCE_PRECISION_HINT accepts only f16 / i8 -- bf16 is rejected), so the
      front-end runs on CPU and only the transformer backbone goes to the NPU.
 
