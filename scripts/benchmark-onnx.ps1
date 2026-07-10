@@ -17,9 +17,17 @@
 # those models are absent this script SKIPS the classifiers and still runs the full
 # HF-hosted Whisper matrix -- so a plain HF checkout benchmarks Whisper end to end.
 #
-#   .\scripts\benchmark-onnx.ps1                       # cpu, all three models
-#   .\scripts\benchmark-onnx.ps1 -Device gpu           # DirectML / OpenVINO GPU
-#   .\scripts\benchmark-onnx.ps1 -Device npu,cpu       # sweep several devices
+# EP default: the OpenVINO EP (ovep). The benchmark defaults -Provider to "openvino",
+# so every device maps to its OpenVINO target (cpu -> openvino:CPU, gpu -> openvino:GPU,
+# npu -> openvino:NPU) instead of plain ORT CPU / DirectML. To run the portable,
+# vendor-agnostic EP fallback chain instead (VitisAI / QNN / DirectML / OpenVINO / CPU
+# -- required on AMD/Qualcomm boxes), pass -Provider auto. Any explicit EP name is
+# honored verbatim (e.g. -Provider DmlExecutionProvider, -Provider VitisAIExecutionProvider).
+#
+#   .\scripts\benchmark-onnx.ps1                       # all three models on OpenVINO CPU
+#   .\scripts\benchmark-onnx.ps1 -Device npu           # OpenVINO NPU (Intel AI Boost)
+#   .\scripts\benchmark-onnx.ps1 -Device npu,cpu       # sweep several devices (OpenVINO)
+#   .\scripts\benchmark-onnx.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
 #   .\scripts\benchmark-onnx.ps1 -Only whisper         # just the ASR model
 #   .\scripts\benchmark-onnx.ps1 -RegenerateFixtures   # rebuild classifier fixtures first
 
@@ -30,7 +38,7 @@ param(
     [int]$Runs = 5,
     [int]$ClassifierRuns = 20,
     [string]$Configuration = "Release",
-    [string]$Provider = "",
+    [string]$Provider = "openvino",
     [string]$Audio = "",
     [string]$Results = "",
     [string]$ClassifierResults = "",
@@ -42,10 +50,33 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "benchmark.lib.ps1")
 Initialize-BenchmarkConsole
 
+# "auto" is the escape hatch back to the app's portable per-device EP fallback chain
+# (leave --provider off so ort_ep.hpp walks VitisAI/QNN/DirectML/OpenVINO/CPU).
+if ($Provider -eq "auto") { $Provider = "" }
+
 $root = Split-Path $PSScriptRoot -Parent
-$exe = Join-Path $root "build\x64\$Configuration\WhisperNpuHal.App.exe"
+
+# The OpenVINO EP lives in a SEPARATE build tree: -EnableOvep emits build\<plat>-ovep\
+# (carrying onnxruntime_providers_openvino.dll + the OpenVINO runtime), while a plain
+# ORT/DirectML build emits build\<plat>\. When OpenVINO is the (default) provider, target
+# the -ovep build; if it isn't there, fall back to the portable EP chain on the plain
+# build rather than failing every run -- and say how to produce the OVEP build.
+$platform = "x64"
+if ($Provider -like "openvino*") {
+    $ovepExe = Join-Path $root "build\x64-ovep\$Configuration\WhisperNpuHal.App.exe"
+    if (Test-Path $ovepExe) {
+        $platform = "x64-ovep"
+    }
+    else {
+        Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\x64-ovep\$Configuration." -ForegroundColor Yellow
+        Write-Host "  -> build it with:  pwsh -File scripts\setup-ovep.ps1 ; pwsh -File scripts\build.ps1 -EnableOvep" -ForegroundColor Yellow
+        Write-Host "  Falling back to the portable EP chain (-Provider auto) on the plain build." -ForegroundColor Yellow
+        $Provider = ""
+    }
+}
+$exe = Join-Path $root "build\$platform\$Configuration\WhisperNpuHal.App.exe"
 if (-not (Test-Path $exe)) {
-    Write-Host "Not built: $exe  (run .\scripts\build.ps1 -EnableOrt or bootstrap.ps1)" -ForegroundColor Red
+    Write-Host "Not built: $exe  (run .\scripts\build.ps1 -EnableOrt / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
     exit 1
 }
 
@@ -136,6 +167,7 @@ foreach ($dev in $Device) {
                 Model         = $v.Model
                 Audio         = $Audio
                 Configuration = $Configuration
+                Platform      = $platform
             }
             if ($Provider) { $runArgs.Provider = $Provider }
             if ($NoResults) { $runArgs.NoResults = $true }
