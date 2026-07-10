@@ -56,20 +56,32 @@ if ($Provider -eq "auto") { $Provider = "" }
 
 $root = Split-Path $PSScriptRoot -Parent
 
+# Target the HOST architecture's build tree by default: x64 boxes get build\x64\,
+# ARM64 (Snapdragon) boxes get build\ARM64\. Use OSArchitecture so this is correct
+# whether PowerShell runs native or x64-emulated on ARM64.
+$hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "ARM64" } else { "x64" }
+$platform = $hostArch
+
 # The OpenVINO EP lives in a SEPARATE build tree: -EnableOvep emits build\<plat>-ovep\
 # (carrying onnxruntime_providers_openvino.dll + the OpenVINO runtime), while a plain
-# ORT/DirectML build emits build\<plat>\. When OpenVINO is the (default) provider, target
-# the -ovep build; if it isn't there, fall back to the portable EP chain on the plain
-# build rather than failing every run -- and say how to produce the OVEP build.
-$platform = "x64"
+# ORT/DirectML/QNN build emits build\<plat>\. When OpenVINO is the (default) provider,
+# target the -ovep build; if it isn't there, fall back to the portable EP chain on the
+# plain build rather than failing every run -- and say how to produce the OVEP build.
+# Note: there is no OpenVINO EP build for ARM64, so on Snapdragon this always falls
+# through to the portable chain (which carries the QNN EP -> Hexagon NPU).
 if ($Provider -like "openvino*") {
-    $ovepExe = Join-Path $root "build\x64-ovep\$Configuration\WhisperNpuHal.App.exe"
+    $ovepExe = Join-Path $root "build\$hostArch-ovep\$Configuration\WhisperNpuHal.App.exe"
     if (Test-Path $ovepExe) {
-        $platform = "x64-ovep"
+        $platform = "$hostArch-ovep"
     }
     else {
-        Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\x64-ovep\$Configuration." -ForegroundColor Yellow
-        Write-Host "  -> build it with:  pwsh -File scripts\setup-ovep.ps1 ; pwsh -File scripts\build.ps1 -EnableOvep" -ForegroundColor Yellow
+        Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\$hostArch-ovep\$Configuration." -ForegroundColor Yellow
+        if ($hostArch -eq "ARM64") {
+            Write-Host "  (OpenVINO has no ARM64 EP build; the portable chain uses the QNN EP -> Hexagon NPU instead.)" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "  -> build it with:  pwsh -File scripts\setup-ovep.ps1 ; pwsh -File scripts\build.ps1 -EnableOvep" -ForegroundColor Yellow
+        }
         Write-Host "  Falling back to the portable EP chain (-Provider auto) on the plain build." -ForegroundColor Yellow
         $Provider = ""
     }
