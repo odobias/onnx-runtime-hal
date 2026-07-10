@@ -48,6 +48,13 @@ struct Result {
     int eval_samples = 0;   // samples that carry ground truth
     int correct = 0;
     double max_abs_p_diff = 0.0;  // max |p - expected_p| over all samples (cross-EP agreement)
+    // CPU-offload audit: does any op silently fall back to the CPU EP when an
+    // accelerator was requested? -1 = not measured (e.g. profiling unavailable).
+    // ep_nodes = distinct nodes on the requested EP; cpu_nodes = nodes on the CPU EP.
+    bool offload_measured = false;
+    int ep_nodes = -1;
+    int cpu_nodes = -1;
+    std::string cpu_offload_ops;  // fallback op histogram, e.g. "Gather x3, Cast x2"
     std::vector<SampleResult> samples;
 };
 
