@@ -23,6 +23,7 @@
 
 #ifdef WHISPER_HAL_ORT
 #include <onnxruntime_cxx_api.h>
+#include "backends/ort_common/ort_offload.hpp"
 #if defined(_WIN32) && __has_include(<dml_provider_factory.h>)
 #include <dml_provider_factory.h>
 #define WHISPER_HAL_CLS_HAS_DML 1
@@ -397,10 +398,16 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     std::unique_ptr<Ort::Session> session;
     std::string active_provider, last_err;
     const auto chain = fallback_chain(device, provider_override);
+    // Profile the session so we can audit CPU offload after the run. The accelerator
+    // EPs fuse their subgraph into one node, so profiling adds a sub-microsecond
+    // per-run cost on the interesting (NPU/GPU) paths -- well inside timing noise.
+    const fs::path prof_prefix = fs::temp_directory_path() / ("whal_ofl_" + res.model);
+    const std::wstring prof_prefix_w = prof_prefix.wstring();
     for (size_t i = 0; i < chain.size(); ++i) {
         try {
             Ort::SessionOptions so;
             so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+            so.EnableProfiling(prof_prefix_w.c_str());
             append_provider(env, so, chain[i], device, cpu_threads, cache_dir, vitis_config_file);
             const auto t0 = std::chrono::steady_clock::now();
             const std::wstring wpath = fx.onnx_path.wstring();
@@ -475,6 +482,23 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     res.mean_infer_ms = lat_ms.empty() ? 0.0 : mean / static_cast<double>(lat_ms.size());
     res.median_infer_ms = percentile(lat_ms, 50.0);
     res.p90_infer_ms = percentile(lat_ms, 90.0);
+
+    // CPU-offload audit: flush the profile trace and tally the per-node provider
+    // assignments (deduped across all runs). Best-effort -- never fail the benchmark.
+    try {
+        const std::string prof_path = session->EndProfilingAllocated(alloc).get();
+        const auto st = ort_common::parse_ort_profile(prof_path);
+        if (st.measured) {
+            res.offload_measured = true;
+            res.ep_nodes = st.ep_nodes;
+            res.cpu_nodes = st.cpu_nodes;
+            res.cpu_offload_ops = st.cpu_ops;
+        }
+        std::error_code ec;
+        fs::remove(prof_path, ec);
+    } catch (const std::exception&) {
+        // profiling unavailable / parse failed -> leave offload unmeasured (-1)
+    }
     return res;
 }
 
