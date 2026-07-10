@@ -30,6 +30,10 @@
 #   .\scripts\benchmark-onnx.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
 #   .\scripts\benchmark-onnx.ps1 -Only whisper         # just the ASR model
 #   .\scripts\benchmark-onnx.ps1 -RegenerateFixtures   # rebuild classifier fixtures first
+#
+# Startup policy: every model/device gets a dedicated cache that is deleted before
+# the run. The C++ harness then creates the session twice against that cache:
+# cold = compile from an empty cache; hot = reload the artifact cold just produced.
 
 [CmdletBinding()]
 param(
@@ -110,6 +114,21 @@ $whisperVariants = @(
 $fixRoot = Join-Path $root "models\deepfake\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
+# Keep benchmark caches isolated by binary platform + provider + model + device.
+# This avoids cross-EP blob contamination and makes deletion safe and targeted.
+$providerTag = if ($Provider) { $Provider } else { "auto" }
+$providerTag = $providerTag -replace '[^A-Za-z0-9_.-]', '_'
+$benchmarkCacheRoot = Join-Path $root "build\cache\benchmark-onnx\$platform\$providerTag"
+
+function New-ColdBenchmarkCache {
+    param([string]$ModelTag, [string]$DeviceTag)
+    $path = Join-Path $benchmarkCacheRoot "$ModelTag\$DeviceTag"
+    if (Test-Path $path) { Remove-Item $path -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $path | Out-Null
+    Write-Host "cache      : reset -> $path" -ForegroundColor DarkGray
+    return $path
+}
+
 # --- best-effort whisper reference (WER) from the eval manifest --------------
 function Get-EvalRef {
     param([string]$AudioPath)
@@ -172,6 +191,7 @@ foreach ($dev in $Device) {
                 continue
             }
             Write-Host "`n--- Whisper tiny.en ($($v.Label), ASR) ---" -ForegroundColor Cyan
+            $cacheDir = New-ColdBenchmarkCache -ModelTag "whisper-$($v.Label)" -DeviceTag $dev
             $runArgs = @{
                 Backend       = $v.Backend
                 Device        = $dev
@@ -180,6 +200,7 @@ foreach ($dev in $Device) {
                 Audio         = $Audio
                 Configuration = $Configuration
                 Platform      = $platform
+                CacheDir      = $cacheDir
             }
             if ($Provider) { $runArgs.Provider = $Provider }
             if ($NoResults) { $runArgs.NoResults = $true }
@@ -199,7 +220,9 @@ foreach ($dev in $Device) {
             continue
         }
         Write-Host "`n--- $m (classifier) ---" -ForegroundColor Cyan
+        $cacheDir = New-ColdBenchmarkCache -ModelTag "classifier-$m" -DeviceTag $dev
         $clsArgs = @("--classify", $fix, $dev, "$ClassifierRuns")
+        $clsArgs += @("--cache", $cacheDir)
         if ($Provider) { $clsArgs += @("--provider", $Provider) }
         if (-not $NoResults) { $clsArgs += @("--results", $ClassifierResults) }
         & $exe @clsArgs

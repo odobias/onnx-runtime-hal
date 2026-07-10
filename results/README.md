@@ -157,6 +157,12 @@ Every classifier run now **self-audits CPU offload** — did any op silently fal
 to the ORT CPU EP when an accelerator was requested? The harness profiles the session
 and tallies the per-node provider assignment (deduped across iterations). Columns:
 
+- `cache_dir` — the model/device-specific cache used for both session creations.
+- `cold_load_seconds` — first session creation after `benchmark-onnx.ps1` deletes
+  that cache (a real device compile).
+- `hot_load_seconds` — second session creation from the artifact cold produced.
+- `load_seconds` — compatibility alias for `cold_load_seconds`; use the explicit
+  cold/hot columns for new analysis.
 - `ep_nodes` — distinct nodes that ran on the requested EP (the accelerator EPs fuse
   their supported subgraph into a single node, so `ep_nodes=1` means "fully fused").
 - `cpu_nodes` — distinct nodes that fell back to `CPUExecutionProvider`.

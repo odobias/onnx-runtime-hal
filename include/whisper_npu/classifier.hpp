@@ -39,7 +39,12 @@ struct Result {
     std::string runtime_version;    // Ort::GetVersionString()
     std::string host_arch;          // x64 / arm64 / ...
     std::string host_os;
-    double load_seconds = 0.0;
+    std::string cache_dir;
+    // Session creation measured twice against the same cache. The benchmark runner
+    // deletes that cache before the call, so cold is a real compile and hot is a
+    // reload from the artifact produced by cold.
+    double cold_load_seconds = 0.0;
+    double hot_load_seconds = 0.0;
     double mean_infer_ms = 0.0;
     double median_infer_ms = 0.0;
     double p90_infer_ms = 0.0;

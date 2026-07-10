@@ -202,6 +202,13 @@ its dynamic shapes are rejected by the NPU compilers, so it is skipped on NPU by
 rather than silently demoted to CPU). ASR rows append to `results\benchmark-results.csv`;
 classifier rows to `results\deepfake-benchmark-cpp.csv`.
 
+Every model/device pair gets an isolated cache which the runner deletes immediately
+before measurement. The C++ harness creates the model twice: **cold** compiles from
+that empty cache, while **hot** reloads the artifact cold just produced. This policy
+is identical for Whisper, TSC, and FakeAudio; classifier rows expose
+`cold_load_seconds` and `hot_load_seconds` alongside the legacy `load_seconds`
+(an alias of cold for compatibility).
+
 **The benchmark depends only on this HF repo — no Avast internal repository is involved.**
 Everything the C++ benchmark consumes comes from the private HF snapshot above:
 `get-models.ps1` pulls the Whisper ONNX packages, eval set, and sample audio, and

@@ -383,6 +383,7 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     res.runtime_version = Ort::GetVersionString();
     res.runs = std::max(1, runs);
     res.model_size_mb = file_size_mb(fx.onnx_path);
+    res.cache_dir = cache_dir;
 
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "whisper_hal_classifier");
 
@@ -398,21 +399,65 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     std::unique_ptr<Ort::Session> session;
     std::string active_provider, last_err;
     const auto chain = fallback_chain(device, provider_override);
-    // Profile the session so we can audit CPU offload after the run. The accelerator
-    // EPs fuse their subgraph into one node, so profiling adds a sub-microsecond
-    // per-run cost on the interesting (NPU/GPU) paths -- well inside timing noise.
+    // Only the hot session is profiled: it is the one that executes inference and
+    // therefore owns the provider-assignment events used by the CPU-offload audit.
     const fs::path prof_prefix = fs::temp_directory_path() / ("whal_ofl_" + res.model);
     const std::wstring prof_prefix_w = prof_prefix.wstring();
-    for (size_t i = 0; i < chain.size(); ++i) {
-        try {
+
+    // QNN needs ORT's EPContext mechanism in addition to the generic EP options:
+    // cold session creation compiles the HTP graph and writes an embedded context
+    // model; hot session creation loads that context model and skips recompilation.
+    // OpenVINO and VitisAI consume cache_dir directly in append_provider().
+    const auto build_session = [&](const std::string& provider, bool enable_profile) {
+        fs::path qnn_ctx;
+        if (lower(provider).find("qnn") != std::string::npos && !cache_dir.empty()) {
+            qnn_ctx = fs::path(cache_dir) / (res.model + "_qnn_ctx.onnx");
+        }
+
+        const auto make_options = [&](bool generate_qnn_ctx) {
             Ort::SessionOptions so;
             so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-            so.EnableProfiling(prof_prefix_w.c_str());
-            append_provider(env, so, chain[i], device, cpu_threads, cache_dir, vitis_config_file);
+            if (enable_profile) so.EnableProfiling(prof_prefix_w.c_str());
+            append_provider(env, so, provider, device, cpu_threads, cache_dir, vitis_config_file);
+            if (generate_qnn_ctx) {
+                const std::string p = qnn_ctx.string();
+                so.AddConfigEntry("ep.context_enable", "1");
+                so.AddConfigEntry("ep.context_file_path", p.c_str());
+                so.AddConfigEntry("ep.context_embed_mode", "1");
+            }
+            return so;
+        };
+
+        if (!qnn_ctx.empty() && fs::exists(qnn_ctx)) {
+            try {
+                auto so = make_options(false);
+                const std::wstring wctx = qnn_ctx.wstring();
+                return std::make_unique<Ort::Session>(env, wctx.c_str(), so);
+            } catch (const std::exception& e) {
+                std::cerr << "[classifier] QNN context cache '" << qnn_ctx.string()
+                          << "' unusable (" << e.what() << "); recompiling\n";
+                std::error_code ec;
+                fs::remove(qnn_ctx, ec);
+            }
+        }
+
+        if (!qnn_ctx.empty()) {
+            std::error_code ec;
+            fs::create_directories(qnn_ctx.parent_path(), ec);
+        }
+        auto so = make_options(!qnn_ctx.empty());
+        const std::wstring wpath = fx.onnx_path.wstring();
+        return std::make_unique<Ort::Session>(env, wpath.c_str(), so);
+    };
+
+    // Cold creation selects the first EP that can build the model. benchmark-onnx
+    // removes cache_dir before calling us, making this a genuine compile.
+    for (size_t i = 0; i < chain.size(); ++i) {
+        try {
             const auto t0 = std::chrono::steady_clock::now();
-            const std::wstring wpath = fx.onnx_path.wstring();
-            session = std::make_unique<Ort::Session>(env, wpath.c_str(), so);
-            res.load_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+            session = build_session(chain[i], false);
+            res.cold_load_seconds =
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             active_provider = chain[i];
             break;
         } catch (const std::exception& e) {
@@ -427,6 +472,17 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     if (!session) {
         throw std::runtime_error("no ONNX Runtime EP could build a classifier session (last error: " +
                                  last_err + ")");
+    }
+
+    // Destroy the cold session, then recreate the same selected EP from its newly
+    // populated cache. Do not run the fallback chain again: changing EPs would make
+    // the cold/hot pair incomparable.
+    session.reset();
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        session = build_session(active_provider, true);
+        res.hot_load_seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     }
 
     res.execution_provider = active_provider;
