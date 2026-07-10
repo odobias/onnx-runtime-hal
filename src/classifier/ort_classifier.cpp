@@ -269,7 +269,8 @@ Ort::ConstEpDevice find_qnn_device(Ort::Env& env) {
 #endif
 
 void append_provider(Ort::Env& env, Ort::SessionOptions& so, const std::string& provider,
-                     Device device, int cpu_threads, const std::string& cache_dir) {
+                     Device device, int cpu_threads, const std::string& cache_dir,
+                     const std::string& vitis_config_file) {
     const std::string p = lower(provider);
 
     if (p.rfind("openvino", 0) == 0) {
@@ -297,6 +298,14 @@ void append_provider(Ort::Env& env, Ort::SessionOptions& so, const std::string& 
     if (p == "vitisai" || p == "vitisaiexecutionprovider") {
         std::unordered_map<std::string, std::string> vitis_opts;
         if (!cache_dir.empty()) { vitis_opts["cache_dir"] = cache_dir; vitis_opts["cache_key"] = "classifier"; }
+        // A vitisai_config.json (next to the fixture or the model) lets us hand VAIML
+        // accuracy knobs -- e.g. accurate-mode LayerNorm, float partial sums, disabling
+        // BFP16 matmul emulation -- instead of its lossy fast defaults. Without it the
+        // HTSAT backbone runs as 544 BFP16 Gemms w/ bf16 accumulation and diverges.
+        if (!vitis_config_file.empty()) {
+            vitis_opts["config_file"] = vitis_config_file;
+            std::cerr << "[classifier] VitisAI config_file=" << vitis_config_file << "\n";
+        }
         so.AppendExecutionProvider_VitisAI(vitis_opts);
         return;
     }
@@ -376,6 +385,15 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
 
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "whisper_hal_classifier");
 
+    // Optional VitisAI compile config: prefer one next to the fixture, else next to
+    // the model. Lets us pass VAIML accuracy knobs without any CLI change.
+    std::string vitis_config_file;
+    for (const auto& cand : {dir / "vitisai_config.json",
+                             fx.onnx_path.parent_path() / "vitisai_config.json"}) {
+        std::error_code ec;
+        if (fs::exists(cand, ec)) { vitis_config_file = cand.string(); break; }
+    }
+
     std::unique_ptr<Ort::Session> session;
     std::string active_provider, last_err;
     const auto chain = fallback_chain(device, provider_override);
@@ -383,7 +401,7 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         try {
             Ort::SessionOptions so;
             so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-            append_provider(env, so, chain[i], device, cpu_threads, cache_dir);
+            append_provider(env, so, chain[i], device, cpu_threads, cache_dir, vitis_config_file);
             const auto t0 = std::chrono::steady_clock::now();
             const std::wstring wpath = fx.onnx_path.wstring();
             session = std::make_unique<Ort::Session>(env, wpath.c_str(), so);
