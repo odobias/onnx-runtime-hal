@@ -26,6 +26,7 @@ param(
     [string]$Results = "",
     [string]$Label = "",
     [string]$Ref = "",
+    [string]$CacheDir = "",
     [switch]$NoCache,
     [switch]$NoResults
 )
@@ -57,8 +58,10 @@ $extraArgs = @()
 if (-not $NoCache) {
     # Scoped by backend AND device: Intel/AMD (and NPU/GPU/CPU within each) compile
     # to incompatible blobs, so a shared cache dir would silently cross-contaminate.
-    $cacheDir = Join-Path $root "build\cache\$Backend\$Device"
-    $extraArgs += @("--cache", $cacheDir)
+    # Benchmark orchestrators may provide a more specific cache path and clear it
+    # before this call to guarantee a real cold -> hot measurement pair.
+    if (-not $CacheDir) { $CacheDir = Join-Path $root "build\cache\$Backend\$Device" }
+    $extraArgs += @("--cache", $CacheDir)
 }
 if ($Threads -gt 0) { $extraArgs += @("--threads", "$Threads") }
 if ($Provider) { $extraArgs += @("--provider", $Provider) }

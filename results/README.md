@@ -36,9 +36,15 @@ Successful rows include:
 `provider_attempts` is JSON stored inside the CSV field. It preserves each
 provider tried, whether it succeeded, and the provider-specific error.
 
-CPU offload is based on distinct ORT profiler nodes, not compute share. It is
-evidence that operations executed on CPU, but it must not be interpreted as a
-percentage of runtime spent on CPU.
+CPU offload is based on distinct ORT profiler nodes, not compute share. One
+accelerator event may represent hundreds of fused ONNX operations while cheap
+shape/control operations remain individual CPU nodes.
+
+Classifier startup is measured twice against a dedicated cache:
+
+- `cold_load_seconds`: first session creation after the suite clears the cache.
+- `hot_load_seconds`: second session creation from the artifact cold produced.
+- `load_seconds`: compatibility alias for the cold value.
 
 ## Schema authority
 
@@ -56,3 +62,5 @@ research reports. They are useful evidence, but they are not substitutes for the
 portable suite ledger and may describe older model exports or runtime versions.
 
 Quantization sweeps under `benchmark/research/` are explicitly research-only.
+Neutral ONNX portability findings remain in `onnx-portability.md` and
+`cpp-onnx-npu-findings.md`.

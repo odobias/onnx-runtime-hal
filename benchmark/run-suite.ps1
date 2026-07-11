@@ -30,6 +30,10 @@
 #   .\benchmark\run-suite.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
 #   .\benchmark\run-suite.ps1 -Only whisper         # just the ASR model
 #   .\benchmark\run-suite.ps1 -RegenerateFixtures   # rebuild classifier fixtures first
+#
+# Startup policy: every model/device gets a dedicated cache that is deleted before
+# the run. The C++ harness then creates the session twice against that cache:
+# cold = compile from an empty cache; hot = reload the artifact cold just produced.
 
 [CmdletBinding()]
 param(
@@ -109,6 +113,21 @@ $workloads = @((Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).wo
 $fixRoot = Join-Path $root "workloads\classifiers\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
+# Keep benchmark caches isolated by binary platform + provider + model + device.
+# This avoids cross-EP blob contamination and makes deletion safe and targeted.
+$providerTag = if ($Provider) { $Provider } else { "auto" }
+$providerTag = $providerTag -replace '[^A-Za-z0-9_.-]', '_'
+$benchmarkCacheRoot = Join-Path $root "build\cache\benchmark-onnx\$platform\$providerTag"
+
+function New-ColdBenchmarkCache {
+    param([string]$ModelTag, [string]$DeviceTag)
+    $path = Join-Path $benchmarkCacheRoot "$ModelTag\$DeviceTag"
+    if (Test-Path $path) { Remove-Item $path -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $path | Out-Null
+    Write-Host "cache      : reset -> $path" -ForegroundColor DarkGray
+    return $path
+}
+
 # --- best-effort whisper reference (WER) from the eval manifest --------------
 function Get-EvalRef {
     param([string]$AudioPath)
@@ -185,15 +204,18 @@ function Invoke-NativeBenchmark {
     }
 
     $args = @()
+    $cache = Join-Path $root "build\cache\$($Workload.id)\$RequestedDevice"
+    if (Test-Path $cache) { Remove-Item -LiteralPath $cache -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $cache | Out-Null
     if ($Workload.kind -eq "asr") {
         $args += @("run", "whisper", $path, $Audio, [string]$Workload.backend, $RequestedDevice, "$Runs")
-        $cache = Join-Path $root "build\cache\$($Workload.id)\$RequestedDevice"
         $args += @("--cache", $cache, "--json")
         $ref = Get-EvalRef -AudioPath $Audio
         if ($ref) { $args += @("--ref", $ref) }
         if (-not $NoResults) { $args += @("--results", $Results, "--label", [string]$Workload.id) }
     } else {
         $args += @("run", [string]$Workload.id, $path, $RequestedDevice, "$ClassifierRuns", "--json")
+        $args += @("--cache", $cache)
         if (-not $NoResults) { $args += @("--results", $ClassifierResults) }
     }
     if ($Provider) { $args += @("--provider", $Provider) }

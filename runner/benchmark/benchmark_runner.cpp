@@ -316,7 +316,8 @@ constexpr const char* kBenchmarkCsvHeader =
 // the writer and the additive migration below agree on column order.
 constexpr const char* kClassifierCsvHeader =
     "timestamp_utc,model,requested_device,execution_provider,runtime,runtime_version,"
-    "host_arch,host_os,backend_name,runs,load_seconds,mean_infer_ms,median_infer_ms,p90_infer_ms,"
+    "host_arch,host_os,backend_name,runs,cache_dir,load_seconds,cold_load_seconds,hot_load_seconds,"
+    "mean_infer_ms,median_infer_ms,p90_infer_ms,"
     "model_size_mb,eval_samples,correct,accuracy,max_abs_p_diff,"
     "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,power_source,eval_detail,"
     "status,requested_provider,resolved_provider,fallback_occurred,provider_attempts,error";
@@ -351,7 +352,14 @@ void migrate_named_csv_schema(const std::filesystem::path& csv_path,
         for (size_t i = 0; i < new_header.size(); ++i) {
             if (i) out << ',';
             const auto it = by_name.find(new_header[i]);
-            out << csv_escape(it == by_name.end() ? "" : it->second);
+            // Preserve the historical single classifier load as the cold value
+            // when upgrading older ledgers; hot remains unknown for those rows.
+            if (it == by_name.end() && new_header[i] == "cold_load_seconds") {
+                const auto legacy = by_name.find("load_seconds");
+                out << csv_escape(legacy == by_name.end() ? "" : legacy->second);
+            } else {
+                out << csv_escape(it == by_name.end() ? "" : it->second);
+            }
         }
         out << '\n';
     }
@@ -590,7 +598,10 @@ void append_classifier_csv(const std::string& path, const npu_inference_bench::c
         << csv_escape(r.host_os) << ','
         << csv_escape(r.backend_name) << ','
         << r.runs << ','
-        << std::setprecision(6) << r.load_seconds << ','
+        << csv_escape(r.cache_dir) << ','
+        << std::setprecision(6) << r.cold_load_seconds << ','  // legacy load_seconds alias
+        << r.cold_load_seconds << ','
+        << r.hot_load_seconds << ','
         << r.mean_infer_ms << ','
         << r.median_infer_ms << ','
         << r.p90_infer_ms << ','
@@ -657,7 +668,10 @@ int run_classify(const std::string& dir, npu_inference_bench::Device device, con
         js << ",\"host_arch\":\"" << json_escape(r.host_arch) << "\"";
         js << ",\"host_os\":\"" << json_escape(r.host_os) << "\"";
         js << ",\"power_source\":\"" << json_escape(power_source()) << "\"";
-        js << ",\"load_seconds\":" << r.load_seconds;
+        js << ",\"cache_dir\":\"" << json_escape(r.cache_dir) << "\"";
+        js << ",\"load_seconds\":" << r.cold_load_seconds;  // legacy alias
+        js << ",\"cold_load_seconds\":" << r.cold_load_seconds;
+        js << ",\"hot_load_seconds\":" << r.hot_load_seconds;
         js << ",\"model_size_mb\":" << r.model_size_mb;
         js << ",\"runs\":" << r.runs;
         js << ",\"mean_infer_ms\":" << r.mean_infer_ms;
@@ -696,8 +710,14 @@ int run_classify(const std::string& dir, npu_inference_bench::Device device, con
     std::cout << "host       : " << r.host_arch << " / " << r.host_os << "\n";
     std::cout << "power      : " << power_source() << "\n";
     std::cout << std::setprecision(3);
-    std::cout << "load       : " << r.load_seconds << " s";
+    std::cout << "load cold  : " << r.cold_load_seconds << " s";
     if (r.model_size_mb >= 0) std::cout << "   (model " << std::setprecision(1) << r.model_size_mb << " MB)";
+    std::cout << std::setprecision(3) << "\n";
+    std::cout << "load hot   : " << r.hot_load_seconds << " s";
+    if (r.cold_load_seconds > 0.0 && r.hot_load_seconds > 0.0) {
+        std::cout << "   (" << std::setprecision(1)
+                  << (r.cold_load_seconds / r.hot_load_seconds) << "x faster)";
+    }
     std::cout << std::setprecision(3) << "\n";
     std::cout << std::setprecision(2);
     std::cout << "infer      : mean " << r.mean_infer_ms << " ms (median " << r.median_infer_ms
