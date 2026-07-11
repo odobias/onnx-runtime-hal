@@ -1,14 +1,14 @@
-# fakeaudio on the Intel NPU (OpenVINO)
+﻿# fakeaudio on the Intel NPU (OpenVINO)
 
 Answers the "UNVERIFIED on Intel OpenVINO" note in
-`scripts/experiments/export_fakeaudio_variants.py`. On AMD's VAIML every fakeaudio
+`tools/research/export_fakeaudio_variants.py`. On AMD's VAIML every fakeaudio
 variant diverged (~0.99) and the model was declared CPU/GPU-only. **On Intel it is
 different: the model runs correctly on the NPU** — but only after two independent
 fixes, one from AMD's precision toolkit and one compile fix in this repo.
 
 Host: Intel Core Ultra (Lunar Lake), NPU driver 10.0.26100.x, OpenVINO 2026.2.1,
 `onnxruntime-openvino` 1.24.1 / OpenVINO 2025.4.1 for the ORT path. On AC power.
-Reproduce: `.venv\Scripts\python.exe scripts\experiments\fakeaudio_npu_intel.py --bf16 --full-npu`
+Reproduce: `.venv\Scripts\python.exe tools\research\fakeaudio_npu_intel.py --bf16 --full-npu`
 (after `export_fakeaudio_variants.py`).
 
 ## TL;DR
@@ -65,7 +65,7 @@ ms) but mispredicts, because the fp32-hungry front-end is forced to fp16.
 
 ## Verification (measured, not inferred)
 
-`scripts/experiments/verify_fakeaudio_fp16_underflow.py` instruments the actual
+`tools/research/verify_fakeaudio_fp16_underflow.py` instruments the actual
 tensors on real labeled audio. Findings:
 
 - **The clamp constant underflows, the tensors don't hit −inf.** `amin = 1e-10`

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- Shared C++ settings + output layout for all projects. -->
 <Project>
   <PropertyGroup>
@@ -7,8 +7,8 @@
          its own "<platform>-ovep" tree (exe + colocated runtime + obj). -->
     <PlatformOutTag Condition="'$(EnableOvep)'=='true'">$(Platform)-ovep</PlatformOutTag>
     <PlatformOutTag Condition="'$(PlatformOutTag)'==''">$(Platform)</PlatformOutTag>
-    <OutDir>$(WhisperHalRoot)build\$(PlatformOutTag)\$(Configuration)\</OutDir>
-    <IntDir>$(WhisperHalRoot)build\obj\$(MSBuildProjectName)\$(PlatformOutTag)\$(Configuration)\</IntDir>
+    <OutDir>$(NpuInferenceBenchRoot)build\$(PlatformOutTag)\$(Configuration)\</OutDir>
+    <IntDir>$(NpuInferenceBenchRoot)build\obj\$(MSBuildProjectName)\$(PlatformOutTag)\$(Configuration)\</IntDir>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
@@ -17,7 +17,7 @@
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(WhisperHalRoot)include;$(WhisperHalRoot)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(NpuInferenceBenchRoot)runner\include;$(NpuInferenceBenchRoot)runner\runtime;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>

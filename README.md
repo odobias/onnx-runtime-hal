@@ -1,471 +1,221 @@
-# whisper-npu-hal
+﻿# NPU Inference Benchmark
 
-A C++ **hardware-abstraction layer** for running `whisper-tiny(.en)` speech-to-text on
-different vendor NPUs behind one stable API. Proof-of-concept for a
-hardware-independent runner with swappable per-platform backends.
+`npu-inference-bench` is a Windows C++ benchmark suite for finding out what
+actually happens when ONNX inference is requested on a CPU, GPU, or NPU.
 
-## Build once, self-select everywhere
+It benchmarks three production-shaped workloads:
 
-The headline path is the **unified ONNX Runtime backend** (`src/backends/ort_static`): a
-single C++ source that runs the one portable `whisper/en-static-onnx` model and
-**self-selects its execution provider at runtime**. Every vendor EP is compiled into the
-same binary — their `Append*` calls resolve through the ORT API table at runtime, so they
-cost nothing until tried and fail gracefully on the wrong host. The constructor walks a
-fallback chain and keeps the first EP that actually builds a session:
+- **Whisper tiny.en** automatic speech recognition, including a fixed-shape
+  NPU-compatible export and a dynamic KV-cache CPU/GPU export.
+- **TSC**, a text scam classifier.
+- **FakeAudio / GAD**, a generated-audio detector.
 
-```
-NPU request:  QNN (Qualcomm) -> VitisAI (AMD) -> OpenVINO NPU (Intel) -> DirectML -> CPU
-GPU request:  DirectML (any DX12 GPU) -> OpenVINO GPU -> CPU
-CPU request:  CPU
-```
+Latency and accuracy are only half the result. The runner also records execution
+provider selection, failed provider attempts, fallback, runtime versions, and
+CPU offload. An NPU request that silently executes on the CPU is therefore
+reported as an executor problem instead of being celebrated as an NPU result.
 
-So one build **per ISA** covers every vendor on that ISA, and `device auto` picks the best
-available accelerator with no per-vendor code path:
+This is a benchmark and runtime-diagnostics project. The old Whisper HAL is now
+an internal workload adapter rather than the product architecture.
 
-| Binary | ISA | EPs compiled in | Validated |
-|---|---|---|---|
-| ARM64 | `build/ARM64` | CPU + QNN NPU (DirectML dormant — see caveat) | **Yes, on Snapdragon X Elite** |
-| x64   | `build/x64`, `build/x64-ovep` | CPU + DirectML + VitisAI NPU + OpenVINO NPU/GPU | AMD VitisAI + CPU validated; Intel OVEP code-complete |
-
-The **only** per-host variable is the runtime DLL pack colocated with the exe — and that is
-unavoidable: each vendor ships its own ONNX Runtime build (QNN plugin against ORT 1.27,
-Intel `onnxruntime-openvino` 1.24.1, AMD's Ryzen AI ORT) at **different, mutually
-incompatible ORT versions**, so a literally-single fat binary across all vendors is not
-possible today. `bootstrap.ps1`/`setup-*.ps1` stage the correct pack per host; the C++ is
-built from one source and one command per ISA.
-
-Per-vendor backends still exist for their native paths: **Intel** OpenVINO GenAI (for the
-OpenVINO-IR precision variants) and **AMD** Ryzen AI. The unified `onnx-static` backend is
-the cross-vendor "one model everywhere" path.
-
-Build system: **MSBuild / Visual Studio 2026** (`WhisperNpuHal.sln`).
-`PlatformToolset=$(DefaultPlatformToolset)`, so it also builds on older VS if needed.
-
-## Design
-
-```
-include/whisper_npu/whisper_engine.hpp   Public API: IWhisperEngine, Backend, factory
-include/whisper_npu/audio.hpp            Dependency-free 16 kHz mono WAV loader
-src/factory.cpp                          create_engine() + backend availability; routes
-                                         auto/QNN through the unified ort_static backend
-src/backends/ort_static/                 Unified static-ONNX backend: runtime EP self-select
-                                         (QNN/VitisAI/OpenVINO/DirectML/CPU) + fallback chain
-src/backends/intel/                      OpenVINO GenAI backend (OV-IR precision variants)
-src/backends/amd/                        Ryzen AI / VitisAI native backend
-src/backends/qualcomm/                   Legacy standalone QNN backend (superseded on ARM64
-                                         by ort_static; kept for x64-emulated fallback)
-include/whisper_npu/metrics.hpp          Backend-neutral WER/CER + text normalization
-app/main.cpp                             CLI runner: cold/hot start, inference bench,
-                                         confidence, WER/CER, --json for the harness
-msbuild/*.props                          Shared + per-backend build settings
-projects/*/*.vcxproj, WhisperNpuHal.sln  MSBuild projects (Core static lib + App exe)
-scripts/                                 setup / build / run / export / benchmark helpers
-scripts/benchmark-onnx.ps1               DEFAULT benchmark: portable ONNX models via the C++ app
-scripts/benchmark-quant.ps1              quantization research sweep (OV-IR precision variants)
-scripts/compare-devices.ps1              NPU vs GPU vs CPU comparison for one variant
-```
-
-The application depends only on `whisper_npu/whisper_engine.hpp`. Backends are selected
-at runtime via `create_engine(Backend, EngineOptions)`; `Backend::Auto` prefers the
-unified `ort_static` backend and lets it self-select the EP. Which backends compile in
-depends on the toggles `EnableOrt` / `EnableOvep` / `EnableAmd` / `EnableQualcomm` /
-`EnableIntel`. Backends not compiled with their SDK still link (as throwing stubs) so the
-repo always builds.
-
-## Model caching (the fast-load story)
-
-The first NPU load compiles the model to a device blob (slow, ~seconds). Set a cache
-directory (`EngineOptions::cache_dir`, CLI `--cache <dir>`) and OpenVINO persists that
-blob, so subsequent **hot** starts import it and are near-instant. The CLI loads the
-engine twice (cold then hot) and prints both times plus the speedup. AMD/VitisAI uses
-the ORT provider cache when available; Qualcomm has matching QNN context-binary hooks
-for when the real backend lands.
-
-## Build & run (PowerShell 7)
-
-The repo is **self-installing** — a fresh clone pulls everything it needs (toolchain,
-SDK, model, audio); none of it is committed.
+## Run the portable suite
 
 ```powershell
-git clone https://github.com/odobias/whisper-npu-hal
-cd whisper-npu-hal
-.\scripts\bootstrap.ps1       # auto-detects platform, installs its toolchain + model + audio, then builds
-.\scripts\run.ps1             # NPU, exported model, cold/hot cache demo
+.\tools\build\bootstrap.ps1
+.\benchmark\run-suite.ps1
 ```
 
-`bootstrap.ps1` **detects the platform** (NPU/CPU vendor) and bootstraps *that platform's*
-toolchain; override with `-Platform intel|amd|qualcomm`. It runs these steps (also usable
-individually):
-
-| Script | Platform | Fetches / does | Output (gitignored) |
-|---|---|---|---|
-| `setup-intel.ps1` | intel | OpenVINO GenAI C++ SDK (download or link) | `third_party/` |
-| `setup-amd.ps1` | amd | Ryzen AI SDK + NPU driver (vendor installers, elevated) | `C:\Program Files\RyzenAI\...`, conda env |
-| `setup-qualcomm.ps1` | qualcomm | ONNX Runtime + Plugin QNN EP (pip + NuGet headers) | `third_party/onnxruntime`, `third_party/qnn-ep` |
-| `get-model.ps1` | intel | export `whisper-tiny.en` to OpenVINO IR (Python venv + optimum-cli) | `models/whisper/en-ov/` |
-| `get-amd-model.ps1` | amd | download AMD ONNX Tiny + OpenAI tokenizer/config sidecars | `models/whisper/amd/` |
-| `get-audio.ps1` | all | public-domain 16 kHz sample | `models/audio/jfk.wav` |
-| `build.ps1` | all | MSBuild Release\|x64 (prefers VS 2026), right backend enabled | `build/` |
-
-If VS Build Tools is installed for the first time, reboot and re-run `bootstrap.ps1`.
-
-> **AMD note:** the Ryzen AI SDK and NPU driver ship no silent installer and need
-> elevation, so `setup-amd.ps1` downloads them, launches the vendor installers
-> (approve UAC + the wizard, keeping defaults), and polls for completion. Re-running
-> after success is a fast no-op. Pin versions/URLs via its params if AMD moves them.
-
-Run directly if you prefer:
+Useful variants:
 
 ```powershell
-.\build\x64\Release\WhisperNpuHal.App.exe <model_dir> <audio.wav> intel npu 5 --cache .\build\cache\npu
+# Portable provider chain for the current machine.
+.\benchmark\run-suite.ps1 -Provider auto
+
+# Try all portable workloads on NPU, GPU, and CPU.
+.\benchmark\run-suite.ps1 -Device npu,gpu,cpu -Provider auto
+
+# Limit the suite.
+.\benchmark\run-suite.ps1 -Only whisper
+.\benchmark\run-suite.ps1 -Only tsc,fakeaudio
 ```
 
-Run the unchanged static ONNX export through ONNX Runtime:
+The suite is driven by `benchmark/manifests/portable.json`. Unsupported,
+missing, and failed combinations are recorded rather than disappearing from the
+comparison.
+
+## What gets recorded
+
+Successful ASR and classifier measurements are appended to:
+
+- `results/ledgers/asr.csv`
+- `results/ledgers/classifiers.csv`
+
+Every requested workload/device/provider combination, including failures, is
+appended to:
+
+- `results/ledgers/attempts.jsonl`
+
+The attempt ledger includes:
+
+- requested workload, device, and provider;
+- status and error;
+- resolved execution provider;
+- every failed and successful provider attempt;
+- whether fallback occurred;
+- CPU-offload evidence when ORT profiling is available;
+- the workload-specific JSON result.
+
+Machine-readable column contracts live in `benchmark/schemas/`.
+
+## Workloads
+
+### Whisper tiny.en
+
+`whisper-tiny-static` uses fixed encoder and decoder shapes. It recomputes the
+decoder context, but NPU compilers can compile it.
+
+`whisper-tiny-dynamic` uses a growing KV cache. It is faster on CPU and GPU, but
+dynamic cache shapes are intentionally marked unsupported on NPU.
+
+ASR metrics include cold and hot load time, mean/median/p90 latency, real-time
+factor, WER, CER, token timing, provider fallback, and CPU offload.
+
+### Text Scam Classifier
+
+TSC replays validated fixture tensors through the requested ORT provider. It
+reports latency, labeled accuracy, numerical drift from the CPU reference, and
+CPU offload.
+
+### FakeAudio / Generated Audio Detector
+
+FakeAudio uses the same fixture-replay contract as TSC. Keeping preprocessing
+outside the C++ timing loop isolates runtime/compiler behavior from Python audio
+pipeline differences.
+
+Fixtures are generated by `tools/fixtures/generate.py`.
+
+## Executor model
+
+For automatic provider selection, the logical device chains are:
+
+- NPU: QNN, VitisAI, OpenVINO NPU, then GPU and CPU candidates.
+- GPU: DirectML, OpenVINO GPU, then CPU.
+- CPU: ONNX Runtime CPU.
+
+An explicit `-Provider` performs one provider attempt. `-Provider auto` enables
+the fallback chain.
+
+The provider implementations are:
+
+- Qualcomm Snapdragon: QNN execution provider.
+- AMD Ryzen AI: VitisAI execution provider.
+- Intel AI Boost: OpenVINO execution provider.
+- GPU: DirectML or OpenVINO GPU.
+- CPU: ONNX Runtime CPU or OpenVINO CPU.
+
+Vendor ONNX Runtime distributions are not binary-compatible. Separate runtime
+packages and the `build/<platform>-ovep` output remain necessary; pretending one
+set of vendor DLLs can serve every machine would produce misleading results.
+
+## Repository architecture
+
+```text
+benchmark/
+  run-suite.ps1              manifest-driven benchmark of record
+  run-whisper.ps1            one Whisper invocation
+  compare-devices.ps1        secondary comparison report
+  manifests/portable.json    all portable workloads
+  schemas/                   result contracts
+  lib/harness.ps1            shared sweep and aggregation code
+  research/                  quantization-only sweeps
+
+runner/
+  cli/main.cpp               thin process entry point
+  benchmark/                 timing, reporting, and workload dispatch
+  core/                      workload factory
+  runtime/                   provider selection and offload diagnostics
+  include/npu_inference_bench/
+
+workloads/
+  whisper/backends/          Whisper engine adapters
+  whisper/models/            downloaded model payloads
+  classifiers/               classifier runner and downloaded assets
+  eval/                      labeled evaluation clips
+  audio/                     sample audio
+
+tools/
+  build/                     bootstrap and MSBuild entry points
+  setup/                     vendor runtime setup
+  fetch/                     Hugging Face asset synchronization
+  export/                    model export utilities
+  fixtures/                  required classifier fixture generation
+  validate/                  correctness validators
+  research/                  non-authoritative probes and experiments
+```
+
+## Build
+
+The project targets Windows x64 and ARM64 using C++17 and MSBuild.
 
 ```powershell
-.\scripts\build.ps1 -EnableOrt -DisableIntel
-.\scripts\build.ps1 -EnableOrt -DisableIntel -OrtDir C:\path\to\onnxruntime   # non-RyzenAI ORT SDK
-.\scripts\run.ps1 -Backend onnx-static -Device cpu -Runs 1
-.\scripts\run.ps1 -Backend onnx-static -Device gpu -Runs 1
-.\scripts\run.ps1 -Backend onnx-static -Device npu -Provider VitisAIExecutionProvider -Runs 1
+# Dependency-free build; all runtime backends are stubs.
+.\tools\build\build.ps1 -DisableIntel
+
+# Intel OpenVINO GenAI.
+.\tools\build\build.ps1
+
+# Portable ONNX Runtime.
+.\tools\build\build.ps1 -EnableOrt -DisableIntel
+
+# Intel OpenVINO execution provider.
+.\tools\setup\setup-ovep.ps1
+.\tools\build\build.ps1 -EnableOvep
+
+# AMD Ryzen AI.
+.\tools\build\build.ps1 -EnableAmd -DisableIntel
+
+# Qualcomm ARM64.
+.\tools\build\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel
 ```
 
-`onnx-static` self-selects the EP: an NPU request walks QNN -> VitisAI -> OpenVINO NPU ->
-DirectML -> CPU, a GPU request walks DirectML -> OpenVINO GPU -> CPU, and each attempt that
-can't build a session logs a `[whisper-hal] EP '<x>' unavailable ...; falling back to '<y>'`
-line so the actually-selected provider is visible. Force a specific ONNX Runtime provider
-with `--provider` on the app or `-Provider` on `run.ps1` (for example `CPUExecutionProvider`,
-`DmlExecutionProvider`, `VitisAIExecutionProvider`, or `OpenVINOExecutionProvider`); an
-explicit override is honored verbatim with no fallback. Provider cache keys are derived from
-the model directory and split by session (`*_encoder`, `*_decoder`), so encoder and decoder
-compiled blobs do not collide when a backend such as VitisAI persists artifacts.
+Build output:
 
-Point `OrtDir` at a platform ONNX Runtime SDK if the default Ryzen AI ORT location is
-not present. On this AMD Ryzen AI machine, the unchanged static ONNX NPU path
-cold-compiles encoder and decoder into separate VitisAI cache entries (~214 s cold
-load), then hot-loads from cache in ~2.6 s and runs the JFK sample at ~0.053 RTF with
-0% WER.
+```text
+build/<platform>[/variant]/<configuration>/NpuInferenceBench.exe
+```
 
-Qualcomm Snapdragon X (native ARM64, Plugin QNN EP on HTP). This produces the unified
-ARM64 binary that self-selects QNN NPU -> (GPU) -> CPU:
+## Single-workload CLI
 
 ```powershell
-.\scripts\setup-qualcomm.ps1 -Platform ARM64        # stages native win-arm64 ORT + QNN
-.\scripts\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel   # -> build/ARM64/Release
-.\build\ARM64\Release\WhisperNpuHal.App.exe models\whisper\en-static-onnx models\audio\jfk.wav onnx-static npu 5
+NpuInferenceBench.exe run whisper <model_dir> <audio.wav> [backend] [device] [runs] [options]
+NpuInferenceBench.exe run tsc <fixture_dir> [device] [runs] [options]
+NpuInferenceBench.exe run fakeaudio <fixture_dir> [device] [runs] [options]
 ```
 
-Uses the same `models/whisper/en-static-onnx` package as `onnx-static`. First load
-compiles graphs to the Hexagon NPU (~15 s); inference on the JFK sample is ~0.5 s
-(~22x real time) on Snapdragon X Elite. Requesting `gpu` falls back to CPU (DirectML is
-dormant on ARM64 — see caveats).
+Common options include `--provider`, `--cache`, `--threads`, `--json`, and
+`--results`.
 
-## Model store (Hugging Face)
+Use `benchmark/run-suite.ps1` for comparable measurements. Direct CLI calls are
+single-shot executor probes.
 
-`models/` is gitignored (~1.5 GB of ONNX + OpenVINO variants) — committing it to GitHub
-LFS would blow past the 1 GB free tier and its bandwidth cap immediately. Instead the
-whole tree is snapshotted to the **private Hugging Face model repo
-[`odobias/npu-hal-over-9000`](https://huggingface.co/odobias/npu-hal-over-9000)**, which
-gives 100 GB free private storage and no LFS bandwidth throttling. Both scripts are wired
-to that repo by default (override with `-Repo <user>/<name>`).
+## Models and fixtures
+
+Large model payloads are intentionally not committed. `tools/fetch/asset-map.json`
+defines the local and Hugging Face paths used by:
 
 ```powershell
-hf auth login                    # once; token needs Write permission
-.\scripts\get-models.ps1         # pull the model snapshot into models/ (after clone)
-.\scripts\push-models.ps1        # re-snapshot models/ to HF after re-exporting
+.\tools\fetch\get-models.ps1
+.\tools\fetch\push-models.ps1
 ```
 
-The repo is **private**, so pulling requires an HF account that's been granted read access
-to it (a token in `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN`, or `hf auth login`); pushing
-requires **write** access (owner). This is an alternative to reproducing models locally via
-`get-model.ps1` / `get-amd-model.ps1` / `export-variants.ps1` — pull the exact pinned
-artifacts instead of re-running the export toolchain.
+The default repository is private, so downloading requires authorization.
 
-## Benchmark (default, portable)
+## Scope and limitations
 
-`scripts\benchmark-onnx.ps1` is **the benchmark of record.** One command runs the three
-portable ONNX models this project ships — Whisper tiny.en (ASR), the Text Scam Classifier,
-and the FakeAudio / Generated Audio Detector — through the **same C++ app on the same ONNX
-Runtime**, so the numbers are directly comparable on any host (x64 or ARM64, CPU/GPU/NPU)
-and go through the real vendor NPU EPs (VitisAI / QNN / OpenVINO), not a wheel-limited
-Python probe.
-
-```powershell
-.\scripts\benchmark-onnx.ps1                  # cpu, all three models
-.\scripts\benchmark-onnx.ps1 -Device npu,cpu  # sweep several devices
-.\scripts\benchmark-onnx.ps1 -Only whisper    # just the ASR model
-```
-
-Whisper runs as two flavors of the *same* model: `onnx-static` (fixed-shape no-KV
-recompute — NPU-compilable) and `onnx-dynamic` (with-past KV cache — faster on CPU/GPU, but
-its dynamic shapes are rejected by the NPU compilers, so it is skipped on NPU by design
-rather than silently demoted to CPU). ASR rows append to `results\benchmark-results.csv`;
-classifier rows to `results\deepfake-benchmark-cpp.csv`.
-
-Every model/device pair gets an isolated cache which the runner deletes immediately
-before measurement. The C++ harness creates the model twice: **cold** compiles from
-that empty cache, while **hot** reloads the artifact cold just produced. This policy
-is identical for Whisper, TSC, and FakeAudio; classifier rows expose
-`cold_load_seconds` and `hot_load_seconds` alongside the legacy `load_seconds`
-(an alias of cold for compatibility).
-
-**The benchmark depends only on this HF repo — no Avast internal repository is involved.**
-Everything the C++ benchmark consumes comes from the private HF snapshot above:
-`get-models.ps1` pulls the Whisper ONNX packages, eval set, and sample audio, and
-`get-deepfake-models.ps1` pulls the deepfake classifier models (Text Scam Classifier,
-FakeAudio detector) from the **same** repo's `deepfake/*` subtree — neither script touches
-any internal/corporate artifact store. The classifiers carry one extra, HF-independent
-requirement: `benchmark-onnx.ps1` feeds them pre-baked input tensors that a Python `.venv`
-generates on first run (`scripts/experiments/dump_fixtures.py`), because the C++ app doesn't
-tokenize text or embed audio itself. That `.venv` is optional — when it (or the classifier
-models) is absent, the ONNX benchmark simply **skips** the classifiers and runs the full
-HF-hosted Whisper matrix. So an HF-only checkout benchmarks everything reachable without ever
-reaching for an internal repo.
-
-The quantization sweep below (`benchmark-quant.ps1`) is a separate **research** tool for
-comparing OV-IR precision variants — not the default path.
-
-## Quantization benchmark — research sweep (`benchmark-quant.ps1`)
-
-The runner reports three axes per run, all backend-neutral (any backend fills what it
-can; missing values are simply omitted):
-
-- **Performance** — cold/hot start, mean/median/p90 latency, RTF, TTFT/TPOT, tok/s, model size.
-- **Confidence** — mean per-token log-prob the model self-reports (`WhisperDecodedResults.scores`).
-  Honest caveat: for whisper-tiny.en this barely moves across precisions, so treat it as
-  weakly informative — **WER is the real discriminator.**
-- **Accuracy** — WER/CER (`--ref "<text>"`) via the common `metrics.hpp`, computed identically
-  regardless of backend.
-
-Compare every manifest entry across its declared `variant × device × clip` matrix:
-
-```powershell
-.\scripts\export-variants.ps1     # fp32 OV-IR baseline -> models/manifest.json
-.\scripts\get-amd-model.ps1       # AMD ONNX variant + merged models/manifest.json (on AMD machines)
-.\scripts\get-eval-set.ps1        # small labeled LibriSpeech sample -> models/eval/eval.jsonl
-.\scripts\benchmark-quant.ps1 -Runs 3   # -> results/quantization-benchmark.{md,csv}
-```
-
-> **Quantized models are research-only.** The product targets one portable static ONNX
-> model on every platform, so the OpenVINO precision sweep (fp16/int8/int4) is no longer a
-> product path. `export-variants.ps1 -Formats fp16,int8,int4` still exports them, but writes
-> to `models/manifest.research.json` (not the product `manifest.json`), so they never enter
-> the default benchmark. Sweep them deliberately with
-> `benchmark-quant.ps1 -Manifest models\manifest.research.json`. The historical quantization
-> tables below are kept as prior measurements, not as a supported configuration.
-
-`manifest.json` is the backend-neutral contract: each entry has `backend`, `precision`,
-`method`, `model_dir`, `devices`, and `size_mb`. Each platform script appends or updates
-its own entries (`backend=amd|intel|qualcomm`) — the harness, metrics, and reports do not
-need platform-specific changes.
-
-Reports land in `results/` (tracked): `quantization-benchmark.{md,csv}` (aggregate sweep)
-plus one canonical aggregate row per `variant × device` appended to
-`results/benchmark-results.csv` (the shared cross-backend file — AMD/Intel rows share the
-same schema). Example NPU result
-(whisper-tiny.en, 12 LibriSpeech clips):
-
-| Variant | Prec | Size MB | Cold s | Hot s | Mean ms | xRT | WER % |
-|---|---|---|---|---|---|---|---|
-| fp32 | fp32 | 150.7 | 10.0 | 0.70 | 137.3 | 71.3 | 9.57 |
-| fp16 | fp16 | 78.8 | 9.4 | 0.62 | 139.3 | 71.1 | 9.57 |
-| int8 | int8 | 44.9 | 10.5 | 0.70 | 141.5 | 60.1 | 10.23 |
-| int4 | int4 | 37.6 | 21.7 | 0.70 | 119.9 | 83.1 | 14.85 |
-
-Takeaways (this NPU): **fp16 is a free win** — half the size, identical WER. **int8** trades
-+0.7% WER for 3.3× smaller. **int4** is the smallest and, on these kernels, not slower at
-inference — but it costs ~5 pts of WER and the longest cold compile (~22 s), so it's an
-accuracy-poor trade for a tiny model. Hot cache makes every NPU load ~0.7 s regardless of
-precision. (GPU/CPU land at slightly lower WER on fp32/fp16 — 8.6% vs the NPU's 9.6% —
-purely from kernel numerics; see the full table in `results/`.)
-
-Full W+A INT8 and the INT8-encoder/FP32-decoder hybrid aren't auto-exported yet (full
-stateful INT8 doesn't run on the NPU — see the findings docs); the manifest is ready to hold
-them as extra methods once wired.
-
-## AMD Ryzen AI
-
-AMD Ryzen AI / VitisAI:
-
-```powershell
-.\scripts\setup-amd.ps1                       # Ryzen AI SDK + NPU driver (once)
-.\scripts\get-amd-model.ps1                   # also creates/merges models\manifest.json
-.\scripts\get-audio.ps1
-.\scripts\build.ps1 -EnableAmd -DisableIntel
-.\scripts\run.ps1 -Backend amd -Device npu
-```
-
-`setup-amd.ps1` installs Ryzen AI (default `C:\Program Files\RyzenAI\1.8.0-beta`,
-conda env `ryzen-ai-1.8.0-beta`) and the matching NPU driver (min `32.0.20101.3760`),
-then sets `RYZEN_AI_INSTALLATION_PATH` so `msbuild/backend.amd.props` finds the ORT/VitisAI
-headers and libs. `.\scripts\bootstrap.ps1 -Platform amd` does all of the above in one shot.
-
-The AMD backend expects `model_dir` to contain `tiny_encoder.onnx`,
-`tiny_decoder.onnx`, `preprocessor_config.json`, `vocab.json`, and the VitisAI
-config JSON files generated by `get-amd-model.ps1`. Runtime does not require
-Python; the app copies the RyzenAI ONNX Runtime / VitisAI DLLs next to the exe.
-
-## Benchmark Results
-
-`run.ps1` appends benchmark rows to `results\benchmark-results.csv` by default:
-
-```powershell
-.\scripts\run.ps1 -Backend amd -Device npu
-.\scripts\run.ps1 -Backend intel -Device npu
-.\scripts\benchmark-quant.ps1 -Runs 3               # manifest-driven all-clip sweep (host NPU only)
-.\scripts\benchmark-quant.ps1 -NpuVendor all        # attempt every vendor's variants
-.\scripts\benchmark-quant.ps1 -NpuVendor intel      # force a specific vendor
-```
-
-`benchmark-quant.ps1` autodetects the host NPU vendor (a machine has one brand — Intel AI
-Boost, AMD XDNA/IPU, or Snapdragon Hexagon) and **skips variants targeting a different
-vendor** instead of wasting a compile on hardware that can't run them. Vendor-neutral
-static-ONNX variants always run. Override with `-NpuVendor all` (no filter) or a forced
-vendor. Skipped variants are listed in the report as `skip:other-npu`, not failures.
-
-Each platform should run only its own manifest entries locally. The CSV schema is
-documented in `results\README.md`; use `-Results <path>` to write benchmark sweeps to
-another CSV, or `-NoResults` on `run.ps1` for scratch single-clip runs.
-
-## Device comparison (NPU vs GPU vs CPU)
-
-CPU is not a separate backend — it's the same manifest-selected backend targeting
-`Device::CPU` instead of `NPU`/`GPU`. It's also the one device likely to exist on any
-x86_64 machine, making it the natural baseline: "is the NPU actually worth it, or is CPU
-good enough?"
-
-```powershell
-.\scripts\run.ps1 -Device cpu                    # single run on CPU
-.\scripts\run.ps1 -Device cpu -Threads 8         # pin OpenVINO to 8 inference threads
-.\scripts\compare-devices.ps1                    # fp16 variant across NPU, GPU, CPU
-.\scripts\compare-devices.ps1 -Devices CPU -Threads 16 -Runs 5
-```
-
-`--threads N` (CLI) / `-Threads N` (`run.ps1`/`compare-devices.ps1`) maps to OpenVINO's
-`ov::inference_num_threads` and only applies to the CPU device; NPU/GPU use their own
-scheduler and ignore it. It matters: on a 32-thread workstation, whisper-tiny.en (fp16)
-went from **249 ms/clip at 1 thread to 93 ms/clip at 32 threads** (~2.7x) — CPU thread
-count is not a cosmetic knob, it's the main lever you have.
-
-`compare-devices.ps1` runs a single variant (fp16 by default) across every requested
-device and pivots the report on *device* instead of *quantization method* (that's
-`benchmark-quant.ps1`'s job). It reads `backend` from the same `manifest.json` entry as the
-quantization sweep. When no `-Variant` is given it autodetects the host NPU vendor and defaults to
-a variant this machine can actually run (override with `-NpuVendor`); an explicitly
-requested cross-vendor variant still runs, with a warning. Unsupported combos — no NPU
-present, GPU not wired for a backend, etc. — are recorded as failures, not crashes.
-
-Measured on this dev machine (AMD Threadripper PRO 7955WX, 16C/32T, NVIDIA T1000 — i.e.
-**zero Intel NPU/GPU hardware**) with `compare-devices.ps1`, whisper-tiny.en fp16, 12
-LibriSpeech clips:
-
-| Device | Chip | Status | Threads | Cold s | Hot s | Mean ms | xRT | tok/s | WER % |
-|---|---|---|---|---|---|---|---|---|---|
-| NPU | - | unsupported | - | - | - | - | - | - | - |
-| GPU | - | unsupported | - | - | - | - | - | - | - |
-| CPU | AMD Ryzen Threadripper PRO 7955WX 16-Cores | ok | 8/32 | 0.44 | 0.32 | 106.3 | 91.3 | 472.7 | 8.91 |
-
-NPU fails because there's no Intel NPU on this box (`NPU_VCL` can't find a device to
-compile for). GPU fails because OpenVINO's `GPU` plugin only targets **Intel**
-GPUs (Level Zero / oneAPI) — it doesn't drive the NVIDIA card, so kernel selection fails
-partway through compiling the model graph. Both are genuine `ok:false` results with a
-real error string, not a script bug — that's the graceful-degradation contract working
-as designed.
-
-### Cross-machine comparison (via the shared results ledger)
-
-`results/benchmark-results.csv` is the cross-machine ledger (see `results/README.md`):
-every machine appends its own canonical rows with the same schema, so results from
-different hardware concatenate without any code changes. **The ledger has been reset to a
-blank slate** (header only) to start fresh on the unified self-selecting binary — rerun the
-loop below on each machine to repopulate it. The tables in this section are **prior
-measurements retained as analysis**, not the current ledger contents:
-
-Every row now also self-identifies the exact chip (`device_full_name`), not just the
-logical `NPU`/`GPU`/`CPU` class — the Intel backend queries OpenVINO's
-`ov::device::full_name` for whatever device it just ran on (e.g. `Intel(R) AI Boost`,
-`13th Gen Intel(R) Core(TM) i7-1370P`), so "what NPU/CPU are we actually comparing
-against" is answered by the CSV itself instead of tribal knowledge. That query was
-added after the laptop sweep below was recorded, so those older rows predate it (empty
-`device_full_name`); new rows from any machine will have it populated.
-
-| Precision | Their CPU | Their GPU | Their NPU | **This CPU (AMD Ryzen Threadripper PRO 7955WX, 32T)** | Speedup vs their CPU |
-|---|---|---|---|---|---|
-| fp32 | 267.7 ms (21.9x) | 119.3 ms (49.1x) | 115.0 ms (50.9x) | **77.9 ms (75.2x)** | 3.44x |
-| fp16 | 227.8 ms (25.7x) | 105.2 ms (55.7x) | 109.6 ms (53.4x) | **68.5 ms (85.5x)** | 3.33x |
-| int8 | 194.2 ms (30.2x) | 161.7 ms (36.2x) | 113.0 ms (51.8x) | **66.4 ms (88.2x)** | 2.92x |
-| int4 | 187.9 ms (31.2x) | 122.6 ms (47.7x) | 84.2 ms (69.6x) | **73.1 ms (80.1x)** | 2.57x |
-
-(mean latency, xRT in parens; WER/CER were identical to their numbers at every
-precision on this clip — same model, same math, just different silicon.)
-
-The uncomfortable-for-NPU-marketing part: **this workstation's CPU alone beats their
-dedicated NPU and GPU on raw latency, at every precision.** That is a real, measured
-result, not a benchmarking mistake — and it is *not* the flex it looks like. A
-32-thread desktop-class CPU pulls an order of magnitude more power than a laptop NPU,
-and whisper-tiny is small enough that a NPU's fixed per-call overhead (compile-time
-batching, driver dispatch) eats into its efficiency advantage before the model is big
-enough to need it. This table answers "which is faster on this specific tiny model,
-right now" — it does not answer "which is more efficient" or "which scales better to
-larger Whisper checkpoints," and treating a latency win here as a verdict on NPUs in
-general would be exactly the kind of unearned generalization worth pushing back on.
-
-To add another machine's rows, run the loop below on it and let it append to (or, once
-merged, git-diff-and-commit into) `results/benchmark-results.csv`:
-
-```powershell
-.\scripts\export-variants.ps1
-.\scripts\get-eval-set.ps1
-foreach ($v in (Get-Content .\models\manifest.json | ConvertFrom-Json).variants) {
-    .\build\x64\Release\WhisperNpuHal.App.exe ".\$($v.model_dir)" .\models\eval\ls_000.wav `
-        intel cpu 2 --cache ".\cache\$($v.id)-CPU" `
-        --ref "MISTER QUILTER IS THE APOSTLE OF THE MIDDLE CLASSES AND WE ARE GLAD TO WELCOME HIS GOSPEL" `
-        --results .\results\benchmark-results.csv --label $v.id
-}
-```
-
-Swap `cpu` for `npu`/`gpu` on hardware that has them. `benchmark-quant.ps1` is deliberately
-**not** used for this — it overwrites (not appends) `results/quantization-benchmark.*`,
-which would blow away the other machine's NPU/GPU sweep already committed there;
-`results/benchmark-results.csv` is the only file in `results/` designed to be
-appended to by multiple machines.
-
-## Adding a backend
-
-1. Implement `create()` / `available()` in `src/backends/<vendor>/...cpp` behind your
-   `WHISPER_HAL_<VENDOR>` macro (stub otherwise).
-2. Add include/lib/define wiring in `msbuild/backend.<vendor>.props`.
-3. Toggle with `/p:Enable<Vendor>=true` (see `Directory.Build.props`).
-
-## Status / caveats
-
-- **Intel**, **AMD**, and **Qualcomm** are all implemented. Qualcomm QNN runs through the
-  unified `ort_static` backend on **native ARM64** and is validated end-to-end on Snapdragon
-  X Elite (QNN NPU, GPU->CPU fallback). The standalone `qualcomm` backend is retained only
-  for x64-emulated scenarios.
-- **DirectML is dormant on ARM64.** `Microsoft.ML.OnnxRuntime.DirectML` is capped at 1.24.x,
-  which is ABI-incompatible with the ORT 1.27 base the QNN plugin needs, so the ARM64 binary
-  ships CPU + QNN only (GPU falls back to CPU). The DirectML code path is compiled in and
-  activates automatically once a compatible ARM64 DML/WinML build exists.
-- **x64 vendor validation is pending hardware.** The unified selection is validated on ARM64;
-  the Intel (OpenVINO EP) and AMD (VitisAI) x64 paths are code-complete and share the same
-  source, but the OVEP-vs-VitisAI runtime packs live at different ORT versions and are
-  validated on their own machines, not merged into one x64 runtime.
-- 16 kHz mono WAV only (no resampler).
-- OpenVINO's `GPU` device only drives **Intel** GPUs (integrated or Arc/Flex, via
-  Level Zero/oneAPI); it will not use an NVIDIA/AMD GPU even if one is present. DirectML is
-  the portable GPU path (any DX12 GPU). `CPU` runs on any AVX2 x86_64 (or ARM64) chip — it's
-  the universal fallback.
-- Exporting variants (`export-variants.ps1` / `get-model.ps1`) needs `optimum-intel`,
-  which currently breaks on **Python 3.14+** (`NormalizedConfig.__init__() got multiple
-  values for argument 'allow_new'` — a `functools.partial`-as-descriptor change in
-  3.14 trips up `optimum`'s `with_args()` config classes; see
-  [huggingface/optimum#2409](https://github.com/huggingface/optimum/pull/2409),
-  opened Feb 2026, stale-closed without merging). Use Python ≤3.13, or patch
-  `.venv\Lib\site-packages\optimum\exporters\base.py`: change
-  `self.NORMALIZED_CONFIG_CLASS(self._config)` to
-  `self.__class__.NORMALIZED_CONFIG_CLASS(self._config)`. `export-variants.ps1` detects
-  this on 3.14+ and prints the same hint on export failure.
-- See `../NPU-FINDINGS.md` and `../NPU-ECOSYSTEM-STATUS.md` for the underlying research,
-  and `results/cpp-onnx-npu-findings.md` for the C++ ONNX-on-NPU key findings (decode
-  strategy, the `maxlen` dud, the mel-FFT win, and GenAI-parity verdict).
+- Windows 10 or newer only.
+- x64 and ARM64 only.
+- Whisper input must be 16 kHz audio; there is no resampler.
+- Vendor execution providers require matching drivers, SDKs, and ORT builds.
+- NPU compiler acceptance is model- and shape-dependent.
+- Research quantization results are not part of the portable benchmark contract.
+- Hardware paths must be validated on the corresponding physical device.

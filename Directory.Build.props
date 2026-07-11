@@ -1,14 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- Repo-wide defaults, auto-imported by every project. Override on the MSBuild
      command line, e.g. /p:EnableAmd=true /p:OpenVINODir=C:\sdk\openvino_genai -->
 <Project>
   <PropertyGroup>
-    <WhisperHalRoot>$(MSBuildThisFileDirectory)</WhisperHalRoot>
+    <NpuInferenceBenchRoot>$(MSBuildThisFileDirectory)</NpuInferenceBenchRoot>
 
     <!-- OpenVINO GenAI C++ SDK location (Intel backend). Priority:
          explicit /p:OpenVINODir  >  OPENVINO_GENAI_DIR env  >  bundled third_party -->
     <OpenVINODir Condition="'$(OpenVINODir)'=='' and '$(OPENVINO_GENAI_DIR)'!=''">$(OPENVINO_GENAI_DIR)</OpenVINODir>
-    <OpenVINODir Condition="'$(OpenVINODir)'==''">$(WhisperHalRoot)third_party\openvino_genai</OpenVINODir>
+    <OpenVINODir Condition="'$(OpenVINODir)'==''">$(NpuInferenceBenchRoot)third_party\openvino_genai</OpenVINODir>
 
     <!-- Per-backend build toggles. Intel is the working reference (on by default);
          AMD/Qualcomm compile as throwing stubs unless their SDKs are wired in. -->
@@ -19,7 +19,7 @@
     <!-- Intel native path through ONNX Runtime's OpenVINO EP (OVEP). This makes the
          unified ORT binary cover Intel NPU/GPU/CPU too, alongside AMD (VitisAI) and
          Qualcomm (QNN). It requires the vendored ORT+OVEP package (ORT 1.24.1 built
-         against OpenVINO 2025.4.1) under third_party (see scripts\setup-ovep.ps1).
+         against OpenVINO 2025.4.1) under third_party (see tools\setup\setup-ovep.ps1).
          EnableOvep implies EnableOrt and is mutually exclusive with the OpenVINO
          GenAI backend (EnableIntel): both drag in openvino.dll at incompatible
          versions, so a single process can host only one. -->
@@ -30,7 +30,7 @@
          is a self-contained package. Set /p:BundleModel=false to skip the (large)
          copy during iterative dev builds. -->
     <BundleModel Condition="'$(BundleModel)'==''">true</BundleModel>
-    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(WhisperHalRoot)models\whisper\en-static-onnx</BundledModelDir>
+    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(NpuInferenceBenchRoot)workloads\whisper\models\static-onnx</BundledModelDir>
 
     <!-- The AMD-native whisper/amd model is ONLY used by the `amd` backend
          variant; the unified auto/onnx-static path runs the portable static model

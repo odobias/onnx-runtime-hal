@@ -1,4 +1,4 @@
-# INT8 quantization of the neutral Whisper-tiny.en ONNX (VitisAI attempt)
+﻿# INT8 quantization of the neutral Whisper-tiny.en ONNX (VitisAI attempt)
 
 Goal: produce an INT8 **QDQ** copy of our vendor-neutral `whisper/en-onnx`
 (encoder + decoder) that AMD's Ryzen AI / VitisAI EP can offload to the XDNA NPU,
@@ -6,7 +6,7 @@ Goal: produce an INT8 **QDQ** copy of our vendor-neutral `whisper/en-onnx`
 in a separate variant dir; Intel keeps eating FP32.
 
 > **CORRECTION (read first).** The premise that AMD *needs* INT8 was wrong.
-> Inspecting `models/whisper/amd/` shows AMD ships a **pure FP32** model
+> Inspecting `workloads/whisper/models/vendor/amd/` shows AMD ships a **pure FP32** model
 > (all `float32` initializers, **zero** QuantizeLinear/DequantizeLinear nodes) and
 > runs it on XDNA via the **VAIML partitioner** (`vaip-pass_vaiml_partition` in the
 > `vitisai_config_*.json`), which compiles the FP32 graph to the AI Engine. So
@@ -14,7 +14,7 @@ in a separate variant dir; Intel keeps eating FP32.
 > optimization. This experiment shows naive PTQ INT8 isn't shippable anyway, but
 > the AMD path doesn't hinge on it. See "FP32 is the real AMD path" below.
 
-Script: `scripts/experiments/quantize_int8_vitis.py` (calibration) + `scripts/experiments/_eval_int8.py`
+Script: `tools/research/quantize_int8_vitis.py` (calibration) + `tools/research/_eval_int8.py`
 (pure-ORT decode check). Tooling: `onnxruntime.quantization` 1.27 (no `vai_q_onnx`
 / AMD Quark installed). Calibration set: 12 LibriSpeech clips + `jfk.wav`, real mel
 features via `WhisperFeatureExtractor`; decoder calibrated on real greedy-decode
@@ -68,7 +68,7 @@ quantization, not a runtime bug (same script's FP32 path decodes perfectly).
 
 ## FP32 is the real AMD path (correcting the premise)
 
-Inspection of `models/whisper/amd/` (via `scripts/experiments/_inspect_amd.py`):
+Inspection of `workloads/whisper/models/vendor/amd/` (via `tools/research/_inspect_amd.py`):
 
 | file | initializer dtypes | QDQ nodes | I/O | notes |
 |---|---|---|---|---|
