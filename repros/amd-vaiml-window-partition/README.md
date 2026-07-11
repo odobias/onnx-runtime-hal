@@ -13,8 +13,11 @@ on the first `Run()`.
 
 This directory is intentionally source-only:
 
+- `bootstrap.ps1` - validates the selected Python/runtime, optionally installs
+  Python graph-generation packages, and can download AMD SDK/driver installers.
 - `run.ps1` - portable Windows runner for a new machine.
 - `repro.py` - generates `model.onnx`, runs CPU control, then runs VitisAI.
+- `requirements.txt` - Python packages needed to generate the ONNX graph.
 - `.gitignore` - ignores the generated `model.onnx` and Python cache files.
 
 `model.onnx` is **not committed**. It is generated locally by `repro.py` from
@@ -33,21 +36,60 @@ deterministic random input seed (`20260711`).
 Both a cold compile and a load from the populated VAIML cache reproduce the same
 process crash.
 
-## Run on a new machine
+## Bootstrap on a new machine
 
-Prerequisite: install Ryzen AI SDK and use the SDK Python environment that exposes
-`VitisAIExecutionProvider` in ONNX Runtime. The runner tries these Python
-locations, in order:
+The failing provider is AMD-specific. Vanilla `pip install onnxruntime` is **not**
+enough and can actively confuse the repro because it does not include
+`VitisAIExecutionProvider`. Use the Ryzen AI SDK Python/runtime.
+
+The bootstrap script validates the selected Python, optionally installs the
+lightweight graph-generation packages (`numpy`, `onnx`), and checks that
+`onnxruntime` exposes `VitisAIExecutionProvider`:
+
+```powershell
+.\repros\amd-vaiml-window-partition\bootstrap.ps1 -InstallPythonDeps
+```
+
+Override the SDK Python if needed:
+
+```powershell
+.\repros\amd-vaiml-window-partition\bootstrap.ps1 `
+  -Python C:\path\to\ryzen-ai-env\python.exe `
+  -InstallPythonDeps
+```
+
+The script tries these Python locations, in order:
 
 1. `-Python <path>` argument
 2. `$env:RYZEN_AI_PYTHON`
 3. `C:\ProgramData\miniforge3\envs\ryzen-ai-1.8.0-beta\python.exe`
 4. `python` on `PATH`
 
+If the AMD SDK is missing, bootstrap can download the official AMD installer and
+NPU driver archive and verify their SHA-256 hashes:
+
+```powershell
+.\repros\amd-vaiml-window-partition\bootstrap.ps1 `
+  -DownloadRyzenAI `
+  -AcceptAmdDownloadTerms
+```
+
+It deliberately does **not** silently launch vendor installers. Those may require
+administrator rights and license prompts, and pretending otherwise would be
+bullshit.
+
+## Run
+
 From the repository root:
 
 ```powershell
 .\repros\amd-vaiml-window-partition\run.ps1
+```
+
+Run bootstrap first, then execute the repro:
+
+```powershell
+.\repros\amd-vaiml-window-partition\run.ps1 -Bootstrap -InstallPythonDeps
 ```
 
 Override the SDK Python if needed:

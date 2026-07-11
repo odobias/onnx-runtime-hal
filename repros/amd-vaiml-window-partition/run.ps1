@@ -2,6 +2,8 @@
 param(
     [string]$Python = "",
     [string]$CacheDir = "",
+    [switch]$Bootstrap,
+    [switch]$InstallPythonDeps,
     [switch]$ReuseCache,
     [switch]$RegenerateModel
 )
@@ -31,6 +33,15 @@ function Resolve-Python {
         if ($candidate -and (Test-Path $candidate)) { return (Resolve-Path $candidate).Path }
     }
     throw "No Python found. Pass -Python <path-to-Ryzen-AI-python.exe> or set RYZEN_AI_PYTHON."
+}
+
+if ($Bootstrap) {
+    $bootstrapScript = Join-Path $PSScriptRoot "bootstrap.ps1"
+    $bootstrapArgs = @()
+    if ($Python) { $bootstrapArgs += @("-Python", $Python) }
+    if ($InstallPythonDeps) { $bootstrapArgs += "-InstallPythonDeps" }
+    & $bootstrapScript @bootstrapArgs
+    if ($LASTEXITCODE -ne 0) { throw "bootstrap failed with exit code $LASTEXITCODE" }
 }
 
 $pythonExe = Resolve-Python $Python
