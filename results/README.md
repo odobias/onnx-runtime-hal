@@ -148,10 +148,17 @@ NPU latency.
 
 ## Classifier ledger (deepfake) + CPU-offload audit
 
-The deepfake classifiers (`tsc`, `fakeaudio`) have their own ledger,
+The deepfake classifiers (`tsc`, `fakeaudio`) have their own active ledger,
 `results\deepfake-benchmark-cpp.csv` (one row per model x EP), because they carry a
 different metric set (accuracy + cross-EP probability agreement, not WER/RTF). Each
-row is written directly by the C++ harness (`--classify ... --results`).
+new row is written directly by the C++ harness (`--classify ... --results`).
+
+The active ledger contains only metric-complete rows from the latest matched AMD
+CPU/DirectML/VitisAI sweep and the complete Qualcomm QNN sweep. Superseded rows
+and rows created before provider-placement profiling were introduced are preserved
+in `results\deepfake-benchmark-cpp.legacy.csv`; they must not be mixed into current
+latency or offload comparisons. The sole Intel OpenVINO EP result is also retained
+there because it lacks placement metrics and needs a current-contract rerun.
 
 Every classifier run now **self-audits CPU offload** — did any op silently fall back
 to the ORT CPU EP when an accelerator was requested? The harness profiles the session
@@ -170,6 +177,11 @@ the goal. A CPU-device run reads `100%` by definition — that's the baseline, n
 regression (check `requested_device`). Empty cells mean the audit couldn't run (e.g.
 profiling unavailable). Measured on Lunar Lake: both `tsc` and the `fakeaudio`
 backbone report `0%` offload on the NPU (fully fused).
+
+The CSV currently records architecture, OS build, and AC/battery state, but not a
+full hardware identity or the Windows power-plan/Energy Saver state. Keep those
+details in the accompanying report when comparing hosts; `battery` alone is not
+enough to establish equivalent power conditions.
 
 On AMD VitisAI, TSC reports one fused NPU partition plus 13 CPU shape/control
 nodes (`Gather`, `Cast`, `Unsqueeze`, and similar). It preserves 14/15 fixture
