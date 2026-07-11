@@ -1,4 +1,4 @@
-# fakeaudio on the Qualcomm NPU (QNN / Hexagon HTP)
+﻿# fakeaudio on the Qualcomm NPU (QNN / Hexagon HTP)
 
 Companion to `results/fakeaudio-intel-npu.md`. It replays the same
 `export_fakeaudio_variants.py` precision variants on the Qualcomm Hexagon HTP
@@ -15,9 +15,9 @@ shows on the HTP.
 Reproduce (after `get-deepfake-models.ps1`, from a repo with the `.venv`):
 
 ```
-.venv\Scripts\python.exe scripts\experiments\export_fakeaudio_variants.py
-.venv\Scripts\python.exe scripts\experiments\build_fakeaudio_variant_fixtures.py
-build\ARM64\Release\WhisperNpuHal.App.exe --classify models\deepfake\fixtures\fakeaudio-bb-fp32 npu 20
+.venv\Scripts\python.exe tools\research\export_fakeaudio_variants.py
+.venv\Scripts\python.exe tools\research\build_fakeaudio_variant_fixtures.py
+build\ARM64\Release\NpuInferenceBench.exe --classify workloads\classifiers\fixtures\fakeaudio-bb-fp32 npu 20
 ```
 
 ## TL;DR (QNN HTP, vs full-fp32 CPU)

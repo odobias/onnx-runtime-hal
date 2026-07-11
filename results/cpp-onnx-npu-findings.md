@@ -1,4 +1,4 @@
-# C++ ONNX-on-NPU — Key Findings
+﻿# C++ ONNX-on-NPU — Key Findings
 
 Hard-won lessons from porting the neutral-ONNX Whisper benchmark into the C++ HAL
 (`Backend::IntelOnnx`) and optimizing it for the Intel NPU. Companion to the
@@ -103,7 +103,7 @@ exact reproductions of whisper's front-end.
 
 ## 4. Engineering notes for future maintainers
 
-- **Shared front-end:** `include/whisper_npu/whisper_frontend.hpp` (header-only) —
+- **Shared front-end:** `include/npu_inference_bench/whisper_frontend.hpp` (header-only) —
   mel (naive + FFT), byte-level BPE detokenizer, minimal JSON readers. Dependency-
   free of ONNX/OpenVINO so any backend can reuse it.
 - **Mel filterbank is computed in-process** (`compute_mel_filterbank()`) as a

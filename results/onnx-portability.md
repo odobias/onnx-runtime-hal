@@ -1,4 +1,4 @@
-# Neutral ONNX portability — one model, many runtimes
+﻿# Neutral ONNX portability — one model, many runtimes
 
 Goal: run **one vendor-neutral ONNX** (Whisper-tiny.en, exported by `optimum`) on
 CPU, GPU and NPU without per-device model surgery, and see what that costs in
@@ -52,8 +52,8 @@ _Blank slate — rerun the experiments to repopulate. Raw numbers land in `onnx-
    requires the vendor's bounded-KV runtime, not a generic ONNX.
 
 See `onnx-portability.csv` for the raw numbers. Scripts:
-`scripts/experiments/onnx_ov_decode.py` (dyn KV-cache CPU/GPU), `scripts/experiments/onnx_npu_static.py`
-(static NPU), `scripts/experiments/onnx_decode.py` (raw ORT), `scripts/experiments/probe_ort_raw.py`.
+`tools/research/onnx_ov_decode.py` (dyn KV-cache CPU/GPU), `tools/research/onnx_npu_static.py`
+(static NPU), `tools/research/onnx_decode.py` (raw ORT), `tools/research/probe_ort_raw.py`.
 
 ## C++ port (production HAL backend)
 
@@ -61,7 +61,7 @@ The static no-KV path is now a first-class C++ HAL backend
 (`Backend::IntelOnnx`, `src/backends/intel/intel_onnx_engine.cpp`): the neutral
 ONNX loaded through `ov::Core`, reshaped to static shapes, decoded with the same
 recompute loop — the one strategy that compiles on the NPU. Front-end (log-mel +
-byte-level BPE) is shared, header-only (`include/whisper_npu/whisper_frontend.hpp`);
+byte-level BPE) is shared, header-only (`include/npu_inference_bench/whisper_frontend.hpp`);
 the mel filterbank is computed in-process (librosa Slaney bank) so the neutral
 export needs no baked-in `mel_filters`. Single clip = `jfk.wav` (11 s, 25 tokens),
 `maxlen=128`, greedy + suppress. Rows land in `benchmark-results.csv`.
@@ -107,6 +107,6 @@ Two findings that overturned the intuitive "the KV cache is the problem":
 The naive DFT is kept intact as the reference (`log_mel_spectrogram`,
 `WHISPER_ONNX_MEL=naive`); FFT is the default (`log_mel_spectrogram_fft`).
 
-Build/run: `.\scripts\build.ps1`; `.\scripts\run.ps1 -Backend intel-onnx -Device npu`.
+Build/run: `.\tools\build\build.ps1`; `.\benchmark\run-whisper.ps1 -Backend intel-onnx -Device npu`.
 Diagnostics: `WHISPER_ONNX_PROFILE=1` (per-stage timings), `WHISPER_ONNX_MEL=naive|fft`,
 `WHISPER_ONNX_MAXLEN=<8..448>`.
