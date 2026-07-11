@@ -41,7 +41,7 @@ const fakeAudioRows = [
   ["x64", "ORT CPU full graph", "65.68 ms", "~0", "Correct", "CPU", "AC reference run"],
   ["Intel", "NPU full graph", "~28 ms", "0.9924", "Wrong", "Fully NPU", "Raised fp16 noise floor"],
   ["Qualcomm", "QNN full graph", "127.72 ms", "0.9325", "Wrong", "0 / 1 CPU nodes", "Fully NPU, numerically broken"],
-  ["AMD", "VAIML variants", "crashes or diverges", "~0.99", "Wrong", "NPU", "17 KB first-inference crash repro"],
+  ["AMD", "VAIML variants", "crashes or diverges", "~0.99", "Wrong", "NPU", "source-generated 12.9 KB first-inference crash repro"],
 ];
 
 function Caption({ children }: { children: string }) {
@@ -63,7 +63,7 @@ function Overview() {
         decoder; it is not a pure silicon comparison. TSC preserves accuracy on all three NPUs,
         though AMD leaves small shape/control operations on CPU and has the largest probability drift.
         FakeAudio only works correctly on an NPU when its fp32 front-end stays on CPU and the
-        backbone runs on the NPU. AMD VAIML now has a synthetic 17 KB reproducer that compiles
+        backbone runs on the NPU. AMD VAIML now has a synthetic source-generated 12.9 KB reproducer that compiles
         successfully, creates a session, and access-violates on the first inference.
       </Callout>
 
@@ -184,7 +184,7 @@ function Classifiers() {
       </Stack>
 
       <Callout title="Newest AMD VAIML result" tone="danger">
-        A synthetic 17,088-byte window-partition ONNX returns a finite [64,64,96]
+        A synthetic source-generated 12,884-byte window-partition ONNX returns a finite [64,64,96]
         tensor on CPU. VAIML compiles it with zero reported errors and creates a
         VitisAI session, then crashes on the first Run() with access violation
         0xC0000005 inside onnxruntime_vitisai_ep.dll. Cold and cached paths reproduce.
