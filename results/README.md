@@ -64,3 +64,23 @@ portable suite ledger and may describe older model exports or runtime versions.
 Quantization sweeps under `benchmark/research/` are explicitly research-only.
 Neutral ONNX portability findings remain in `onnx-portability.md` and
 `cpp-onnx-npu-findings.md`.
+
+### Classifier snapshot curation
+
+The pre-schema-v1 classifier snapshot is split by evidence quality:
+
+- `ledgers/classifiers.csv` retains nine rows that include latency, accuracy,
+  probability agreement, and provider-placement metrics: the matched AMD
+  CPU/DirectML/VitisAI sweep and the complete Qualcomm QNN sweep.
+- `ledgers/classifiers.legacy.csv` preserves 18 superseded or incomplete rows.
+  The sole Intel OpenVINO EP result is retained there pending a current-contract
+  rerun; it lacks provider-placement metrics.
+
+Do not mix the legacy rows into current latency or offload comparisons. These
+snapshots also predate the extended schema-v1 fields for cache state, provider
+attempts, fallback, and errors, so future suite runs should write a fresh
+schema-v1 ledger rather than append incompatible rows.
+
+The snapshots record architecture, OS build, and AC/battery state, but not full
+hardware identity or Windows power-plan/Energy Saver state. `battery` alone does
+not establish equivalent power conditions.

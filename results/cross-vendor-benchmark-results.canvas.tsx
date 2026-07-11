@@ -30,18 +30,18 @@ const tscRows = [
   ["Intel", "ORT OpenVINO EP", "NPU", "8.67 ms", "7.87 s", "93.3%", "0.00665", "0% in research audit"],
   ["Qualcomm", "ORT QNN", "NPU", "20.50 ms", "13.96 s", "93.3%", "0.04731", "0 / 1 CPU nodes"],
   ["AMD", "ORT VitisAI", "NPU", "32.60 ms", "5.69 s", "93.3%", "0.05680", "13 CPU shape/control nodes; compute fused"],
-  ["x64", "ORT DirectML", "GPU", "36.64 ms", "1.34 s", "93.3%", "0.0000011", "not recorded"],
-  ["x64", "ORT CPU", "CPU", "79.02 ms", "0.27 s", "93.3%", "~0", "CPU baseline"],
+  ["AMD", "ORT DirectML", "GPU", "65.15 ms", "0.81 s", "93.3%", "0.000306", "0 / 1 CPU nodes"],
+  ["AMD", "ORT CPU", "CPU", "163.13 ms", "0.58 s", "93.3%", "0.0000019", "CPU baseline"],
 ];
 
 const fakeAudioRows = [
   ["Intel", "CPU FE + NPU backbone", "~30 ms end-to-end", "0.0001", "Correct", "~80% work on NPU", "Needs attention-bias surgery"],
   ["Qualcomm", "CPU FE + QNN backbone", "114.94 ms + FE", "0.00084", "Correct", "0 / 1 CPU nodes in backbone", "Ledger excludes CPU FE time"],
-  ["x64", "DirectML full graph", "38.12 ms", "~0", "Correct", "GPU", "AC reference run"],
+  ["AMD", "DirectML full graph", "75.79 ms", "0.0000059", "Correct", "1 CPU Resize / 4 GPU nodes", "Battery · audited 11 Jul"],
   ["x64", "ORT CPU full graph", "65.68 ms", "~0", "Correct", "CPU", "AC reference run"],
   ["Intel", "NPU full graph", "~28 ms", "0.9924", "Wrong", "Fully NPU", "Raised fp16 noise floor"],
   ["Qualcomm", "QNN full graph", "127.72 ms", "0.9325", "Wrong", "0 / 1 CPU nodes", "Fully NPU, numerically broken"],
-  ["AMD", "VAIML variants", "not recorded", "~0.99", "Wrong", "NPU", "No working variant found"],
+  ["AMD", "VAIML variants", "crashes or diverges", "~0.99", "Wrong", "NPU", "source-generated 12.9 KB first-inference crash repro"],
 ];
 
 function Caption({ children }: { children: string }) {
@@ -63,7 +63,8 @@ function Overview() {
         decoder; it is not a pure silicon comparison. TSC preserves accuracy on all three NPUs,
         though AMD leaves small shape/control operations on CPU and has the largest probability drift.
         FakeAudio only works correctly on an NPU when its fp32 front-end stays on CPU and the
-        backbone runs on the NPU.
+        backbone runs on the NPU. AMD VAIML now has a synthetic source-generated 12.9 KB reproducer that compiles
+        successfully, creates a session, and access-violates on the first inference.
       </Callout>
 
       <Grid columns="1.35fr 1fr" gap={18}>
@@ -155,11 +156,11 @@ function Classifiers() {
           horizontal
           height={280}
           categories={["Intel OVEP NPU", "Qualcomm QNN NPU", "AMD VitisAI NPU", "DirectML GPU", "ORT CPU"]}
-          series={[{ name: "Mean inference latency", data: [8.67, 20.50, 32.60, 36.64, 79.02], tone: "success" }]}
+          series={[{ name: "Mean inference latency", data: [8.67, 20.50, 32.60, 65.15, 163.13], tone: "success" }]}
           valueSuffix=" ms"
           showValues
         />
-        <Caption>Source: results/ledgers/classifiers.csv · 20 runs per sample. Intel and Qualcomm NPU rows were measured on battery; x64 CPU/GPU rows shown are AC.</Caption>
+        <Caption>Sources: results/ledgers/classifiers.csv plus the legacy Intel OVEP snapshot · 20 runs per sample. Intel and Qualcomm NPU rows were measured on battery; x64 CPU/GPU rows shown are AC.</Caption>
         <Table
           headers={["Vendor", "Executor", "Device", "Mean", "Load", "Accuracy", "Max probability delta", "CPU fallback"]}
           rows={tscRows}
@@ -179,8 +180,15 @@ function Classifiers() {
           striped
           stickyHeader
         />
-        <Caption>Sources: deepfake-benchmark-cpp.csv, fakeaudio-intel-npu.md, and fakeaudio-qualcomm-npu.md · 9–10 Jul 2026.</Caption>
+        <Caption>Sources: results/ledgers/classifiers.csv, results/ledgers/classifiers.legacy.csv, fakeaudio-intel-npu.md, fakeaudio-qualcomm-npu.md, and repros/amd-vaiml-window-partition/README.md · 9–11 Jul 2026.</Caption>
       </Stack>
+
+      <Callout title="Newest AMD VAIML result" tone="danger">
+        A synthetic source-generated 12,884-byte window-partition ONNX returns a finite [64,64,96]
+        tensor on CPU. VAIML compiles it with zero reported errors and creates a
+        VitisAI session, then crashes on the first Run() with access violation
+        0xC0000005 inside onnxruntime_vitisai_ep.dll. Cold and cached paths reproduce.
+      </Callout>
 
       <Callout title="Do not use label accuracy to validate accelerator correctness" tone="warning">
         The FakeAudio fixture's fp32 reference is already only 3/5. The broken Qualcomm full-NPU
@@ -235,7 +243,7 @@ export default function CrossVendorBenchmarkResults() {
     <Stack gap={18} style={{ padding: 24, background: theme.bg.editor, minHeight: "100%" }}>
       <Stack gap={6}>
         <H1>Benchmark results across executors and vendors</H1>
-        <Text tone="secondary">Whisper, TSC, and FakeAudio · measurements through 10 Jul 2026</Text>
+        <Text tone="secondary">Whisper, TSC, FakeAudio, and AMD VAIML · measurements through 11 Jul 2026</Text>
       </Stack>
 
       <Row gap={8} wrap>
