@@ -1,4 +1,4 @@
-# fakeaudio log-mel front-end: the `MatMul → Clip → Log` precision trap
+﻿# fakeaudio log-mel front-end: the `MatMul → Clip → Log` precision trap
 
 Self-contained write-up of *why* the fakeaudio (MS-CLAP / HTSAT) deepfake-audio
 classifier is destroyed by fp16/int8, *exactly where* in the graph it happens, and
@@ -25,7 +25,7 @@ with the scripts in [Reproduce](#reproduce).
 
 ## Exact location
 
-Base graph: `models/deepfake/fakeaudio/model.onnx` — 2,395 nodes, opset domains as
+Base graph: `workloads/classifiers/fakeaudio/model.onnx` — 2,395 nodes, opset domains as
 exported from MS-CLAP. Node indices are the topological position in `graph.node`.
 
 | node idx | op | node name | note |
@@ -146,11 +146,11 @@ Intel OpenVINO / Qualcomm QNN — different compilers than VAIML, may behave; no
 
 ```powershell
 # per-edge fp16/bf16 attribution table (ranges + Δp + flips)
-.venv\Scripts\python.exe scripts\experiments\fakeaudio_fp16_attribution.py
+.venv\Scripts\python.exe tools\research\fakeaudio_fp16_attribution.py
 
 # static graph structure / op histograms / precision-sensitive ops
-.venv\Scripts\python.exe scripts\experiments\inspect_fakeaudio.py
+.venv\Scripts\python.exe tools\research\inspect_fakeaudio.py
 
 # regenerate the fp16-safe / split / int8 variants from the base model
-.venv\Scripts\python.exe scripts\experiments\export_fakeaudio_variants.py
+.venv\Scripts\python.exe tools\research\export_fakeaudio_variants.py
 ```

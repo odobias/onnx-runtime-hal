@@ -1,4 +1,4 @@
-import {
+﻿import {
   BarChart,
   Callout,
   Card,
@@ -89,7 +89,7 @@ function Overview() {
             }]}
             showValues
           />
-          <Caption>Source: results/benchmark-results.csv · runs from 3–9 Jul 2026. RTF normalizes audio duration, but power, clip count, model package, and decode strategy differ.</Caption>
+          <Caption>Source: results/ledgers/asr.csv · runs from 3–9 Jul 2026. RTF normalizes audio duration, but power, clip count, model package, and decode strategy differ.</Caption>
         </Stack>
 
         <Card>
@@ -121,7 +121,7 @@ function Whisper() {
         striped
         stickyHeader
       />
-      <Caption>Source: results/benchmark-results.csv. Intel GenAI and Intel OVEP rows use one 5.855 s clip on AC; Qualcomm, AMD, DirectML, and ORT CPU rows aggregate 12 clips / 130.47 s on battery. Treat ranking as directional, not laboratory-grade.</Caption>
+      <Caption>Source: results/ledgers/asr.csv. Intel GenAI and Intel OVEP rows use one 5.855 s clip on AC; Qualcomm, AMD, DirectML, and ORT CPU rows aggregate 12 clips / 130.47 s on battery. Treat ranking as directional, not laboratory-grade.</Caption>
 
       <Grid columns={2} gap={18}>
         <Card>
@@ -160,7 +160,7 @@ function Classifiers() {
           valueSuffix=" ms"
           showValues
         />
-        <Caption>Source: results/deepfake-benchmark-cpp.csv · latest battery rows through 11 Jul 2026 · 20 runs per sample.</Caption>
+        <Caption>Sources: results/ledgers/classifiers.csv plus the legacy Intel OVEP snapshot · 20 runs per sample. Intel and Qualcomm NPU rows were measured on battery; x64 CPU/GPU rows shown are AC.</Caption>
         <Table
           headers={["Vendor", "Executor", "Device", "Mean", "Load", "Accuracy", "Max probability delta", "CPU fallback"]}
           rows={tscRows}
@@ -180,7 +180,7 @@ function Classifiers() {
           striped
           stickyHeader
         />
-        <Caption>Sources: deepfake-benchmark-cpp.csv, fakeaudio-intel-npu.md, fakeaudio-qualcomm-npu.md, and repros/amd-vaiml-window-partition/README.md · 9–11 Jul 2026.</Caption>
+        <Caption>Sources: results/ledgers/classifiers.csv, results/ledgers/classifiers.legacy.csv, fakeaudio-intel-npu.md, fakeaudio-qualcomm-npu.md, and repros/amd-vaiml-window-partition/README.md · 9–11 Jul 2026.</Caption>
       </Stack>
 
       <Callout title="Newest AMD VAIML result" tone="danger">

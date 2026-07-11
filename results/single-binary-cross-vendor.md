@@ -1,4 +1,4 @@
-# One Binary Across Vendors — Feasibility Notes
+﻿# One Binary Across Vendors — Feasibility Notes
 
 Research parked for later: can we ship **one** benchmark deploy that runs the unified
 `whisper/en-static-onnx` model on Intel / AMD / Qualcomm NPUs? This is the
@@ -93,7 +93,7 @@ One exe, swap the runtime DLL pack per host (`x64` = AMD/VitisAI, `x64-ovep` = I
   for us.
 - **VitisAI is invisible to `GetEpDevices()`** (registered the legacy way), so auto-EP
   hardware detection can't see the AMD NPU — see the `best_available_device()` probe notes
-  in `src/backends/ort_static/ort_static_engine.cpp` (`WHISPER_HAL_LOG_PROBE=1`).
+  in `src/backends/ort_static/ort_static_engine.cpp` (`NPU_INFERENCE_BENCH_LOG_PROBE=1`).
 
 ---
 
