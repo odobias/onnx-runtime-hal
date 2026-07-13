@@ -370,8 +370,8 @@ bool available() { return true; }
 // guess degrades gracefully rather than failing.
 Device best_available_device() {
 #ifdef NPU_INFERENCE_BENCH_QUALCOMM
-    // Qualcomm / ARM64: confirm a real QNN NPU via the EP device list. DirectML/GPU
-    // is dormant on ARM64, so it is NPU-or-CPU here.
+    // Qualcomm / ARM64: prefer a real QNN NPU, then the DirectML-backed Adreno GPU.
+    // Session construction validates either pick and retains the normal CPU fallback.
     try {
         Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_probe");
         ep::register_qnn_library(env);
@@ -382,8 +382,21 @@ Device best_available_device() {
             }
         }
     } catch (...) {
-        // Fall through to CPU if the plugin can't be probed.
+        // A failed QNN probe must not hide a usable DirectML GPU.
     }
+#ifdef NPU_INFERENCE_BENCH_ORT_HAS_DML
+    try {
+        for (const std::string& provider : Ort::GetAvailableProviders()) {
+            const std::string p = ep::lower(provider);
+            if (p.find("dml") != std::string::npos ||
+                p.find("directml") != std::string::npos) {
+                return Device::GPU;
+            }
+        }
+    } catch (...) {
+        // Fall through to CPU; the explicit GPU path can still report the error.
+    }
+#endif
     return Device::CPU;
 #else
     // x64 (and any non-Qualcomm build). Self-select using ORT's EP-device list as a
