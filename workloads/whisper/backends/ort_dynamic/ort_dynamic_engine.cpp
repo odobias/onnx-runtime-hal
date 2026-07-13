@@ -284,6 +284,10 @@ public:
         out.model_format = "onnx";
         out.decode_strategy = "dynamic-kv";
         out.max_context = -1;  // grows with the sequence
+
+        // Finalize profiling after the first transcription (normally the harness
+        // warmup), so measured runs do not accumulate profiler overhead.
+        (void)execution_diagnostics();
         return out;
     }
 

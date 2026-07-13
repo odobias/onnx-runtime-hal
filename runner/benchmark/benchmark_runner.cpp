@@ -310,7 +310,7 @@ constexpr const char* kBenchmarkCsvHeader =
     "cold_start_seconds,hot_start_seconds,power_source,"
     "host_arch,host_os,runtime_version,"
     "requested_provider,resolved_provider,fallback_occurred,provider_attempts,"
-    "cpu_offload_pct,cpu_offload_ops,error";
+    "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,error";
 
 // Classifier ledger schema (see append_classifier_csv). Kept as a named constant so
 // the writer and the additive migration below agree on column order.
@@ -553,6 +553,8 @@ void append_result_csv(const std::string& path,
         << csv_escape(diagnostics.resolved_provider) << ','
         << (diagnostics.fallback_occurred ? "true" : "false") << ','
         << csv_escape(provider_attempts_json(diagnostics)) << ','
+        << (diagnostics.offload_measured ? std::to_string(diagnostics.ep_nodes) : std::string()) << ','
+        << (diagnostics.offload_measured ? std::to_string(diagnostics.cpu_nodes) : std::string()) << ','
         << opt_num(cpu_offload_pct, diagnostics.offload_measured, 4) << ','
         << csv_escape(diagnostics.cpu_offload_ops) << ','
         << "" << '\n';

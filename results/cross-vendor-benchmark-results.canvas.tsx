@@ -23,7 +23,7 @@ const whisperRows = [
   ["AMD", "ORT VitisAI", "NPU", "static, no KV", "0.0819", "221.20 / 2.72 s", "9.90%", "battery · 12 clips"],
   ["Generic x64", "ORT DirectML", "GPU", "static, no KV", "0.1004", "0.69 / 0.58 s", "8.58%", "battery · 12 clips"],
   ["Generic x64", "ORT CPU", "CPU", "static, no KV", "0.1041", "0.42 / 0.42 s", "8.58%", "battery · 12 clips"],
-  ["Intel", "ORT OpenVINO EP", "NPU", "static, no KV", "0.1567", "13.99 / 0.87 s", "5.88%", "AC · 1 clip"],
+  ["Intel", "ORT OpenVINO EP", "NPU", "static, no KV", "0.1163", "14.52 / 0.94 s", "9.57%", "battery · 12 clips"],
 ];
 
 const tscRows = [
@@ -84,12 +84,12 @@ function Overview() {
             ]}
             series={[{
               name: "Real-time factor",
-              data: [0.01062, 0.05538, 0.08195, 0.10044, 0.10414, 0.15666],
+              data: [0.01062, 0.05538, 0.08195, 0.10044, 0.10414, 0.11628],
               tone: "info",
             }]}
             showValues
           />
-          <Caption>Source: results/ledgers/asr.csv · runs from 3–9 Jul 2026. RTF normalizes audio duration, but power, clip count, model package, and decode strategy differ.</Caption>
+          <Caption>Source: results/ledgers/asr.csv · runs from 3–10 Jul 2026. Portable static rows use the same 12 clips / 130.47 s; Intel GenAI still uses one 5.855 s clip and a different decoder.</Caption>
         </Stack>
 
         <Card>
@@ -121,26 +121,26 @@ function Whisper() {
         striped
         stickyHeader
       />
-      <Caption>Source: results/ledgers/asr.csv. Intel GenAI and Intel OVEP rows use one 5.855 s clip on AC; Qualcomm, AMD, DirectML, and ORT CPU rows aggregate 12 clips / 130.47 s on battery. Treat ranking as directional, not laboratory-grade.</Caption>
+      <Caption>Source: results/ledgers/asr.csv. All portable static/no-KV rows now aggregate the same 12 clips / 130.47 s on battery. Intel GenAI remains a one-clip AC run with a different bounded-KV decoder.</Caption>
 
       <Grid columns={2} gap={18}>
         <Card>
           <CardHeader>Executor effect</CardHeader>
           <CardBody>
-            <Text>Intel GenAI's bounded-KV decode reaches RTF 0.0106, roughly 15× faster than Intel's static no-KV OVEP path (0.1567). That gap mostly measures decoding architecture, not merely the NPU.</Text>
+            <Text>Intel GenAI's bounded-KV decode reaches RTF 0.0106, roughly 11× faster than Intel's 12-clip static no-KV OVEP path (0.1163). That gap mostly measures decoding architecture, not merely the NPU.</Text>
           </CardBody>
         </Card>
         <Card>
           <CardHeader>Portable static ONNX</CardHeader>
           <CardBody>
-            <Text>For the same static/no-KV family, QNN NPU (0.0554) leads VitisAI NPU (0.0819), DirectML GPU (0.1004), ORT CPU (0.1041), and Intel OVEP NPU (0.1567) in the recorded data.</Text>
+            <Text>On the same 12 clips and static/no-KV model family, QNN NPU (0.0554) leads VitisAI NPU (0.0819), DirectML GPU (0.1004), ORT CPU (0.1041), and Intel OVEP NPU (0.1163). Host and power differences still prevent a pure silicon ranking.</Text>
           </CardBody>
         </Card>
       </Grid>
 
       <Callout title="Startup matters" tone="warning">
-        AMD VitisAI cold compile is 221 s, versus about 25 s for QNN and 14 s for Intel OVEP.
-        Persisted caches reduce hot load to 2.72 s, 0.94 s, and 0.87 s respectively.
+        AMD VitisAI cold compile is 221 s, versus about 25 s for QNN and 14.5 s for Intel OVEP.
+        Persisted caches reduce hot load to 2.72 s, 0.94 s, and 0.94 s respectively.
       </Callout>
     </Stack>
   );
@@ -210,7 +210,7 @@ function Caveats() {
         </Card>
         <Card>
           <CardHeader>Evaluation scope</CardHeader>
-          <CardBody><Text>Some Whisper rows cover 12 clips / 130.47 s; newer Intel rows cover one 5.855 s clip. RTF helps, but variance and WER are not equally robust.</Text></CardBody>
+          <CardBody><Text>The portable static/no-KV Whisper rows now cover the same 12 clips / 130.47 s. Intel GenAI still covers one 5.855 s clip, so its WER and variance remain less robust.</Text></CardBody>
         </Card>
         <Card>
           <CardHeader>Decode strategy</CardHeader>
@@ -218,7 +218,7 @@ function Caveats() {
         </Card>
         <Card>
           <CardHeader>Offload counters</CardHeader>
-          <CardBody><Text>QNN's “1 EP node” means one fused partition containing hundreds of ONNX ops. Zero CPU nodes proves no fallback outside that partition; it does not mean the model has one operation.</Text></CardBody>
+          <CardBody><Text>Fused-node counts are not compute percentages. QNN reports one fused NPU partition and zero CPU nodes. Intel Whisper OVEP reports 11 accelerator nodes plus 11 CPU nodes (IsNaN ×4, Transpose ×7): genuine host fallback, but not evidence that 50% of FLOPs ran on CPU.</Text></CardBody>
         </Card>
         <Card>
           <CardHeader>AMD TSC host shape operations</CardHeader>

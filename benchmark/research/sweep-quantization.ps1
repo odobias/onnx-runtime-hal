@@ -249,6 +249,10 @@ foreach ($v in $manifestObj.variants) {
             host_arch = (Get-BenchmarkRowValue $firstRow 'host_arch' (Get-BenchmarkHostArch))
             host_os = (Get-BenchmarkRowValue $firstRow 'host_os' (Get-BenchmarkHostOs))
             runtime_version = (Get-BenchmarkRowValue $firstRow 'runtime_version' '')
+            ep_nodes = (Get-BenchmarkRowValue $firstRow 'ep_nodes' '')
+            cpu_nodes = (Get-BenchmarkRowValue $firstRow 'cpu_nodes' '')
+            cpu_offload_pct = (Get-BenchmarkRowValue $firstRow 'cpu_offload_pct' '')
+            cpu_offload_ops = (Get-BenchmarkRowValue $firstRow 'cpu_offload_ops' '')
         })
         Write-Host ("   ok: {0} clips | {1} ms | WER {2}% | conf {3}" -f `
                 $rows.Count, [math]::Round($meanMs, 1),

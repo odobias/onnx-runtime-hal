@@ -29,6 +29,8 @@ Successful rows include:
 - `resolved_provider`
 - `fallback_occurred`
 - `provider_attempts`
+- `ep_nodes`
+- `cpu_nodes`
 - `cpu_offload_pct`
 - `cpu_offload_ops`
 - `error`
@@ -36,9 +38,13 @@ Successful rows include:
 `provider_attempts` is JSON stored inside the CSV field. It preserves each
 provider tried, whether it succeeded, and the provider-specific error.
 
-CPU offload is based on distinct ORT profiler nodes, not compute share. One
-accelerator event may represent hundreds of fused ONNX operations while cheap
-shape/control operations remain individual CPU nodes.
+CPU offload is based on distinct ORT profiler nodes, not compute share.
+`ep_nodes` and `cpu_nodes` expose the underlying counts; one accelerator event
+may represent hundreds of fused ONNX operations while cheap shape/control
+operations remain individual CPU nodes. The same profiler parser is used for
+OpenVINO, VitisAI, QNN, and DirectML, so the audit is vendor-neutral. Whisper
+profiling ends after the first transcription (normally warmup), before measured
+latency runs.
 
 Classifier startup is measured twice against a dedicated cache:
 

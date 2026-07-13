@@ -286,6 +286,10 @@ public:
         out.model_format = "onnx";
         out.decode_strategy = "static-no-kv";
         out.max_context = static_cast<long>(kStaticMaxTokens);
+
+        // Finalize profiling after the first transcription (normally the harness
+        // warmup), so measured runs do not accumulate profiler overhead.
+        (void)execution_diagnostics();
         return out;
     }
 

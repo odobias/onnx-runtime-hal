@@ -42,7 +42,7 @@ function Get-BenchmarkResultColumns {
         "cold_start_seconds", "hot_start_seconds", "power_source",
         "host_arch", "host_os", "runtime_version",
         "requested_provider", "resolved_provider", "fallback_occurred", "provider_attempts",
-        "cpu_offload_pct", "cpu_offload_ops", "error"
+        "ep_nodes", "cpu_nodes", "cpu_offload_pct", "cpu_offload_ops", "error"
     )
 }
 
