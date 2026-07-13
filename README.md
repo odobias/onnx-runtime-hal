@@ -180,8 +180,16 @@ The project targets Windows x64 and ARM64 using C++17 and MSBuild.
 .\tools\build\build.ps1 -EnableAmd -DisableIntel
 
 # Qualcomm ARM64.
+.\tools\setup\setup-qualcomm.ps1
 .\tools\build\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel
 ```
+
+The Qualcomm setup stages one native ARM64 executable with both execution
+providers: QNN targets the Hexagon NPU and DirectML targets the Adreno GPU.
+The portable suite can exercise both with `-Device npu,gpu -Provider auto`.
+See [Qualcomm Snapdragon on Windows ARM64](docs/platforms/qualcomm-windows-arm64.md)
+for the tested CPU, GPU, and NPU requirements, supported workloads, verification
+criteria, and troubleshooting guidance.
 
 Build output:
 
