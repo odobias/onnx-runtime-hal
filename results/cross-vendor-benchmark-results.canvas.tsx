@@ -18,38 +18,20 @@
 } from "cursor/canvas";
 
 const whisperRows = [
-  ["Intel", "OpenVINO GenAI", "NPU", "bounded KV", "0.0106", "7.59 / 0.56 s", "5.88%", "AC · 1 clip"],
-  ["Qualcomm", "ORT QNN", "NPU", "static, no KV", "0.0554", "24.70 / 0.94 s", "8.58%", "battery · 12 clips"],
-  ["AMD", "ORT VitisAI", "NPU", "static, no KV", "0.0819", "221.20 / 2.72 s", "9.90%", "battery · 12 clips"],
-  ["Generic x64", "ORT DirectML", "GPU", "static, no KV", "0.1004", "0.69 / 0.58 s", "8.58%", "battery · 12 clips"],
-  ["Generic x64", "ORT CPU", "CPU", "static, no KV", "0.1041", "0.42 / 0.42 s", "8.58%", "battery · 12 clips"],
-  ["Intel", "ORT OpenVINO EP", "NPU", "static, no KV", "0.1163", "14.52 / 0.94 s", "9.57%", "battery · 12 clips"],
-  ["Intel", "ORT OpenVINO EP", "CPU", "dynamic KV", "0.0903", "4.25 / 2.69 s", "5.88%", "battery · 1 clip · 12534e24…"],
-  ["Intel", "ORT OpenVINO EP", "GPU", "dynamic KV", "0.1814", "5.67 / 2.66 s", "5.88%", "battery · 1 clip · 12534e24…"],
+  ["Snapdragon ARM64", "QNN NPU", "Static", "1.27.0", "415.38 ms", "0.0709", "16.89 / 0.73 s", "5.88 / 4.49%", "2 EP / 0 CPU", "0%"],
+  ["Radeon 890M x64", "DirectML GPU", "Static", "1.25.1", "840.72 ms", "0.1436", "2.04 / 0.60 s", "5.88 / 4.49%", "2 EP / 0 CPU", "0%"],
+  ["Radeon 890M x64", "DirectML GPU", "Dynamic KV", "1.25.1", "780.18 ms", "0.1332", "1.44 / 1.41 s", "5.88 / 4.49%", "592 EP / 180 CPU", "23.32%"],
+  ["Snapdragon ARM64", "DirectML GPU", "Static", "1.24.4", "1355.40 ms", "0.2315", "1.62 / 0.99 s", "5.88 / 4.49%", "2 EP / 0 CPU", "0%"],
+  ["Snapdragon ARM64", "DirectML GPU", "Dynamic KV", "1.24.4", "1391.25 ms", "0.2376", "1.19 / 1.27 s", "5.88 / 4.49%", "592 EP / 180 CPU", "23.32%"],
 ];
 
-const tscRows = [
-  ["Intel", "ORT OpenVINO EP", "NPU", "8.02 ms", "8.11 / 0.55 s", "93.3%", "0.00665", "0 / 1 CPU nodes"],
-  ["Intel", "ORT OpenVINO EP", "GPU", "9.31 ms", "2.29 / 1.07 s", "93.3%", "0.00122", "0 / 1 CPU nodes"],
-  ["Qualcomm", "ORT QNN", "NPU", "20.50 ms", "13.96 s", "93.3%", "0.04731", "0 / 1 CPU nodes"],
-  ["AMD", "ORT VitisAI", "NPU", "32.03 ms", "4.02 s", "93.3%", "0.05680", "13 CPU shape/control nodes; compute fused"],
-  ["AMD", "ORT DirectML", "GPU", "62.42 ms", "0.50 s", "93.3%", "0.000306", "0 / 1 CPU nodes"],
-  ["AMD", "ORT CPU", "CPU", "129.98 ms", "0.37 s", "93.3%", "0.0000019", "CPU baseline"],
-  ["Intel", "ORT OpenVINO EP", "CPU", "191.72 ms", "1.28 / 0.74 s", "93.3%", "0.0000024", "0 / 1 CPU nodes"],
-];
-
-const fakeAudioRows = [
-  ["Intel", "ORT OpenVINO EP CPU", "111.16 ms", "0.00000033", "Correct", "0 / 1 CPU nodes", "hash 549143bc… · battery"],
-  ["Intel", "ORT OpenVINO EP GPU", "17.55 ms at f16", "NaN", "Wrong", "Rejected", "f32 fails OpenCL work-group launch"],
-  ["Intel", "ORT DirectML GPU", "124.77 ms at f32", "0.00000016", "Correct", "1 CPU Resize / 4 GPU nodes", "recorded; prior probe 76.51 ms · battery"],
-  ["Intel", "ORT OpenVINO EP NPU", "unsupported", "—", "No result", "Compiler abort", "Attention dimensions 64 vs 16"],
-  ["Intel", "CPU FE + NPU backbone", "~30 ms end-to-end", "0.0001", "Correct", "~80% work on NPU", "Needs attention-bias surgery"],
-  ["Qualcomm", "CPU FE + QNN backbone", "114.94 ms + FE", "0.00084", "Correct", "0 / 1 CPU nodes in backbone", "Ledger excludes CPU FE time"],
-  ["AMD", "DirectML full graph", "75.79 ms", "0.0000059", "Correct", "1 CPU Resize / 4 GPU nodes", "Battery · audited 11 Jul"],
-  ["x64", "ORT CPU full graph", "65.68 ms", "~0", "Correct", "CPU", "AC reference run"],
-  ["Intel", "NPU full graph", "~28 ms", "0.9924", "Wrong", "Fully NPU", "Raised fp16 noise floor"],
-  ["Qualcomm", "QNN full graph", "127.72 ms", "0.9325", "Wrong", "0 / 1 CPU nodes", "Fully NPU, numerically broken"],
-  ["AMD", "VAIML variants", "crashes or diverges", "~0.99", "Wrong", "NPU", "source-generated 12.9 KB first-inference crash repro"],
+const classifierRows = [
+  ["Snapdragon ARM64", "QNN NPU", "TSC", "1.27.0", "19.86 ms", "15.56 / 1.31 s", "93.33%", "0.0473", "1 EP / 0 CPU", "0%"],
+  ["Radeon 890M x64", "DirectML GPU", "TSC", "1.25.1", "61.67 ms", "0.90 / 0.55 s", "93.33%", "0.000306", "1 EP / 0 CPU", "0%"],
+  ["Radeon 890M x64", "DirectML GPU", "FakeAudio", "1.25.1", "69.82 ms", "1.34 / 0.74 s", "60.00%", "0.00000594", "4 EP / 1 CPU", "20%"],
+  ["Snapdragon ARM64", "DirectML GPU", "FakeAudio", "1.24.4", "76.27 ms", "1.18 / 0.67 s", "60.00%", "0.00000036", "4 EP / 1 CPU", "20%"],
+  ["Snapdragon ARM64", "DirectML GPU", "TSC", "1.24.4", "97.45 ms", "1.04 / 0.95 s", "93.33%", "0.00000108", "1 EP / 0 CPU", "0%"],
+  ["Snapdragon ARM64", "QNN NPU", "FakeAudio", "1.24.4", "126.74 ms", "18.24 / 0.88 s", "80.00%*", "0.9325", "1 EP / 0 CPU", "0%"],
 ];
 
 function Caption({ children }: { children: string }) {
@@ -60,56 +42,61 @@ function Overview() {
   return (
     <Stack gap={20}>
       <Grid columns={4} gap={14}>
-        <Stat value="3" label="NPU vendors measured" />
-        <Stat value="0.0106" label="Best Whisper RTF · Intel GenAI" tone="success" />
-        <Stat value="8.02 ms" label="Fastest TSC · Intel NPU" tone="success" />
-        <Stat value="0%" label="QNN CPU fallback · 3 graphs" tone="success" />
+        <Stat value="11" label="Current accelerator rows retained" />
+        <Stat value="11 / 11" label="No provider fallback" tone="success" />
+        <Stat value="7" label="Zero CPU-offload rows" tone="success" />
+        <Stat value="4" label="Partial CPU-offload rows" tone="warning" />
       </Grid>
 
       <Callout title="Bottom line" tone="info">
-        Intel GenAI remains the Whisper latency leader, but its bounded-KV decoder is not a pure
-        silicon comparison. In the new battery run, Intel OpenVINO EP TSC is 4.0× faster on NPU
-        than AMD VitisAI while preserving 14/15 accuracy. DirectML now runs full-graph FakeAudio
-        on Intel GPU at exact FP32 reference parity; the OpenVINO GPU path still emits NaNs and
-        NPU compilation still aborts. Exact Intel artifact hashes are recorded; historical AMD
-        rows predate hashing, so identical model bytes are not yet proven.
+        QNN NPU leads the current Whisper static and TSC measurements. DirectML
+        executes all four workloads on both x64 Radeon and ARM64 Snapdragon.
+        Dynamic Whisper and FakeAudio retain CPU nodes on both GPUs. QNN
+        FakeAudio is fully assigned to the NPU but numerically wrong.
       </Callout>
 
-      <Grid columns="1.35fr 1fr" gap={18}>
+      <Grid columns="1.3fr 1fr" gap={18}>
         <Stack gap={8}>
-          <H2>Whisper real-time factor by executor</H2>
-          <Text size="small" tone="secondary">X-axis: executor and device · Y-axis: real-time factor (lower is better)</Text>
+          <H2>CPU-offload node share</H2>
+          <Text size="small" tone="secondary">
+            X-axis: profiler node share assigned to CPU (%) · Y-axis: host, provider, and workload
+          </Text>
           <BarChart
             horizontal
-            height={330}
+            height={390}
             categories={[
-              "Intel GenAI NPU",
-              "Qualcomm QNN NPU",
-              "AMD VitisAI NPU",
-              "DirectML GPU",
-              "ORT CPU",
-              "Intel OVEP NPU · 13 Jul",
+              "Snapdragon QNN · Whisper static",
+              "Radeon DML · Whisper static",
+              "Radeon DML · Whisper dynamic",
+              "Snapdragon DML · Whisper static",
+              "Snapdragon DML · Whisper dynamic",
+              "Snapdragon QNN · TSC",
+              "Radeon DML · TSC",
+              "Radeon DML · FakeAudio",
+              "Snapdragon DML · TSC",
+              "Snapdragon DML · FakeAudio",
+              "Snapdragon QNN · FakeAudio",
             ]}
             series={[{
-              name: "Real-time factor",
-              data: [0.01062, 0.05538, 0.08195, 0.10044, 0.10414, 0.11628],
-              tone: "info",
+              name: "CPU-offload node share",
+              data: [0, 0, 23.32, 0, 23.32, 0, 0, 20, 0, 20, 0],
+              tone: "warning",
             }]}
+            valueSuffix="%"
             showValues
           />
-          <Caption>Source: results/ledgers/asr.csv · runs through 13 Jul 2026. Portable static rows use the same 12 clips / 130.47 s; Intel GenAI still uses one 5.855 s clip and a different decoder.</Caption>
+          <Caption>Source: results/ledgers/asr.csv and classifiers.csv · 13 Jul 2026 · node counts, not compute share.</Caption>
         </Stack>
 
         <Card>
-          <CardHeader trailing={<Pill size="sm" active>Decision readout</Pill>}>What is shippable now</CardHeader>
+          <CardHeader trailing={<Pill size="sm" active>Current</Pill>}>Evidence readout</CardHeader>
           <CardBody>
             <Stack gap={12}>
-              <Text><Text weight="semibold">Whisper:</Text> all three vendor NPUs have a working path. Intel GenAI is fastest; Qualcomm QNN has the best measured portable-static NPU result.</Text>
-              <Text><Text weight="semibold">TSC:</Text> all three NPUs preserve 14/15 fixture accuracy. Intel NPU is 8.02 ms; AMD is 32.03 ms and leaves 13 shape/control nodes on CPU.</Text>
-              <Text><Text weight="semibold">Model identity:</Text> new Intel rows carry SHA-256 identities. The AMD/Qualcomm history does not, so byte-for-byte matching requires reruns there.</Text>
-              <Text><Text weight="semibold">FakeAudio:</Text> ship only as CPU fp32 front-end + NPU backbone on Intel/Qualcomm.</Text>
-              <Text><Text weight="semibold">AMD FakeAudio:</Text> no correct VAIML path has been demonstrated.</Text>
-              <Text><Text weight="semibold">Naive INT8:</Text> not shippable for Whisper or FakeAudio; accuracy collapses.</Text>
+              <Text><Text weight="semibold">Whisper:</Text> QNN static is 415 ms; Radeon DirectML is 781–841 ms; Snapdragon DirectML is 1.36–1.39 s.</Text>
+              <Text><Text weight="semibold">TSC:</Text> all retained rows preserve 14/15 accuracy. QNN is 19.86 ms.</Text>
+              <Text><Text weight="semibold">FakeAudio DirectML:</Text> both hosts match the 3/5 CPU reference with negligible probability drift.</Text>
+              <Text><Text weight="semibold">FakeAudio QNN:</Text> 4/5 labels is misleading; probability drift is 0.9325.</Text>
+              <Text><Text weight="semibold">Placement:</Text> zero fallback does not mean zero CPU offload.</Text>
             </Stack>
           </CardBody>
         </Card>
@@ -120,36 +107,46 @@ function Overview() {
 
 function Whisper() {
   return (
-    <Stack gap={16}>
-      <H2>Whisper tiny.en — executors and vendors</H2>
+    <Stack gap={18}>
+      <Stack gap={8}>
+        <H2>Whisper tiny.en accelerator latency</H2>
+        <Text size="small" tone="secondary">
+          X-axis: host, provider, and decode strategy · Y-axis: mean inference latency (ms)
+        </Text>
+        <BarChart
+          horizontal
+          height={290}
+          categories={[
+            "Snapdragon QNN · static",
+            "Radeon DML · static",
+            "Radeon DML · dynamic",
+            "Snapdragon DML · static",
+            "Snapdragon DML · dynamic",
+          ]}
+          series={[{
+            name: "Mean inference latency",
+            data: [415.38, 840.72, 780.18, 1355.4, 1391.25],
+            tone: "info",
+          }]}
+          valueSuffix=" ms"
+          showValues
+        />
+        <Caption>Five measured runs after one warmup · identical package hashes · 5.855 s LS_000 clip · battery.</Caption>
+      </Stack>
+
       <Table
-        headers={["Vendor", "Executor", "Device", "Decode", "RTF ↓", "Cold / hot load", "WER", "Run context"]}
+        headers={["Host", "Provider", "Decode", "ORT", "Mean", "RTF", "Cold / hot", "WER / CER", "Placement", "CPU offload"]}
         rows={whisperRows}
-        columnAlign={["left", "left", "left", "left", "right", "right", "right", "left"]}
-        rowTone={["success", "warning", "success", "neutral", "success", "neutral", "warning", "warning"]}
+        columnAlign={["left", "left", "left", "left", "right", "right", "right", "right", "left", "right"]}
+        rowTone={["success", "neutral", "warning", "neutral", "warning"]}
         striped
         stickyHeader
       />
-      <Caption>Source: results/ledgers/asr.csv. All portable static/no-KV rows aggregate the same 12 clips / 130.47 s on battery. New one-clip Intel rows additionally record artifact hashes; Intel GenAI remains a one-clip AC run with a different bounded-KV decoder.</Caption>
 
-      <Grid columns={2} gap={18}>
-        <Card>
-          <CardHeader>Executor effect</CardHeader>
-          <CardBody>
-            <Text>Intel GenAI's bounded-KV decode reaches RTF 0.0106, roughly 11× faster than Intel's 12-clip static no-KV OVEP path (0.1163). That gap mostly measures decoding architecture, not merely the NPU.</Text>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>Portable static ONNX</CardHeader>
-          <CardBody>
-            <Text>On the same 12 clips and static/no-KV model family, QNN NPU (0.0554) leads VitisAI NPU (0.0819), DirectML GPU (0.1004), ORT CPU (0.1041), and Intel OVEP NPU (0.1163). Historical rows lack hashes, so identical model bytes are not yet proven.</Text>
-          </CardBody>
-        </Card>
-      </Grid>
-
-      <Callout title="Startup matters" tone="warning">
-        AMD VitisAI cold compile is 221 s, versus about 25 s for QNN and 14.5 s for Intel OVEP.
-        Persisted caches reduce hot load to 2.72 s, 0.94 s, and 0.94 s respectively.
+      <Callout title="Decode and placement" tone="warning">
+        Static QNN is the fastest retained Whisper row. Dynamic KV helps on the
+        Radeon run but not on Snapdragon DirectML. Both dynamic DirectML runs
+        leave the same 180 shape/control nodes on CPU.
       </Callout>
     </Stack>
   );
@@ -157,92 +154,89 @@ function Whisper() {
 
 function Classifiers() {
   return (
-    <Stack gap={20}>
+    <Stack gap={18}>
       <Stack gap={8}>
-        <H2>Text Scam Classifier</H2>
-        <Text size="small" tone="secondary">X-axis: executor/device · Y-axis: mean inference latency in milliseconds (lower is better)</Text>
+        <H2>Classifier accelerator latency</H2>
+        <Text size="small" tone="secondary">
+          X-axis: host, provider, and classifier · Y-axis: mean inference latency per fixture (ms)
+        </Text>
         <BarChart
           horizontal
-          height={280}
-          categories={["Intel OVEP NPU", "Intel OVEP GPU", "Qualcomm QNN NPU", "AMD VitisAI NPU", "AMD DirectML GPU", "AMD ORT CPU", "Intel OVEP CPU"]}
-          series={[{ name: "Mean inference latency", data: [8.02, 9.31, 20.50, 32.03, 62.42, 129.98, 191.72], tone: "success" }]}
+          height={310}
+          categories={[
+            "Snapdragon QNN · TSC",
+            "Radeon DML · TSC",
+            "Radeon DML · FakeAudio",
+            "Snapdragon DML · FakeAudio",
+            "Snapdragon DML · TSC",
+            "Snapdragon QNN · FakeAudio",
+          ]}
+          series={[{
+            name: "Mean inference latency",
+            data: [19.86, 61.67, 69.82, 76.27, 97.45, 126.74],
+            tone: "success",
+          }]}
           valueSuffix=" ms"
           showValues
         />
-        <Caption>Source: results/ledgers/classifiers.csv · 20 runs per sample · measurements through 13 Jul 2026. New Intel and July AMD rows were measured on battery.</Caption>
-        <Table
-          headers={["Vendor", "Executor", "Device", "Mean", "Load", "Accuracy", "Max probability delta", "CPU fallback"]}
-          rows={tscRows}
-          columnAlign={["left", "left", "left", "right", "right", "right", "right", "left"]}
-          rowTone={["success", "success", "success", "warning", "neutral", "neutral", "warning"]}
-          striped
-        />
+        <Caption>Source: results/ledgers/classifiers.csv · 20 runs per fixture · battery.</Caption>
       </Stack>
 
-      <Stack gap={8}>
-        <H2>FakeAudio detector</H2>
-        <Table
-          headers={["Vendor", "Path", "Latency", "Max probability delta", "Agreement", "Placement", "Important caveat"]}
-          rows={fakeAudioRows}
-          columnAlign={["left", "left", "right", "right", "left", "left", "left"]}
-          rowTone={["success", "danger", "success", "danger", "success", "success", "success", "success", "danger", "danger", "danger"]}
-          striped
-          stickyHeader
-        />
-        <Caption>Sources: results/ledgers/classifiers.csv, results/ledgers/classifiers.legacy.csv, fakeaudio-intel-npu.md, fakeaudio-qualcomm-npu.md, and repros/amd-vaiml-window-partition/README.md · through 13 Jul 2026.</Caption>
-      </Stack>
+      <Table
+        headers={["Host", "Provider", "Model", "ORT", "Mean", "Cold / hot", "Accuracy", "Max probability delta", "Placement", "CPU offload"]}
+        rows={classifierRows}
+        columnAlign={["left", "left", "left", "left", "right", "right", "right", "right", "left", "right"]}
+        rowTone={["success", "success", "success", "success", "success", "danger"]}
+        striped
+        stickyHeader
+      />
 
-      <Callout title="Newest AMD VAIML result" tone="danger">
-        A synthetic source-generated 12,884-byte window-partition ONNX returns a finite [64,64,96]
-        tensor on CPU. VAIML compiles it with zero reported errors and creates a
-        VitisAI session, then crashes on the first Run() with access violation
-        0xC0000005 inside onnxruntime_vitisai_ep.dll. Cold and cached paths reproduce.
-      </Callout>
-
-      <Callout title="Do not use label accuracy to validate accelerator correctness" tone="warning">
-        The FakeAudio fixture's fp32 reference is already only 3/5. The broken Qualcomm full-NPU
-        run scores 4/5 by accidentally flipping a sample, while diverging from the trusted CPU
-        probabilities by 0.93. Cross-executor probability agreement is the correctness metric.
+      <Callout title="The asterisk matters" tone="danger">
+        QNN FakeAudio reports 4/5 labels, but the trusted FP32 reference is 3/5
+        and the maximum probability delta is 0.9325. That row is retained as a
+        complete accelerator failure, not as an accuracy improvement.
       </Callout>
     </Stack>
   );
 }
 
-function Caveats() {
+function Method() {
   return (
-    <Stack gap={16}>
-      <H2>Comparison limits</H2>
+    <Stack gap={18}>
+      <H2>Curation contract</H2>
       <Grid columns={2} gap={16}>
         <Card>
-          <CardHeader>Power and host state</CardHeader>
-          <CardBody><Text>Rows mix AC and battery measurements. Battery runs can throttle CPU, GPU, and NPU clocks; do not attribute every delta to architecture.</Text></CardBody>
+          <CardHeader>Required fields</CardHeader>
+          <CardBody>
+            <Stack gap={8}>
+              <Text>Model SHA-256 and inference precision</Text>
+              <Text>Runtime and runtime version</Text>
+              <Text>Requested and resolved provider</Text>
+              <Text>Fallback status and provider attempts</Text>
+              <Text>Accelerator/CPU node counts and offload percentage</Text>
+              <Text>Cold/hot load, latency, and quality metrics</Text>
+            </Stack>
+          </CardBody>
         </Card>
+
         <Card>
-          <CardHeader>Evaluation scope</CardHeader>
-          <CardBody><Text>The portable static/no-KV Whisper rows now cover the same 12 clips / 130.47 s. Intel GenAI still covers one 5.855 s clip, so its WER and variance remain less robust.</Text></CardBody>
-        </Card>
-        <Card>
-          <CardHeader>Decode strategy</CardHeader>
-          <CardBody><Text>Intel GenAI uses bounded KV caching. Portable NPU paths use static no-KV recomputation. Comparing their latency as if only the hardware changed would be nonsense.</Text></CardBody>
-        </Card>
-        <Card>
-          <CardHeader>Offload counters</CardHeader>
-          <CardBody><Text>Fused-node counts are not compute percentages. QNN reports one fused NPU partition and zero CPU nodes. Intel Whisper OVEP reports 11 accelerator nodes plus 11 CPU nodes (IsNaN ×4, Transpose ×7): genuine host fallback, but not evidence that 50% of FLOPs ran on CPU.</Text></CardBody>
-        </Card>
-        <Card>
-          <CardHeader>AMD TSC host shape operations</CardHeader>
-          <CardBody><Text>VitisAI runs the expensive transformer as one fused NPU node but leaves 13 shape/control nodes on CPU. A fixed-shape ONNX simplification reduced this by only one Unsqueeze and did not change latency or probability drift, so the original graph is retained.</Text></CardBody>
-        </Card>
-        <Card>
-          <CardHeader>Artifact identity</CardHeader>
-          <CardBody><Text>Intel static Whisper: 9da9f440…; dynamic Whisper: 12534e24…; TSC: 90f2ed1b…; FakeAudio: 549143bc…. Hashes cover graph and weight artifacts by content, independent of filenames. Historical rows remain blank.</Text></CardBody>
+          <CardHeader>Rows omitted</CardHeader>
+          <CardBody>
+            <Stack gap={8}>
+              <Text><Text weight="semibold">ASR:</Text> 58 ledger rows; 5 retained.</Text>
+              <Text><Text weight="semibold">Classifiers:</Text> 24 ledger rows; 6 retained.</Text>
+              <Text>Incomplete historical rows are excluded.</Text>
+              <Text>Qualcomm CPU baselines and pre-fix GPU-to-CPU fallback probes are superseded by successful DirectML runs.</Text>
+              <Text>One x64 DirectML row without reliable host provenance is excluded.</Text>
+            </Stack>
+          </CardBody>
         </Card>
       </Grid>
-      <Callout title="Current evidence quality" tone="info">
-        The strongest cross-vendor conclusions are qualitative: all three NPUs run Whisper;
-        all three preserve TSC fixture accuracy; FakeAudio requires a CPU fp32 front-end plus NPU
-        backbone on Intel/Qualcomm; and AMD FakeAudio remains unresolved. Exact latency rankings
-        need a controlled AC-powered, same-clips, same-hash, same-runtime rerun.
+
+      <Callout title="Comparison limits" tone="warning">
+        These are same-model, same-clip or same-fixture comparisons, but not a
+        controlled hardware shootout. Runtime versions and host power behavior
+        differ. Node percentages describe profiler placement, not FLOP share.
       </Callout>
     </Stack>
   );
@@ -250,25 +244,26 @@ function Caveats() {
 
 export default function CrossVendorBenchmarkResults() {
   const theme = useHostTheme();
-  const [tab, setTab] = useCanvasState("benchmark-tab", "Overview");
+  const [tab, setTab] = useCanvasState("benchmark-tab-v3", "Overview");
+  const tabs = ["Overview", "Whisper", "Classifiers", "Method"];
 
   return (
     <Stack gap={18} style={{ padding: 24, background: theme.bg.editor, minHeight: "100%" }}>
       <Stack gap={6}>
-        <H1>Benchmark results across executors and vendors</H1>
-        <Text tone="secondary">Whisper, TSC, FakeAudio, and AMD VAIML · measurements through 13 Jul 2026</Text>
+        <H1>Current schema-complete accelerator results</H1>
+        <Text tone="secondary">Radeon 890M x64 and Snapdragon ARM64 · DirectML and QNN · 13 Jul 2026</Text>
       </Stack>
 
       <Row gap={8} wrap>
-        {["Overview", "Whisper", "Classifiers", "Caveats"].map((name) => (
-          <Pill active={tab === name} onClick={() => setTab(name)}>{name}</Pill>
+        {tabs.map((name) => (
+          <Pill key={name} active={tab === name} onClick={() => setTab(name)}>{name}</Pill>
         ))}
       </Row>
 
       {tab === "Overview" && <Overview />}
       {tab === "Whisper" && <Whisper />}
       {tab === "Classifiers" && <Classifiers />}
-      {tab === "Caveats" && <Caveats />}
+      {tab === "Method" && <Method />}
     </Stack>
   );
 }
