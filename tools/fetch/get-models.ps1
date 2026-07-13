@@ -83,4 +83,4 @@ foreach ($e in $entries) {
 }
 
 Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
-Write-Host "Benchmark assets ready under workloads/." -ForegroundColor Green
+Write-Host "Benchmark assets ready at their mapped workload/model paths." -ForegroundColor Green

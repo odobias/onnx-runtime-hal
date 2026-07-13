@@ -51,7 +51,7 @@ FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
 BASE = os.path.join(FA, "model.onnx")
 FE = os.path.join(FA, "model.frontend-fp32.onnx")
 BB = os.path.join(FA, "model.backbone-fp32.onnx")
-BB_NPU = os.path.join(FA, "model.backbone.npu-intel.onnx")
+BB_NPU = os.path.join(FA, "model.backbone.expanded-attention-bias.onnx")
 
 
 def expand_attention_bias(src, dst):

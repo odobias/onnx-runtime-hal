@@ -36,11 +36,11 @@
         {
           "provider": "openvino",
           "device": "npu",
-          "path": "models/deepfake/fixtures/fakeaudio-bb-npu-intel",
+          "path": "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias",
           "outputs": [
-            "models/deepfake/fakeaudio/model.backbone.npu-intel.onnx",
-            "models/deepfake/fixtures/fakeaudio-bb-npu-intel/model.tsv",
-            "models/deepfake/fixtures/fakeaudio-bb-npu-intel/fixture-step.json"
+            "models/deepfake/fakeaudio/model.backbone.expanded-attention-bias.onnx",
+            "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
+            "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
           ],
           "steps": [
             {

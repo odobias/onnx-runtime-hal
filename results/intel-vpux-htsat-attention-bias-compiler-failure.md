@@ -65,9 +65,9 @@ expanded_bias = Expand(bias, shape)
 Add(scores, expanded_bias) -> Softmax
 ```
 
-The resulting `model.backbone.npu-intel.onnx` compiles successfully. This is a
-semantics-preserving rewrite; CPU FP32 frontend plus the transformed NPU
-backbone showed:
+The resulting `model.backbone.expanded-attention-bias.onnx` compiles
+successfully. This is a semantics-preserving, vendor-neutral rewrite; CPU FP32
+frontend plus the transformed NPU backbone showed:
 
 - maximum probability delta versus full FP32 CPU: approximately `0.0001`
 - prediction flips on five validation samples: `0`
@@ -91,7 +91,7 @@ Why does SDPA fusion transform a valid rank-four broadcast into
 ## Attachments needed
 
 - `model.backbone-fp32.onnx` — failing backbone
-- `model.backbone.npu-intel.onnx` — working explicit-broadcast backbone
+- `model.backbone.expanded-attention-bias.onnx` — working explicit-broadcast backbone
 - one frontend-output input tensor
 - full verbose NPU compilation log
 - exact `FULL_DEVICE_NAME`, driver version, and OpenVINO package version

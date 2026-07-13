@@ -41,7 +41,9 @@ TSC = os.path.join(DF, "tsc", "model.onnx")
 FA_BASE = os.path.join(DF, "fakeaudio", "model.onnx")
 FA_FE = os.path.join(DF, "fakeaudio", "model.frontend-fp32.onnx")
 FA_BB = os.path.join(DF, "fakeaudio", "model.backbone-fp32.onnx")
-FA_BB_NPU = os.path.join(DF, "fakeaudio", "model.backbone.npu-intel.onnx")
+FA_BB_NPU = os.path.join(
+    DF, "fakeaudio", "model.backbone.expanded-attention-bias.onnx"
+)
 
 
 def op_of(node):

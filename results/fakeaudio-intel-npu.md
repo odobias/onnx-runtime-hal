@@ -101,21 +101,20 @@ front-end and it NaNs again.
 ## Through the C++ benchmark of record
 
 The split is now a first-class path in the C++ harness (not just this Python probe).
-`tools/research/build_fakeaudio_variant_fixtures.py` emits a `fakeaudio-bb-npu-intel`
-fixture (log-mel input pre-computed by the fp32 front-end on CPU, `model.tsv` ->
-`model.backbone.npu-intel.onnx`, `expected_p` = full fp32 CPU probability), and the
-`fakeaudio` workload in `benchmark/manifests/portable.json` pins the NPU to it via a
-`deviceFixtures` override (the whole-model graph LLVM-aborts vpux, so only the NPU is
-routed to the surgered backbone; GPU/CPU keep the whole model). So:
+`tools/research/build_fakeaudio_variant_fixtures.py` generates the vendor-neutral
+`fakeaudio-bb-expanded-attention-bias` fixture from the generic fp32 backbone
+(log-mel input pre-computed by the fp32 frontend on CPU, `expected_p` = full fp32
+CPU probability). The `fakeaudio` workload records this as an OpenVINO-NPU
+`executorFixtures` recipe; other providers and devices keep the whole model. So:
 
 ```
-.\benchmark\run-suite.ps1 -Only fakeaudio -Device npu     # OpenVINO NPU, surgered backbone
+.\benchmark\run-suite.ps1 -Only fakeaudio -Device npu     # generates and runs the fixed backbone
 ```
 
 Measured on this box through `NpuInferenceBench.exe` (x64-ovep, OpenVINO EP NPU):
 mean **~24 ms**, `max|Δp|` **6.8e-5** vs the CPU reference, 0 flips, fully on the NPU.
-The fixture ships on HF alongside the models, so a fresh `get-classifier-models.ps1`
-checkout benchmarks it with no Python.
+Only the canonical model and base fixture are fetched from HF. The benchmark
+creates the derived backbone and fixture locally and records both artifact hashes.
 
 ## Verdict
 

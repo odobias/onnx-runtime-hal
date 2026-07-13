@@ -9,9 +9,10 @@
     { "local": "workloads/whisper/manifest.research.json", "hf": "manifest.research.json", "kind": "file" },
     { "local": "workloads/audio/jfk.wav", "hf": "audio/jfk.wav", "kind": "file" },
     { "local": "workloads/eval", "hf": "eval" },
-    { "local": "workloads/classifiers/fakeaudio", "hf": "deepfake/fakeaudio" },
-    { "local": "workloads/classifiers/tsc", "hf": "deepfake/tsc" },
-    { "local": "workloads/classifiers/audio-samples", "hf": "deepfake/audio-samples" },
-    { "local": "workloads/classifiers/fixtures", "hf": "deepfake/fixtures" }
+    { "local": "models/deepfake/fakeaudio/model.onnx", "hf": "deepfake/fakeaudio/model.onnx", "kind": "file" },
+    { "local": "models/deepfake/tsc", "hf": "deepfake/tsc" },
+    { "local": "models/deepfake/audio-samples", "hf": "deepfake/audio-samples" },
+    { "local": "models/deepfake/fixtures/fakeaudio", "hf": "deepfake/fixtures/fakeaudio" },
+    { "local": "models/deepfake/fixtures/tsc", "hf": "deepfake/fixtures/tsc" }
   ]
 }
