@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- AMD backend: ONNX Runtime + VitisAI EP (Ryzen AI). Imported only when
      EnableAmd=true. Point RyzenAiDir at your Ryzen AI SDK, e.g.
      /p:EnableAmd=true /p:RyzenAiDir=C:\Program Files\RyzenAI\1.8.0-beta -->
@@ -15,7 +15,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(OrtAmdInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WHISPER_HAL_AMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NPU_INFERENCE_BENCH_AMD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(OrtAmdLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

@@ -1,18 +1,24 @@
-# Build output
+﻿# Build output
 build/
 bin/
 obj/
 
-# Downloaded / linked SDKs (large; fetched by scripts/setup-intel.ps1)
+# Downloaded / linked SDKs (large; fetched by tools/setup/)
 third_party/
 
-# Python virtual env (created by scripts/get-model.ps1)
+# Python virtual env (created by tools/fetch/get-whisper-model.ps1)
 .venv/
 .venv-ovep/
+.venv-quark*/
 __pycache__/
 
-# Models & audio (fetched/exported by scripts; never committed)
-models/
+# Workload payloads (fetched/exported by tools; never committed)
+workloads/whisper/models/
+workloads/classifiers/tsc/
+workloads/classifiers/fakeaudio/
+workloads/classifiers/fixtures/
+workloads/eval/
+workloads/audio/
 *.wav
 *.blob
 *_openvino_model/
@@ -23,12 +29,13 @@ cache/
 original-info-signature.txt
 original-model-signature.txt
 
-# Regenerated benchmark report artifacts (overwritten by scripts/benchmark-quant.ps1 each
-# run; the canonical ledger is results/benchmark-results.csv, which IS tracked).
+# Regenerated benchmark report artifacts (overwritten by benchmark/research/sweep-quantization.ps1 each
+# run; the canonical CSV ledgers under results/ledgers/ are tracked).
 results/quantization-benchmark.csv
 results/quantization-benchmark-detail.csv
 results/quantization-benchmark.md
 results/host-info.json
+results/ledgers/attempts.jsonl
 
 # Transient build/benchmark logs (e.g. build_ovep.log, bench_intel_whisper.log)
 *.log
