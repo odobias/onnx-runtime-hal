@@ -6,6 +6,7 @@
 #   .\build.ps1 -Configuration Debug
 #   .\build.ps1 -EnableAmd -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel
+#   .\build.ps1 -EnableDirectML -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel -OrtDir C:\onnxruntime
 #   .\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel  # native Snapdragon
 
@@ -15,6 +16,9 @@ param(
     [ValidateSet("x64", "ARM64")][string]$Platform = "",
     [switch]$EnableAmd,
     [switch]$EnableOrt,
+    # Use the official Microsoft.ML.OnnxRuntime.DirectML SDK assembled by
+    # tools/fetch/get-onnxruntime-directml.ps1. Emits a separate *-dml build tree.
+    [switch]$EnableDirectML,
     # Intel native path via ONNX Runtime's OpenVINO EP. Makes the unified ORT binary
     # cover Intel NPU/GPU/CPU. Implies -EnableOrt and forces the OpenVINO GenAI
     # backend OFF (they need incompatible openvino.dll versions in one process).
@@ -72,8 +76,16 @@ if ($EnableOvep -and -not $DisableIntel) {
     Write-Host "EnableOvep: forcing Intel (OpenVINO GenAI) backend OFF -- OVEP replaces it (openvino.dll version conflict)." -ForegroundColor Yellow
     $DisableIntel = $true
 }
+if ($EnableDirectML -and -not $OrtDir) {
+    $directmlDir = Join-Path $root "third_party\onnxruntime-directml"
+    if (-not (Test-Path (Join-Path $directmlDir "include\onnxruntime_cxx_api.h"))) {
+        Write-Host "DirectML SDK missing. Run: .\tools\fetch\get-onnxruntime-directml.ps1" -ForegroundColor Red
+        exit 1
+    }
+    $OrtDir = $directmlDir
+}
 $enableIntel = -not $DisableIntel
-$enableOrt = $EnableOrt -or $EnableOvep -or $EnableAmd -or $EnableQualcomm
+$enableOrt = $EnableOrt -or $EnableDirectML -or $EnableOvep -or $EnableAmd -or $EnableQualcomm
 $args = @(
     $sln,
     "/t:$target",
@@ -97,10 +109,19 @@ if ($RyzenAiDir) {
 if ($OrtDir) {
     $args += "/p:OrtDir=$OrtDir"
 }
+if ($EnableDirectML) {
+    $args += "/p:PlatformOutTag=$Platform-dml"
+}
 & $found.msbuild @args
 if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit 1 }
 
-$platformOutTag = if ($EnableOvep) { "$Platform-ovep" } else { $Platform }
+$platformOutTag = if ($EnableOvep) {
+    "$Platform-ovep"
+} elseif ($EnableDirectML) {
+    "$Platform-dml"
+} else {
+    $Platform
+}
 $exe = Join-Path $root "build\$platformOutTag\$Configuration\NpuInferenceBench.exe"
 Write-Host ""
 Write-Host "Built: $exe" -ForegroundColor Green

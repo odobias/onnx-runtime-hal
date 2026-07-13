@@ -167,6 +167,11 @@ The project targets Windows x64 and ARM64 using C++17 and MSBuild.
 # Portable ONNX Runtime.
 .\tools\build\build.ps1 -EnableOrt -DisableIntel
 
+# DirectML GPU (downloads the matched ORT and DirectML NuGet runtimes).
+.\tools\fetch\get-onnxruntime-directml.ps1
+.\tools\build\build.ps1 -EnableDirectML -DisableIntel
+.\benchmark\run-suite.ps1 -Device gpu -Provider DmlExecutionProvider
+
 # Intel OpenVINO execution provider.
 .\tools\setup\setup-ovep.ps1
 .\tools\build\build.ps1 -EnableOvep

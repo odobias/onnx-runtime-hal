@@ -2,24 +2,29 @@
 replayed through the --classify harness on any NPU (this closes the Qualcomm QNN /
 Hexagon HTP gap the AMD/Intel toolkits could not cover).
 
-Run tools/research/export_fakeaudio_variants.py first (it emits the variant
-ONNX models), then this script. It produces four fixture dirs under
+Run tools/research/export_fakeaudio_variants.py first (it emits the generic
+variant ONNX models), then this script. It produces four fixture dirs under
 models/deepfake/fixtures/:
   fakeaudio-fp16safe     -> model.fp16-safe.onnx        (raw PCM input, whole-graph drop-in)
   fakeaudio-bb-fp32      -> model.backbone-fp32.onnx    (mel input; Qualcomm HTP runs this as-is)
   fakeaudio-bb-int8      -> model.backbone-int8.onnx    (mel input from the CPU front-end)
-  fakeaudio-bb-npu-intel -> model.backbone.npu-intel.onnx (mel input; the attention-bias
-                            expanded backbone that Intel's OpenVINO vpux compiler accepts --
-                            this is the fixture the C++ benchmark replays for fakeaudio on the
-                            Intel NPU; see results/fakeaudio-intel-npu.md and fakeaudio_npu_intel.py)
+  fakeaudio-bb-npu-intel -> model.backbone.npu-intel.onnx (generated here from the generic
+                            fp32 backbone by explicitly expanding attention bias broadcasts)
 
 expected_p in every fixture is the FULL fp32 model's CPU probability, so the C++
 harness' max_abs_p_diff measures end-to-end agreement vs the trusted CPU answer
 (directly comparable to the 0.93 the unmodified model shows on the HTP).
 """
+import argparse
+from collections import defaultdict
+import hashlib
+import json
 import os
+
 import numpy as np
+import onnx
 import onnxruntime as ort
+from onnx import helper
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
@@ -40,6 +45,66 @@ def softmax_pos(logits):
     x = np.asarray(logits, dtype=np.float64)
     e = np.exp(x - np.max(x, axis=-1, keepdims=True))
     return float((e / e.sum(axis=-1, keepdims=True))[0, POS_IDX])
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def expand_attention_bias(source_path, output_path):
+    """Materialize Add->Softmax bias broadcasts that Intel VPUX mis-fuses."""
+    model = onnx.load(source_path)
+    graph = model.graph
+    initializers = {initializer.name for initializer in graph.initializer}
+    producer = {output: node for node in graph.node for output in node.output}
+    prepend = defaultdict(list)
+    patched = 0
+
+    for softmax in graph.node:
+        if softmax.op_type != "Softmax":
+            continue
+        add = producer.get(softmax.input[0])
+        if add is None or add.op_type != "Add" or len(add.input) != 2:
+            continue
+
+        left, right = add.input
+        constant = left if left in initializers else (
+            right if right in initializers else None
+        )
+        if constant is None:
+            continue
+
+        scores = right if constant == left else left
+        stem = add.name.replace("/", "_").strip("_") or f"attention_bias_{patched}"
+        score_shape = f"{stem}__score_shape"
+        expanded_bias = f"{stem}__expanded_bias"
+        prepend[id(add)].append(
+            helper.make_node("Shape", [scores], [score_shape], name=f"{stem}__Shape")
+        )
+        prepend[id(add)].append(
+            helper.make_node(
+                "Expand", [constant, score_shape], [expanded_bias],
+                name=f"{stem}__Expand"
+            )
+        )
+        add.input[:] = [
+            expanded_bias if value == constant else value for value in add.input
+        ]
+        patched += 1
+
+    rebuilt = []
+    for node in graph.node:
+        rebuilt.extend(prepend.get(id(node), []))
+        rebuilt.append(node)
+    del graph.node[:]
+    graph.node.extend(rebuilt)
+    onnx.checker.check_model(model)
+    onnx.save(model, output_path)
+    return patched
 
 
 def load_labels():
@@ -86,6 +151,13 @@ def write_fixture(name, onnx_rel, in_name, dtype, tensors, ref_p, labels):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--only", choices=("all", "intel-npu"), default="all",
+        help="Build every research fixture or only the Intel OpenVINO NPU fixture."
+    )
+    args = parser.parse_args()
+
     labels = load_labels()
     pcm = load_pcm()
 
@@ -99,28 +171,71 @@ def main():
     mels = {s: fe.run(None, {fe_in: pcm[s]})[0].astype(np.float32) for s in SAMPLES}
     print("mel shape:", mels[SAMPLES[0]].shape)
 
-    bb_in = sess(os.path.join(FA, "model.backbone-fp32.onnx")).get_inputs()[0].name
-    bbi_in = sess(os.path.join(FA, "model.backbone-int8.onnx")).get_inputs()[0].name
+    generic_bb = os.path.join(FA, "model.backbone-fp32.onnx")
+    bb_in = sess(generic_bb).get_inputs()[0].name
 
-    write_fixture("fakeaudio-fp16safe", "../../fakeaudio/model.fp16-safe.onnx",
-                  bin_name, "f32", pcm, ref_p, labels)
-    write_fixture("fakeaudio-bb-fp32", "../../fakeaudio/model.backbone-fp32.onnx",
-                  bb_in, "f32", mels, ref_p, labels)
-    write_fixture("fakeaudio-bb-int8", "../../fakeaudio/model.backbone-int8.onnx",
-                  bbi_in, "f32", mels, ref_p, labels)
+    if args.only == "all":
+        bbi_in = sess(os.path.join(FA, "model.backbone-int8.onnx")).get_inputs()[0].name
+        write_fixture("fakeaudio-fp16safe", "../../fakeaudio/model.fp16-safe.onnx",
+                      bin_name, "f32", pcm, ref_p, labels)
+        write_fixture("fakeaudio-bb-fp32", "../../fakeaudio/model.backbone-fp32.onnx",
+                      bb_in, "f32", mels, ref_p, labels)
+        write_fixture("fakeaudio-bb-int8", "../../fakeaudio/model.backbone-int8.onnx",
+                      bbi_in, "f32", mels, ref_p, labels)
 
     # The Intel-NPU backbone: numerically identical to backbone-fp32 (same mel input,
     # same reference p) but with each attention bias-Add's constant pre-expanded to the
     # scores' full shape so OpenVINO's vpux SDPA fusion can't mis-broadcast it (the LLVM
     # abort). This is the fixture run-suite replays for fakeaudio on the Intel NPU.
     intel_bb = os.path.join(FA, "model.backbone.npu-intel.onnx")
-    if os.path.exists(intel_bb):
-        bbn_in = sess(intel_bb).get_inputs()[0].name
-        write_fixture("fakeaudio-bb-npu-intel", "../../fakeaudio/model.backbone.npu-intel.onnx",
-                      bbn_in, "f32", mels, ref_p, labels)
-    else:
-        print("  (skip fakeaudio-bb-npu-intel: model.backbone.npu-intel.onnx not found -- "
-              "run fakeaudio_npu_intel.py or fetch it from HF first)")
+    patched = expand_attention_bias(generic_bb, intel_bb)
+    if patched != 7:
+        raise RuntimeError(
+            f"expected 7 Add->Softmax attention biases, patched {patched}; "
+            "refusing to publish an unverified Intel NPU fixture"
+        )
+
+    generic_session = sess(generic_bb)
+    intel_session = sess(intel_bb)
+    generic_in = generic_session.get_inputs()[0].name
+    intel_in = intel_session.get_inputs()[0].name
+    max_logit_delta = max(
+        float(np.max(np.abs(
+            generic_session.run(None, {generic_in: mels[s]})[0] -
+            intel_session.run(None, {intel_in: mels[s]})[0]
+        )))
+        for s in SAMPLES
+    )
+    if max_logit_delta > 1e-5:
+        raise RuntimeError(
+            f"attention expansion changed CPU logits by {max_logit_delta}"
+        )
+
+    fixture_name = "fakeaudio-bb-npu-intel"
+    write_fixture(
+        fixture_name, "../../fakeaudio/model.backbone.npu-intel.onnx",
+        intel_in, "f32", mels, ref_p, labels
+    )
+    metadata = {
+        "schema_version": 1,
+        "vendor": "Intel",
+        "executor": "OpenVINO NPU",
+        "transform": "expand-add-softmax-attention-bias",
+        "patched_attention_blocks": patched,
+        "source_model": "../../fakeaudio/model.backbone-fp32.onnx",
+        "source_model_sha256": sha256(generic_bb),
+        "generated_model": "../../fakeaudio/model.backbone.npu-intel.onnx",
+        "generated_model_sha256": sha256(intel_bb),
+        "max_cpu_logit_delta": max_logit_delta,
+    }
+    metadata_path = os.path.join(FIXROOT, fixture_name, "fixture-step.json")
+    with open(metadata_path, "w", encoding="utf-8", newline="\n") as stream:
+        json.dump(metadata, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+    print(
+        f"  generated Intel NPU backbone: {patched} attention blocks, "
+        f"max CPU logit delta {max_logit_delta:.3g}"
+    )
 
 
 if __name__ == "__main__":

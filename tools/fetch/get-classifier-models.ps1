@@ -1,8 +1,7 @@
 ﻿# Downloads the deepfake-detection pipeline classifier models (FakeAudio /
 # Generated Audio Detector, and the Text Scam Classifier) from the private
-# Hugging Face model repo into workloads/classifiers/. Output is gitignored (models/
-# is never committed) -- a fresh clone/machine re-runs this script instead of
-# the binaries living in git.
+# Hugging Face model repo into models/deepfake/. Output is gitignored -- a fresh
+# clone/machine re-runs this script instead of committing model binaries.
 #
 # The models are mirrored to HF by scripts/push-models.ps1 (which snapshots the
 # whole models/ tree). This script pulls only the deepfake/* subtree, so it does
@@ -28,7 +27,7 @@ $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 # HF stores these under deepfake/... so downloading into models/ lands them at
-# the paths the validators/benchmark expect (workloads/classifiers/...).
+# the paths the validators and benchmark expect (models/deepfake/...).
 $outDir = Join-Path $root "models"
 $outRoot = Join-Path $outDir "deepfake"
 
@@ -79,7 +78,9 @@ if ($Models -contains "tsc") {
 
 Write-Host "Downloading $($Models -join ', ') from $repoId -> $outRoot ..." -ForegroundColor Cyan
 $dlArgs = @($repoId, "--repo-type", "model", "--local-dir", $outDir)
-foreach ($p in $includes) { $dlArgs += @("--include", $p) }
+# Keep each filter in one native argument so PowerShell cannot expand wildcards
+# against source files in this checkout before the hf CLI sees them.
+foreach ($p in $includes) { $dlArgs += "--include=$p" }
 & $hf download @dlArgs
 if ($LASTEXITCODE -ne 0) { Write-Host "Download failed." -ForegroundColor Red; exit 1 }
 
@@ -95,4 +96,4 @@ if ($Models -contains "fakeaudio") {
 if ($Models -contains "tsc") {
     Write-Host "TSC ready: $(Join-Path $outRoot 'tsc') ($(Get-Size (Join-Path $outRoot 'tsc')) MB)" -ForegroundColor Green
 }
-Write-Host "Total workloads/classifiers: $(Get-Size $outRoot) MB" -ForegroundColor Green
+Write-Host "Total models/deepfake: $(Get-Size $outRoot) MB" -ForegroundColor Green

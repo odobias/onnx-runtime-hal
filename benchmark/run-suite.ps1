@@ -28,6 +28,7 @@
 #   .\benchmark\run-suite.ps1 -Device npu           # OpenVINO NPU (Intel AI Boost)
 #   .\benchmark\run-suite.ps1 -Device npu,cpu       # sweep several devices (OpenVINO)
 #   .\benchmark\run-suite.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
+#   .\benchmark\run-suite.ps1 -Device gpu -Provider DmlExecutionProvider
 #   .\benchmark\run-suite.ps1 -Precision preferred  # let each executor choose precision
 #   .\benchmark\run-suite.ps1 -Only whisper         # just the ASR model
 #   .\benchmark\run-suite.ps1 -RegenerateFixtures   # rebuild classifier fixtures first
@@ -98,9 +99,21 @@ if ($Provider -like "openvino*") {
         $Provider = ""
     }
 }
+elseif ($Provider -match "(?i)dml|directml") {
+    # A first-class DirectML build has its own tree so building OVEP or another
+    # ORT distribution cannot silently replace onnxruntime.dll underneath it.
+    $dmlExe = Join-Path $root "build\$hostArch-dml\$Configuration\NpuInferenceBench.exe"
+    if (Test-Path $dmlExe) {
+        $platform = "$hostArch-dml"
+    }
+    else {
+        Write-Host "No dedicated DirectML build at build\$hostArch-dml\$Configuration; trying the plain ORT build." -ForegroundColor Yellow
+        Write-Host "  -> create it with: .\tools\fetch\get-onnxruntime-directml.ps1 ; .\tools\build\build.ps1 -EnableDirectML -DisableIntel" -ForegroundColor Yellow
+    }
+}
 $exe = Join-Path $root "build\$platform\$Configuration\NpuInferenceBench.exe"
 if (-not (Test-Path $exe)) {
-    Write-Host "Not built: $exe  (run .\tools\build\build.ps1 -EnableOrt / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
+    Write-Host "Not built: $exe  (run .\tools\build\build.ps1 -EnableOrt / -EnableDirectML / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
     exit 1
 }
 
@@ -163,7 +176,8 @@ function Ensure-Fixtures {
 
     $vpy = Join-Path $root ".venv\Scripts\python.exe"
     if (-not (Test-Path $vpy)) {
-        Write-Host "Fixtures missing for: $($need -join ', '); no .venv to generate them (run bootstrap.ps1)." -ForegroundColor Yellow
+        Write-Host "Fixtures missing for: $($need -join ', '); no .venv to generate them." -ForegroundColor Yellow
+        Write-Host "  Install tools\research\requirements.txt plus one ONNX Runtime wheel." -ForegroundColor Yellow
         return
     }
     Write-Host "Generating classifier fixtures: $($need -join ', ') ..." -ForegroundColor Cyan
@@ -205,17 +219,65 @@ function Write-Attempt {
 function Invoke-NativeBenchmark {
     param([object]$Workload, [string]$RequestedDevice)
 
-    # A workload may pin a device-specific fixture/model via "deviceFixtures". This is how
-    # fakeaudio runs on the NPU: the whole-model graph LLVM-aborts Intel's vpux compiler, so
-    # the NPU is routed to the attention-surgered backbone split (front-end pre-baked into the
-    # mel fixture, backbone on the NPU). Other devices keep the base whole-model fixture.
+    # A workload may define a provider+device fixture recipe. FakeAudio uses this
+    # for OpenVINO NPU: export the generic fp32 frontend/backbone split, apply the
+    # explicit attention-bias expansion, then replay the generated mel fixture.
+    # Other providers and devices keep the base whole-model fixture.
     $relPath = [string]$Workload.path
-    if (($Workload.PSObject.Properties.Name -contains 'deviceFixtures') -and $Workload.deviceFixtures) {
-        $devFix = $Workload.deviceFixtures.PSObject.Properties[$RequestedDevice]
-        if ($devFix -and $devFix.Value) {
-            $relPath = [string]$devFix.Value
-            Write-Host "fixture    : device override for '$RequestedDevice' -> $relPath" -ForegroundColor DarkGray
+    $fixtureSpec = $null
+    if (($Workload.PSObject.Properties.Name -contains 'executorFixtures') -and $Workload.executorFixtures) {
+        $requestedProvider = ([string]$Provider).ToLowerInvariant()
+        foreach ($candidate in @($Workload.executorFixtures)) {
+            $candidateProvider = ([string]$candidate.provider).ToLowerInvariant()
+            if (
+                ([string]$candidate.device).ToLowerInvariant() -eq $RequestedDevice.ToLowerInvariant() -and
+                $requestedProvider.StartsWith($candidateProvider)
+            ) {
+                $fixtureSpec = $candidate
+                break
+            }
         }
+    }
+    if ($fixtureSpec) {
+        $needsBuild = [bool]$RegenerateFixtures
+        foreach ($output in @($fixtureSpec.outputs)) {
+            if (-not (Test-Path (Join-Path $root (([string]$output) -replace '/', '\')))) {
+                $needsBuild = $true
+            }
+        }
+        if ($needsBuild) {
+            $vpy = Join-Path $root ".venv\Scripts\python.exe"
+            if (-not (Test-Path $vpy)) {
+                $message = "fixture recipe requires the project .venv: $($fixtureSpec.path)"
+                Write-Host $message -ForegroundColor Yellow
+                Write-Host "  Install tools\research\requirements.txt plus one ONNX Runtime wheel." -ForegroundColor Yellow
+                Write-Attempt $Workload $RequestedDevice "assets-missing" $message $null
+                return $false
+            }
+            foreach ($step in @($fixtureSpec.steps)) {
+                $script = Join-Path $root (([string]$step.script) -replace '/', '\')
+                $stepArgs = @($step.arguments | ForEach-Object { [string]$_ })
+                Write-Host "fixture step: $($step.script) $($stepArgs -join ' ')" -ForegroundColor DarkGray
+                & $vpy $script @stepArgs
+                if ($LASTEXITCODE -ne 0) {
+                    $message = "fixture step failed ($LASTEXITCODE): $($step.script)"
+                    Write-Host $message -ForegroundColor Yellow
+                    Write-Attempt $Workload $RequestedDevice "fixture-failed" $message $null
+                    return $false
+                }
+            }
+            foreach ($output in @($fixtureSpec.outputs)) {
+                $outputPath = Join-Path $root (([string]$output) -replace '/', '\')
+                if (-not (Test-Path $outputPath)) {
+                    $message = "fixture recipe did not produce: $outputPath"
+                    Write-Host $message -ForegroundColor Yellow
+                    Write-Attempt $Workload $RequestedDevice "fixture-failed" $message $null
+                    return $false
+                }
+            }
+        }
+        $relPath = [string]$fixtureSpec.path
+        Write-Host "fixture    : $($fixtureSpec.provider)/$RequestedDevice -> $relPath" -ForegroundColor DarkGray
     }
     $path = Join-Path $root ($relPath -replace '/', '\')
     if (-not (Test-Path $path)) {

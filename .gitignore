@@ -21,6 +21,7 @@ workloads/classifiers/audio-samples/
 workloads/classifiers/fixtures/
 workloads/eval/
 workloads/audio/
+models/deepfake/
 *.wav
 *.blob
 *_openvino_model/
