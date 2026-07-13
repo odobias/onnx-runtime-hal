@@ -57,12 +57,12 @@ const classifierRows = [
   ],
   [
     "FakeAudio",
-    "1.24.4",
+    "1.25.1",
     "549143bc…",
-    "124.77 ms",
-    "1.42 / 1.99 s",
+    "69.82 ms",
+    "1.34 / 0.74 s",
     "60.00%",
-    "0.00000016",
+    "0.00000594",
     "4 GPU / 1 CPU",
     "20%",
     "Resize ×1",
@@ -229,7 +229,7 @@ function Classifiers() {
           series={[
             {
               name: "Mean inference latency",
-              data: [61.67, 124.77],
+              data: [61.67, 69.82],
               tone: "success",
             },
           ]}
@@ -309,14 +309,16 @@ function Method() {
                 two current rows retained.
               </Text>
               <Text>
-                <Text weight="semibold">Classifiers:</Text> 13 historical rows
-                omitted; two current rows retained.
+                <Text weight="semibold">Classifiers:</Text> 14 rows omitted; two
+                current Radeon rows retained.
               </Text>
               <Text>
-                Older rows lack one or more reproducibility or placement fields.
+                Thirteen older rows lack one or more reproducibility or placement
+                fields.
               </Text>
               <Text>
-                Equivalent duplicate rows are reduced to the newest complete run.
+                One complete DirectML row from another host is excluded from this
+                same-hardware snapshot.
               </Text>
             </Stack>
           </CardBody>
