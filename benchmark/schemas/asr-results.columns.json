@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "columns": [
+    "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name",
+    "device_full_name", "model_package", "variant_id", "base_model", "precision",
+    "quant_method", "execution_provider", "model_dir", "audio_path", "audio_seconds",
+    "runs", "warmup", "cache_dir", "cold_load_seconds", "warm_load_seconds",
+    "mean_infer_seconds", "rtf", "realtime_factor", "label", "model_size_mb",
+    "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps", "wer", "cer",
+    "transcription", "runtime", "model_format", "decode_strategy", "max_context",
+    "eval_clips", "status", "cold_start_seconds", "hot_start_seconds", "power_source",
+    "host_arch", "host_os", "runtime_version", "requested_provider", "resolved_provider",
+    "fallback_occurred", "provider_attempts", "cpu_offload_pct", "cpu_offload_ops", "error"
+  ]
+}
