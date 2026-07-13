@@ -23,7 +23,7 @@
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "workloads/classifiers/fixtures/tsc",
+      "path": "models/deepfake/fixtures/tsc",
       "devices": ["npu", "gpu", "cpu"],
       "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
     },
