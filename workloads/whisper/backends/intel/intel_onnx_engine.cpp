@@ -6,6 +6,7 @@
 // (padded) causal sequence each step. O(n * MaxTokens), but fully static and
 // NPU-compilable -- identical strategy to the AMD backend, just via OpenVINO.
 #include "backend_registry.hpp"
+#include "npu_inference_bench/precision_policy.hpp"
 
 #include <chrono>
 #include <stdexcept>
@@ -95,6 +96,7 @@ public:
     explicit IntelOnnxEngine(const EngineOptions& options)
         : device_(ov_device(options)),
           full_device_name_(query_full_device_name(device_)),
+          inference_precision_(precision_policy::resolve(options)),
           max_tokens_(env_max_tokens()),
           profile_(env_profile()),
           use_fft_mel_(env_use_fft_mel()) {
@@ -121,6 +123,12 @@ public:
         if (!options.cache_dir.empty()) props.insert(ov::cache_dir(options.cache_dir));
         if (options.cpu_threads > 0 && device_ == "CPU")
             props.insert(ov::inference_num_threads(options.cpu_threads));
+        if (inference_precision_ == "f32")
+            props.insert(ov::hint::inference_precision(ov::element::f32));
+        else if (inference_precision_ == "f16")
+            props.insert(ov::hint::inference_precision(ov::element::f16));
+        else if (inference_precision_ == "bf16")
+            props.insert(ov::hint::inference_precision(ov::element::bf16));
 
         const auto t0 = std::chrono::steady_clock::now();
         auto enc_model = core_.read_model(enc_path.string());
@@ -242,11 +250,19 @@ public:
     std::string full_device_name() const override { return full_device_name_; }
     std::string runtime_version() const override { return ov::get_openvino_version().buildNumber; }
     double load_seconds() const override { return load_seconds_; }
+    ExecutionDiagnostics execution_diagnostics() const override {
+        ExecutionDiagnostics diagnostics;
+        diagnostics.requested_provider = "openvino";
+        diagnostics.resolved_provider = "openvino";
+        diagnostics.inference_precision = inference_precision_;
+        return diagnostics;
+    }
 
 private:
     ov::Core core_;
     std::string device_;
     std::string full_device_name_;
+    std::string inference_precision_;
     ov::CompiledModel encoder_;
     ov::CompiledModel decoder_;
     std::vector<float> mel_filters_;

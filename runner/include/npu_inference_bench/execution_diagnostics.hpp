@@ -14,6 +14,7 @@ struct ProviderAttempt {
 struct ExecutionDiagnostics {
     std::string requested_provider;
     std::string resolved_provider;
+    std::string inference_precision;
     bool fallback_occurred = false;
     std::vector<ProviderAttempt> attempts;
     bool offload_measured = false;

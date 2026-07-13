@@ -2,6 +2,7 @@
 // ONNX Runtime Plugin QNN EP (onnxruntime-qnn >= 2.x). Uses the same static no-KV
 // decode loop as ort_static / intel_onnx.
 #include "backend_registry.hpp"
+#include "npu_inference_bench/precision_policy.hpp"
 
 #include <algorithm>
 #include <array>
@@ -125,7 +126,19 @@ public:
     explicit QualcommQnnEngine(const EngineOptions& options)
         : env_(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_qnn"),
           device_(options.device),
+          inference_precision_(precision_policy::resolve(options)),
           provider_label_(device_ == Device::CPU ? "CPUExecutionProvider" : kQnnEpName) {
+        if (device_ == Device::CPU && inference_precision_ != "f32" &&
+            inference_precision_ != "preferred") {
+            throw std::runtime_error(
+                "ORT CPU cannot apply a provider-wide precision conversion; "
+                "use f32/preferred or export another model");
+        }
+        if (device_ != Device::CPU && inference_precision_ != "preferred") {
+            throw std::runtime_error(
+                "QNN precision is fixed by its model/backend configuration; "
+                "use precision=preferred");
+        }
         const fs::path dir(options.model_dir);
         const fs::path enc_path = dir / "encoder_model.onnx";
         const fs::path dec_path = dir / "decoder_model.onnx";
@@ -263,10 +276,18 @@ public:
     std::string device_name() const override { return provider_label_; }
     std::string runtime_version() const override { return Ort::GetVersionString(); }
     double load_seconds() const override { return load_seconds_; }
+    ExecutionDiagnostics execution_diagnostics() const override {
+        ExecutionDiagnostics diagnostics;
+        diagnostics.requested_provider = provider_label_;
+        diagnostics.resolved_provider = provider_label_;
+        diagnostics.inference_precision = inference_precision_;
+        return diagnostics;
+    }
 
 private:
     Ort::Env env_;
     Device device_;
+    std::string inference_precision_;
     std::string provider_label_;
     int64_t sot_ = 50257;
     int64_t eos_ = 50256;

@@ -1,14 +1,17 @@
 {
   "note": "Canonical mapping between benchmark-first repository paths and the Hugging Face asset snapshot. Both paths are relative to their respective repository roots.",
   "map": [
-    { "local": "workloads/whisper/models/static-onnx", "hf": "workloads/whisper/models/static-onnx" },
-    { "local": "workloads/whisper/models/dynamic-onnx", "hf": "workloads/whisper/models/dynamic-onnx" },
-    { "local": "workloads/whisper/models/ov-ir", "hf": "workloads/whisper/models/ov-ir" },
-    { "local": "workloads/whisper/models/vendor/amd", "hf": "workloads/whisper/models/vendor/amd" },
-    { "local": "workloads/whisper/manifest.json", "hf": "workloads/whisper/manifest.json", "kind": "file" },
-    { "local": "workloads/whisper/manifest.research.json", "hf": "workloads/whisper/manifest.research.json", "kind": "file" },
-    { "local": "workloads/audio/jfk.wav", "hf": "workloads/audio/jfk.wav", "kind": "file" },
-    { "local": "workloads/eval", "hf": "workloads/eval" },
-    { "local": "workloads/classifiers", "hf": "workloads/classifiers" }
+    { "local": "workloads/whisper/models/static-onnx", "hf": "whisper/en-static-onnx" },
+    { "local": "workloads/whisper/models/dynamic-onnx", "hf": "whisper/en-onnx" },
+    { "local": "workloads/whisper/models/ov-ir", "hf": "whisper/en-ov" },
+    { "local": "workloads/whisper/models/vendor/amd", "hf": "whisper/amd" },
+    { "local": "workloads/whisper/manifest.json", "hf": "manifest.json", "kind": "file" },
+    { "local": "workloads/whisper/manifest.research.json", "hf": "manifest.research.json", "kind": "file" },
+    { "local": "workloads/audio/jfk.wav", "hf": "audio/jfk.wav", "kind": "file" },
+    { "local": "workloads/eval", "hf": "eval" },
+    { "local": "workloads/classifiers/fakeaudio", "hf": "deepfake/fakeaudio" },
+    { "local": "workloads/classifiers/tsc", "hf": "deepfake/tsc" },
+    { "local": "workloads/classifiers/audio-samples", "hf": "deepfake/audio-samples" },
+    { "local": "workloads/classifiers/fixtures", "hf": "deepfake/fixtures" }
   ]
 }

@@ -177,6 +177,8 @@ public:
                 active_provider_ = provider;
                 diagnostics_.attempts.push_back({provider, true, {}});
                 diagnostics_.resolved_provider = provider;
+                diagnostics_.inference_precision =
+                    ep::resolved_inference_precision(options_, provider);
                 diagnostics_.fallback_occurred = provider != chain.front();
                 break;
             } catch (const std::exception& e) {
@@ -286,6 +288,10 @@ public:
         out.model_format = "onnx";
         out.decode_strategy = "static-no-kv";
         out.max_context = static_cast<long>(kStaticMaxTokens);
+
+        // Finalize profiling after the first transcription (normally the harness
+        // warmup), so measured runs do not accumulate profiler overhead.
+        (void)execution_diagnostics();
         return out;
     }
 

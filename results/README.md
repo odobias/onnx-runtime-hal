@@ -29,6 +29,8 @@ Successful rows include:
 - `resolved_provider`
 - `fallback_occurred`
 - `provider_attempts`
+- `ep_nodes`
+- `cpu_nodes`
 - `cpu_offload_pct`
 - `cpu_offload_ops`
 - `error`
@@ -36,9 +38,11 @@ Successful rows include:
 `provider_attempts` is JSON stored inside the CSV field. It preserves each
 provider tried, whether it succeeded, and the provider-specific error.
 
-CPU offload is based on distinct ORT profiler nodes, not compute share. One
-accelerator event may represent hundreds of fused ONNX operations while cheap
-shape/control operations remain individual CPU nodes.
+CPU offload is based on distinct ORT profiler nodes, not compute share.
+`ep_nodes` and `cpu_nodes` expose the underlying counts; one accelerator event
+may represent hundreds of fused ONNX operations while cheap shape/control
+operations remain individual CPU nodes. Whisper profiling ends after the first
+transcription (normally warmup), before measured latency runs.
 
 Classifier startup is measured twice against a dedicated cache:
 
@@ -54,6 +58,21 @@ Machine-readable schemas live in:
 - `../benchmark/schemas/classifier-results.columns.json`
 
 The C++ writer and PowerShell harness follow those column orders.
+
+`model_sha256` identifies the exact inference artifacts used by a row. Each
+ONNX, OpenVINO XML/BIN, or external data artifact is hashed by content; the
+sorted artifact digests are then hashed together. Package paths and filenames
+therefore do not affect identity, while any graph or weight change does.
+Historical rows created before this field remain blank.
+
+`inference_precision` records the provider-neutral precision policy. CPU and
+GPU runs default to `f32`; NPU runs default to `preferred`. Use
+`run-suite.ps1 -Precision preferred` (or set
+`NPU_INFERENCE_BENCH_PRECISION=preferred`) to let the executor choose. OpenVINO
+maps explicit policies to `INFERENCE_PRECISION_HINT`. ORT CPU and DirectML can
+guarantee FP32 for FP32 model tensors but cannot perform a provider-wide
+FP16/BF16 conversion. QNN and VitisAI precision is compiler/model-defined, so
+non-`preferred` requests are rejected rather than silently mislabeled.
 
 ## Historical reports
 
