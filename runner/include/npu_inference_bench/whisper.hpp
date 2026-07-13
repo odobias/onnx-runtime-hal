@@ -127,7 +127,6 @@ public:
     // Wall-clock time spent constructing/compiling this engine (model load +
     // device compile). With a warm cache this should drop dramatically.
     virtual double load_seconds() const = 0;
-
 };
 
 // --- Introspection -----------------------------------------------------------
