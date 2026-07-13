@@ -82,6 +82,11 @@ Other Markdown, CSV, and Canvas files in this directory are snapshots or derived
 research reports. They are useful evidence, but they are not substitutes for the
 portable suite ledger and may describe older model exports or runtime versions.
 
+Current hardware snapshots:
+
+- `amd-directml-2026-07-13.md`: audited Radeon 890M DirectML results for both
+  Whisper variants, TSC, and FakeAudio, including CPU-offload node counts.
+
 Quantization sweeps under `benchmark/research/` are explicitly research-only.
 Neutral ONNX portability findings remain in `onnx-portability.md` and
 `cpp-onnx-npu-findings.md`.
