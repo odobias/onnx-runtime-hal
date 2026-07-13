@@ -23,7 +23,7 @@
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "workloads/classifiers/fixtures/tsc",
+      "path": "models/deepfake/fixtures/tsc",
       "devices": ["npu", "gpu", "cpu"],
       "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
     },
@@ -31,7 +31,10 @@
       "id": "fakeaudio",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "workloads/classifiers/fixtures/fakeaudio",
+      "path": "models/deepfake/fixtures/fakeaudio",
+      "deviceFixtures": {
+        "npu": "models/deepfake/fixtures/fakeaudio-bb-npu-intel"
+      },
       "devices": ["npu", "gpu", "cpu"],
       "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
     }

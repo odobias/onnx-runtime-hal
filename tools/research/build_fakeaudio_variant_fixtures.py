@@ -3,11 +3,15 @@ replayed through the --classify harness on any NPU (this closes the Qualcomm QNN
 Hexagon HTP gap the AMD/Intel toolkits could not cover).
 
 Run tools/research/export_fakeaudio_variants.py first (it emits the variant
-ONNX models), then this script. It produces three fixture dirs under
-workloads/classifiers/fixtures/:
-  fakeaudio-fp16safe  -> model.fp16-safe.onnx     (raw PCM input, whole-graph drop-in)
-  fakeaudio-bb-fp32   -> model.backbone-fp32.onnx (mel input from the CPU front-end)
-  fakeaudio-bb-int8   -> model.backbone-int8.onnx (mel input from the CPU front-end)
+ONNX models), then this script. It produces four fixture dirs under
+models/deepfake/fixtures/:
+  fakeaudio-fp16safe     -> model.fp16-safe.onnx        (raw PCM input, whole-graph drop-in)
+  fakeaudio-bb-fp32      -> model.backbone-fp32.onnx    (mel input; Qualcomm HTP runs this as-is)
+  fakeaudio-bb-int8      -> model.backbone-int8.onnx    (mel input from the CPU front-end)
+  fakeaudio-bb-npu-intel -> model.backbone.npu-intel.onnx (mel input; the attention-bias
+                            expanded backbone that Intel's OpenVINO vpux compiler accepts --
+                            this is the fixture the C++ benchmark replays for fakeaudio on the
+                            Intel NPU; see results/fakeaudio-intel-npu.md and fakeaudio_npu_intel.py)
 
 expected_p in every fixture is the FULL fp32 model's CPU probability, so the C++
 harness' max_abs_p_diff measures end-to-end agreement vs the trusted CPU answer
@@ -104,6 +108,19 @@ def main():
                   bb_in, "f32", mels, ref_p, labels)
     write_fixture("fakeaudio-bb-int8", "../../fakeaudio/model.backbone-int8.onnx",
                   bbi_in, "f32", mels, ref_p, labels)
+
+    # The Intel-NPU backbone: numerically identical to backbone-fp32 (same mel input,
+    # same reference p) but with each attention bias-Add's constant pre-expanded to the
+    # scores' full shape so OpenVINO's vpux SDPA fusion can't mis-broadcast it (the LLVM
+    # abort). This is the fixture run-suite replays for fakeaudio on the Intel NPU.
+    intel_bb = os.path.join(FA, "model.backbone.npu-intel.onnx")
+    if os.path.exists(intel_bb):
+        bbn_in = sess(intel_bb).get_inputs()[0].name
+        write_fixture("fakeaudio-bb-npu-intel", "../../fakeaudio/model.backbone.npu-intel.onnx",
+                      bbn_in, "f32", mels, ref_p, labels)
+    else:
+        print("  (skip fakeaudio-bb-npu-intel: model.backbone.npu-intel.onnx not found -- "
+              "run fakeaudio_npu_intel.py or fetch it from HF first)")
 
 
 if __name__ == "__main__":

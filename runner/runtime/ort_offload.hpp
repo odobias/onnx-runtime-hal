@@ -21,6 +21,18 @@
 namespace npu_inference_bench {
 namespace ort_common {
 
+// Render a fallback op-count map as "Gather x3, Cast x2" (sorted by op name).
+inline std::string format_op_hist(const std::map<std::string, int>& hist) {
+    std::ostringstream ops;
+    bool first = true;
+    for (const auto& [op, n] : hist) {
+        if (!first) ops << ", ";
+        ops << op << " x" << n;
+        first = false;
+    }
+    return ops.str();
+}
+
 struct OffloadStats {
     bool measured = false;
     int ep_nodes = -1;    // distinct nodes on the requested (non-CPU) EP
@@ -114,17 +126,10 @@ inline OffloadStats parse_ort_profile(const std::filesystem::path& profile_json)
             ++ep;
         }
     }
-    std::ostringstream ops;
-    bool first = true;
-    for (const auto& [op, n] : cpu_op_hist) {
-        if (!first) ops << ", ";
-        ops << op << " x" << n;
-        first = false;
-    }
     st.measured = true;
     st.ep_nodes = ep;
     st.cpu_nodes = cpu;
-    st.cpu_ops = ops.str();
+    st.cpu_ops = format_op_hist(cpu_op_hist);
     return st;
 }
 

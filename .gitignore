@@ -39,6 +39,9 @@ results/quantization-benchmark.md
 results/host-info.json
 results/ledgers/attempts.jsonl
 
+# Transient build/benchmark logs (e.g. build_ovep.log, bench_intel_whisper.log)
+*.log
+
 # Visual Studio
 .vs/
 *.user

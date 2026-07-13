@@ -116,7 +116,11 @@ if (-not (Test-Path $Manifest)) {
     exit 1
 }
 $workloads = @((Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).workloads)
-$fixRoot = Join-Path $root "workloads\classifiers\fixtures"
+# Classifier fixtures + their ONNX models are colocated under models/deepfake/ (the
+# model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx, so fixtures must
+# live beside the models). tools/fixtures/generate.py writes here too. (The workloads/
+# classifiers/ layout in the manifest is the in-progress target for a later migration.)
+$fixRoot = Join-Path $root "models\deepfake\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
 # Keep benchmark caches isolated by binary platform + provider + model + device.
@@ -201,7 +205,19 @@ function Write-Attempt {
 function Invoke-NativeBenchmark {
     param([object]$Workload, [string]$RequestedDevice)
 
-    $path = Join-Path $root ([string]$Workload.path -replace '/', '\')
+    # A workload may pin a device-specific fixture/model via "deviceFixtures". This is how
+    # fakeaudio runs on the NPU: the whole-model graph LLVM-aborts Intel's vpux compiler, so
+    # the NPU is routed to the attention-surgered backbone split (front-end pre-baked into the
+    # mel fixture, backbone on the NPU). Other devices keep the base whole-model fixture.
+    $relPath = [string]$Workload.path
+    if (($Workload.PSObject.Properties.Name -contains 'deviceFixtures') -and $Workload.deviceFixtures) {
+        $devFix = $Workload.deviceFixtures.PSObject.Properties[$RequestedDevice]
+        if ($devFix -and $devFix.Value) {
+            $relPath = [string]$devFix.Value
+            Write-Host "fixture    : device override for '$RequestedDevice' -> $relPath" -ForegroundColor DarkGray
+        }
+    }
+    $path = Join-Path $root ($relPath -replace '/', '\')
     if (-not (Test-Path $path)) {
         $message = "workload assets missing: $path"
         Write-Host $message -ForegroundColor Yellow
