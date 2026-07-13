@@ -177,6 +177,8 @@ public:
                 active_provider_ = provider;
                 diagnostics_.attempts.push_back({provider, true, {}});
                 diagnostics_.resolved_provider = provider;
+                diagnostics_.inference_precision =
+                    ep::resolved_inference_precision(options_, provider);
                 diagnostics_.fallback_occurred = provider != chain.front();
                 break;
             } catch (const std::exception& e) {

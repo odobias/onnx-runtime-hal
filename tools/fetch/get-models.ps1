@@ -61,7 +61,10 @@ $includes = foreach ($e in $entries) {
 
 Write-Host "Downloading $repoId (mapped subtree) -> staging ..." -ForegroundColor Cyan
 $dlArgs = @($repoId, "--repo-type", "model", "--local-dir", $staging)
-foreach ($p in $includes) { $dlArgs += @("--include", $p) }
+# Keep each filter in one native argument. Passing `--include`, `$p` separately lets
+# Windows PowerShell expand `**` against this checkout before `hf` sees it (for
+# example workloads/classifiers/** became ort_classifier.cpp).
+foreach ($p in $includes) { $dlArgs += "--include=$p" }
 & $hf download @dlArgs
 if ($LASTEXITCODE -ne 0) { Write-Host "Download failed." -ForegroundColor Red; exit 1 }
 

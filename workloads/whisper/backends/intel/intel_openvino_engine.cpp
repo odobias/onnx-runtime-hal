@@ -1,6 +1,7 @@
 ﻿// Intel backend: whisper via OpenVINO GenAI. Targets Intel NPU / GPU / CPU.
 // This is the reference implementation and the only fully-working backend.
 #include "backend_registry.hpp"
+#include "npu_inference_bench/precision_policy.hpp"
 
 #include <chrono>
 #include <stdexcept>
@@ -55,7 +56,9 @@ std::string query_full_device_name(const std::string& device) {
 class IntelOpenVinoEngine final : public IWhisperEngine {
 public:
     explicit IntelOpenVinoEngine(const EngineOptions& options)
-        : device_(ov_device(options)), full_device_name_(query_full_device_name(device_)) {
+        : device_(ov_device(options)),
+          full_device_name_(query_full_device_name(device_)),
+          inference_precision_(precision_policy::resolve(options)) {
         // Passing ov::cache_dir makes OpenVINO persist the device-compiled blob, so
         // the (slow) NPU compile only happens on the first cold load; warm loads
         // import the cached blob and are near-instant.
@@ -67,6 +70,13 @@ public:
         // avoid surprising a discrete accelerator with a CPU-shaped hint.
         if (options.cpu_threads > 0 && device_ == "CPU") {
             properties.insert(ov::inference_num_threads(options.cpu_threads));
+        }
+        if (inference_precision_ == "f32") {
+            properties.insert(ov::hint::inference_precision(ov::element::f32));
+        } else if (inference_precision_ == "f16") {
+            properties.insert(ov::hint::inference_precision(ov::element::f16));
+        } else if (inference_precision_ == "bf16") {
+            properties.insert(ov::hint::inference_precision(ov::element::bf16));
         }
 
         const auto t0 = std::chrono::steady_clock::now();
@@ -110,10 +120,18 @@ public:
     std::string full_device_name() const override { return full_device_name_; }
     std::string runtime_version() const override { return ov::get_openvino_version().buildNumber; }
     double load_seconds() const override { return load_seconds_; }
+    ExecutionDiagnostics execution_diagnostics() const override {
+        ExecutionDiagnostics diagnostics;
+        diagnostics.requested_provider = "openvino-genai";
+        diagnostics.resolved_provider = "openvino-genai";
+        diagnostics.inference_precision = inference_precision_;
+        return diagnostics;
+    }
 
 private:
     std::string device_;
     std::string full_device_name_;
+    std::string inference_precision_;
     std::unique_ptr<ov::genai::WhisperPipeline> pipe_;
     double load_seconds_ = 0.0;
 };

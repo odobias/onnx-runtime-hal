@@ -37,6 +37,7 @@ struct Result {
     std::string requested_device;   // "NPU"/"GPU"/"CPU"
     std::string execution_provider; // EP that actually built the session (post-fallback)
     std::string runtime;            // "onnxruntime-directml" / "-openvino" / ...
+    std::string inference_precision; // effective OpenVINO hint, e.g. "f32"
     std::string runtime_version;    // Ort::GetVersionString()
     std::string host_arch;          // x64 / arm64 / ...
     std::string host_os;
@@ -51,6 +52,7 @@ struct Result {
     double p90_infer_ms = 0.0;
     int runs = 0;
     double model_size_mb = -1.0;
+    std::string model_sha256;  // content identity of the ONNX graph/weights
     int eval_samples = 0;   // samples that carry ground truth
     int correct = 0;
     double max_abs_p_diff = 0.0;  // max |p - expected_p| over all samples (cross-EP agreement)

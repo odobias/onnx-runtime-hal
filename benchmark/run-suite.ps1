@@ -28,6 +28,7 @@
 #   .\benchmark\run-suite.ps1 -Device npu           # OpenVINO NPU (Intel AI Boost)
 #   .\benchmark\run-suite.ps1 -Device npu,cpu       # sweep several devices (OpenVINO)
 #   .\benchmark\run-suite.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
+#   .\benchmark\run-suite.ps1 -Precision preferred  # let each executor choose precision
 #   .\benchmark\run-suite.ps1 -Only whisper         # just the ASR model
 #   .\benchmark\run-suite.ps1 -RegenerateFixtures   # rebuild classifier fixtures first
 #
@@ -43,6 +44,8 @@ param(
     [int]$ClassifierRuns = 20,
     [string]$Configuration = "Release",
     [string]$Provider = "openvino",
+    [ValidateSet("default", "f32", "f16", "bf16", "preferred")]
+    [string]$Precision = "default",
     [string]$Audio = "",
     [string]$Results = "",
     [string]$ClassifierResults = "",
@@ -59,6 +62,9 @@ Initialize-BenchmarkConsole
 # "auto" is the escape hatch back to the app's portable per-device EP fallback chain
 # (leave --provider off so ort_ep.hpp walks VitisAI/QNN/DirectML/OpenVINO/CPU).
 if ($Provider -eq "auto") { $Provider = "" }
+if ($Precision -ne "default") {
+    $env:NPU_INFERENCE_BENCH_PRECISION = $Precision
+}
 
 $root = Split-Path $PSScriptRoot -Parent
 
@@ -236,8 +242,14 @@ function Invoke-NativeBenchmark {
     }
     if ($Provider) { $args += @("--provider", $Provider) }
 
-    $nativeOutput = @(& $exe @args 2>&1)
-    $exitCode = $LASTEXITCODE
+    $oldEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $nativeOutput = @(& $exe @args 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldEap
+    }
     foreach ($line in $nativeOutput) { Write-Host ([string]$line) }
     $result = $null
     for ($i = $nativeOutput.Count - 1; $i -ge 0; --$i) {

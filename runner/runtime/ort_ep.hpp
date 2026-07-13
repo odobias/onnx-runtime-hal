@@ -9,6 +9,7 @@
 #pragma once
 
 #include "npu_inference_bench/whisper.hpp"
+#include "npu_inference_bench/precision_policy.hpp"
 
 #ifdef NPU_INFERENCE_BENCH_ORT
 
@@ -47,6 +48,60 @@ inline std::string lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return s;
+}
+
+inline std::string openvino_device_type(const EngineOptions& options,
+                                        const std::string& provider) {
+    const auto colon = provider.find(':');
+    if (colon != std::string::npos) return provider.substr(colon + 1);
+    return options.device == Device::NPU   ? "NPU"
+           : options.device == Device::GPU ? "GPU"
+                                           : "CPU";
+}
+
+// Provider-neutral policy. CPU/GPU default to reproducible FP32; NPU defaults
+// to device-preferred because accelerator compilers generally fix precision.
+inline std::string inference_precision_policy(const EngineOptions& options,
+                                              const std::string& provider) {
+    const std::string p = lower(provider);
+    Device actual_device = options.device;
+    if (p.find("cpu") != std::string::npos) {
+        actual_device = Device::CPU;
+    } else if (p.find("dml") != std::string::npos ||
+               p.find("directml") != std::string::npos) {
+        actual_device = Device::GPU;
+    } else if (p.rfind("openvino", 0) == 0) {
+        const std::string device = lower(openvino_device_type(options, provider));
+        actual_device = device.rfind("cpu", 0) == 0 ? Device::CPU
+                      : device.rfind("gpu", 0) == 0 ? Device::GPU
+                                                    : Device::NPU;
+    }
+    return precision_policy::resolve(options, actual_device);
+}
+
+inline void validate_inference_precision(const EngineOptions& options,
+                                         const std::string& provider) {
+    const std::string precision = inference_precision_policy(options, provider);
+    const std::string p = lower(provider);
+    if (p.find("openvino") != std::string::npos) return;
+    if (p.find("cpu") != std::string::npos || p.find("dml") != std::string::npos ||
+        p.find("directml") != std::string::npos) {
+        if (precision == "f32" || precision == "preferred") return;
+        throw std::runtime_error(
+            provider + " cannot apply a provider-wide " + precision +
+            " conversion; use a model exported in that precision");
+    }
+    if (precision != "preferred") {
+        throw std::runtime_error(
+            provider + " cannot guarantee provider-wide " + precision +
+            "; use precision=preferred or a compiler/model-specific configuration");
+    }
+}
+
+inline std::string resolved_inference_precision(const EngineOptions& options,
+                                                const std::string& provider) {
+    validate_inference_precision(options, provider);
+    return inference_precision_policy(options, provider);
 }
 
 inline bool is_qnn(const std::string& provider) {
@@ -167,22 +222,24 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
     // Intel native path: OpenVINO EP. Accepts "openvino", "openvinoexecutionprovider",
     // or an "openvino:<DEVICE>" token; device_type comes from the suffix when present.
     if (p.rfind("openvino", 0) == 0) {
-        std::string device_type;
-        const auto colon = provider.find(':');
-        if (colon != std::string::npos) {
-            device_type = provider.substr(colon + 1);
-        } else {
-            device_type = options.device == Device::NPU   ? "NPU"
-                          : options.device == Device::GPU ? "GPU"
-                                                          : "CPU";
-        }
+        const std::string device_type = openvino_device_type(options, provider);
         std::unordered_map<std::string, std::string> ov_opts{{"device_type", device_type}};
         if (!options.cache_dir.empty()) ov_opts["cache_dir"] = options.cache_dir;
+        const std::string precision = inference_precision_policy(options, provider);
+        if (precision != "preferred") {
+            std::string config_device = device_type;
+            const auto dot = config_device.find('.');
+            if (dot != std::string::npos) config_device.resize(dot);
+            ov_opts["load_config"] =
+                "{\"" + config_device +
+                "\":{\"INFERENCE_PRECISION_HINT\":\"" + precision + "\"}}";
+        }
         so.AppendExecutionProvider_OpenVINO_V2(ov_opts);
         return;
     }
 
     if (p == "cpu" || p == "cpuexecutionprovider") {
+        validate_inference_precision(options, provider);
         if (options.cpu_threads > 0) {
             so.SetIntraOpNumThreads(options.cpu_threads);
             so.SetInterOpNumThreads(1);
@@ -191,6 +248,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
     }
 
     if (p == "qnn" || p == "qnnexecutionprovider") {
+        validate_inference_precision(options, provider);
 #ifdef NPU_INFERENCE_BENCH_QUALCOMM
         register_qnn_library(env);
         const Ort::ConstEpDevice qnn_device = find_qnn_device(env);  // throws if absent
@@ -207,6 +265,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
     }
 
     if (p == "vitisai" || p == "vitisaiexecutionprovider") {
+        validate_inference_precision(options, provider);
         std::unordered_map<std::string, std::string> vitis_opts;
         const fs::path config = model_dir / "vitisai_config.json";
         if (fs::exists(config)) vitis_opts["config_file"] = config.string();
@@ -219,6 +278,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
     }
 
     if (p == "dml" || p == "directml" || p == "dmlexecutionprovider") {
+        validate_inference_precision(options, provider);
 #ifdef NPU_INFERENCE_BENCH_ORT_HAS_DML
         Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(so, 0));
         return;

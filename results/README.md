@@ -61,6 +61,21 @@ Machine-readable schemas live in:
 
 The C++ writer and PowerShell harness follow those column orders.
 
+`model_sha256` identifies the exact inference artifacts used by a row. Each
+ONNX, OpenVINO XML/BIN, or external data artifact is hashed by content; the
+sorted artifact digests are then hashed together. Package paths and filenames
+therefore do not affect identity, while any graph or weight change does.
+Historical rows created before this field remain blank.
+
+`inference_precision` records the provider-neutral precision policy. CPU and
+GPU runs default to `f32`; NPU runs default to `preferred`. Use
+`run-suite.ps1 -Precision preferred` (or set
+`NPU_INFERENCE_BENCH_PRECISION=preferred`) to let the executor choose. OpenVINO
+maps explicit policies to `INFERENCE_PRECISION_HINT`. ORT CPU and DirectML can
+guarantee FP32 for FP32 model tensors but cannot perform a provider-wide
+FP16/BF16 conversion. QNN and VitisAI precision is compiler/model-defined, so
+non-`preferred` requests are rejected rather than silently mislabeled.
+
 ## Historical reports
 
 Other Markdown, CSV, and Canvas files in this directory are snapshots or derived

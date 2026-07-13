@@ -3,6 +3,7 @@
 // execution providers and scores per-EP latency + correctness + numerical
 // agreement vs the CPU reference. See runner/include/npu_inference_bench/classifier.hpp.
 #include "npu_inference_bench/classifier.hpp"
+#include "npu_inference_bench/model_hash.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -235,6 +236,7 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     res.runtime_version = Ort::GetVersionString();
     res.runs = std::max(1, runs);
     res.model_size_mb = file_size_mb(fx.onnx_path);
+    res.model_sha256 = model_artifacts_sha256(fx.onnx_path);
     res.cache_dir = cache_dir;
 
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_classifier");
@@ -352,6 +354,8 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
 
     res.execution_provider = active_provider;
     res.runtime = ort_common::runtime_for(active_provider);
+    res.inference_precision =
+        ort_common::resolved_inference_precision(provider_options, active_provider);
     res.diagnostics.resolved_provider = active_provider;
     res.diagnostics.fallback_occurred =
         !chain.empty() && active_provider != chain.front();
@@ -387,6 +391,16 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         const auto shape = last_out[0].GetTensorTypeAndShapeInfo().GetShape();
         const int64_t classes = shape.empty() ? 0 : shape.back();
         const double p = softmax_positive(logits, classes, fx.positive_index);
+        if (!std::isfinite(p)) {
+            double measured_ms = 0.0;
+            for (double latency : lat_ms) measured_ms += latency;
+            if (!lat_ms.empty()) measured_ms /= static_cast<double>(lat_ms.size());
+            throw std::runtime_error(
+                "non-finite classifier probability for sample '" + s.id +
+                "' on provider '" + active_provider +
+                "' (mean inference before rejection: " +
+                std::to_string(measured_ms) + " ms)");
+        }
 
         SampleResult sr;
         sr.id = s.id;

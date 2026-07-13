@@ -196,7 +196,7 @@ foreach ($v in $manifestObj.variants) {
             Write-BenchmarkResultRow $Results ([pscustomobject]@{
                 timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
                 requested_backend = $v.backend; resolved_backend = ""; device = $dev; device_name = ""; device_full_name = ""
-                model_package = $meta.model_package; variant_id = $meta.variant_id; base_model = $meta.base_model
+                model_package = $meta.model_package; model_sha256 = ""; variant_id = $meta.variant_id; base_model = $meta.base_model
                 precision = $meta.precision; quant_method = $meta.quant_method; execution_provider = ""
                 model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = ""; runs = $Runs; warmup = 1; cache_dir = $cacheDir
                 cold_load_seconds = ""; warm_load_seconds = ""; mean_infer_seconds = ""; rtf = ""; realtime_factor = ""
@@ -232,7 +232,9 @@ foreach ($v in $manifestObj.variants) {
             timestamp_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             requested_backend = $v.backend; resolved_backend = $firstRow.backend; device = $dev
             device_name = $firstRow.device; device_full_name = $firstRow.device_full_name
-            model_package = $meta.model_package; variant_id = $meta.variant_id; base_model = $meta.base_model
+            model_package = $meta.model_package
+            model_sha256 = (Get-BenchmarkRowValue $firstRow 'model_sha256' '')
+            variant_id = $meta.variant_id; base_model = $meta.base_model
             precision = $meta.precision; quant_method = $meta.quant_method; execution_provider = $meta.execution_provider
             model_dir = $v.model_dir; audio_path = $EvalSet; audio_seconds = $audioSeconds; runs = $Runs; warmup = 1; cache_dir = $cacheDir
             cold_load_seconds = $coldLoad; warm_load_seconds = $hotLoad
@@ -249,6 +251,7 @@ foreach ($v in $manifestObj.variants) {
             host_arch = (Get-BenchmarkRowValue $firstRow 'host_arch' (Get-BenchmarkHostArch))
             host_os = (Get-BenchmarkRowValue $firstRow 'host_os' (Get-BenchmarkHostOs))
             runtime_version = (Get-BenchmarkRowValue $firstRow 'runtime_version' '')
+            inference_precision = (Get-BenchmarkRowValue $firstRow 'inference_precision' '')
             ep_nodes = (Get-BenchmarkRowValue $firstRow 'ep_nodes' '')
             cpu_nodes = (Get-BenchmarkRowValue $firstRow 'cpu_nodes' '')
             cpu_offload_pct = (Get-BenchmarkRowValue $firstRow 'cpu_offload_pct' '')

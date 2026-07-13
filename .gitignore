@@ -14,8 +14,10 @@ __pycache__/
 
 # Workload payloads (fetched/exported by tools; never committed)
 workloads/whisper/models/
+workloads/whisper/manifest*.json
 workloads/classifiers/tsc/
 workloads/classifiers/fakeaudio/
+workloads/classifiers/audio-samples/
 workloads/classifiers/fixtures/
 workloads/eval/
 workloads/audio/

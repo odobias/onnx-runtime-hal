@@ -62,6 +62,11 @@ struct EngineOptions {
     // ov::inference_num_threads on the Intel backend). 0 = backend/runtime default.
     // Ignored by NPU/GPU devices, where the accelerator's own scheduler applies.
     int cpu_threads = 0;
+
+    // Provider-neutral inference precision policy: "f32" (default on CPU/GPU),
+    // "f16", "bf16", or "preferred" (let the executor choose). Providers must
+    // reject policies they cannot guarantee instead of silently mislabeling runs.
+    std::string precision_policy;
 };
 
 // Backend-neutral result + metrics. Every backend fills `text`/`infer_seconds`;

@@ -8,6 +8,7 @@
 // plus optional tokenizer sidecars. The ONNX files are AMD's NPU-exported
 // whisper-tiny models; tokenizer/preprocessor files come from openai/whisper-tiny.
 #include "backend_registry.hpp"
+#include "npu_inference_bench/precision_policy.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -324,10 +325,22 @@ class AmdRyzenAiEngine final : public IWhisperEngine {
 public:
     explicit AmdRyzenAiEngine(const EngineOptions& options)
         : env_(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_amd"),
-          options_(options) {
+          options_(options),
+          inference_precision_(precision_policy::resolve(options)) {
         const fs::path model_dir(options.model_dir);
         if (options.device == Device::GPU) {
             throw std::runtime_error("AMD backend currently supports CPU and NPU; GPU is not wired");
+        }
+        if (options.device == Device::NPU && inference_precision_ != "preferred") {
+            throw std::runtime_error(
+                "AMD VitisAI precision is fixed by its compiled model/config; "
+                "use precision=preferred");
+        }
+        if (options.device == Device::CPU && inference_precision_ != "f32" &&
+            inference_precision_ != "preferred") {
+            throw std::runtime_error(
+                "ORT CPU cannot apply a provider-wide precision conversion; "
+                "use f32/preferred or export another model");
         }
 
         encoder_path_ = model_dir / "tiny_encoder.onnx";
@@ -439,10 +452,20 @@ public:
     }
     std::string runtime_version() const override { return Ort::GetVersionString(); }
     double load_seconds() const override { return load_seconds_; }
+    ExecutionDiagnostics execution_diagnostics() const override {
+        ExecutionDiagnostics diagnostics;
+        diagnostics.requested_provider =
+            options_.device == Device::NPU ? "VitisAIExecutionProvider"
+                                           : "CPUExecutionProvider";
+        diagnostics.resolved_provider = diagnostics.requested_provider;
+        diagnostics.inference_precision = inference_precision_;
+        return diagnostics;
+    }
 
 private:
     Ort::Env env_;
     EngineOptions options_;
+    std::string inference_precision_;
     fs::path encoder_path_;
     fs::path decoder_path_;
     fs::path encoder_config_;

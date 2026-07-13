@@ -41,6 +41,7 @@
 #include "npu_inference_bench/benchmark_meta.hpp"
 #include "npu_inference_bench/classifier.hpp"
 #include "npu_inference_bench/metrics.hpp"
+#include "npu_inference_bench/model_hash.hpp"
 #include "npu_inference_bench/whisper.hpp"
 
 namespace {
@@ -301,22 +302,22 @@ std::vector<std::string> split_csv_row(const std::string& line) {
 constexpr const char* kBenchmarkCsvHeader =
     "timestamp_utc,requested_backend,resolved_backend,device,device_name,"
     "device_full_name,"
-    "model_package,variant_id,base_model,precision,quant_method,execution_provider,"
+    "model_package,model_sha256,variant_id,base_model,precision,quant_method,execution_provider,"
     "model_dir,audio_path,audio_seconds,runs,warmup,cache_dir,"
     "cold_load_seconds,warm_load_seconds,mean_infer_seconds,rtf,"
     "realtime_factor,label,model_size_mb,avg_logprob,ttft_ms,tpot_ms,"
     "throughput_tps,wer,cer,transcription,"
     "runtime,model_format,decode_strategy,max_context,eval_clips,status,"
     "cold_start_seconds,hot_start_seconds,power_source,"
-    "host_arch,host_os,runtime_version,"
+    "host_arch,host_os,runtime_version,inference_precision,"
     "requested_provider,resolved_provider,fallback_occurred,provider_attempts,"
     "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,error";
 
 // Classifier ledger schema (see append_classifier_csv). Kept as a named constant so
 // the writer and the additive migration below agree on column order.
 constexpr const char* kClassifierCsvHeader =
-    "timestamp_utc,model,requested_device,execution_provider,runtime,runtime_version,"
-    "host_arch,host_os,backend_name,runs,cache_dir,load_seconds,cold_load_seconds,hot_load_seconds,"
+    "timestamp_utc,model,model_sha256,requested_device,execution_provider,runtime,runtime_version,"
+    "inference_precision,host_arch,host_os,backend_name,runs,cache_dir,load_seconds,cold_load_seconds,hot_load_seconds,"
     "mean_infer_ms,median_infer_ms,p90_infer_ms,"
     "model_size_mb,eval_samples,correct,accuracy,max_abs_p_diff,"
     "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,power_source,eval_detail,"
@@ -474,6 +475,7 @@ void append_result_csv(const std::string& path,
                        const std::string& text,
                        const std::string& label,
                        double model_size_mb_val,
+                       const std::string& model_sha256,
                        const npu_inference_bench::TranscribeResult& last,
                        bool have_ref,
                        const npu_inference_bench::ErrorRate& er) {
@@ -512,6 +514,7 @@ void append_result_csv(const std::string& path,
         << csv_escape(engine.device_name()) << ','
         << csv_escape(engine.full_device_name()) << ','
         << csv_escape(meta.model_package) << ','
+        << csv_escape(model_sha256) << ','
         << csv_escape(meta.variant_id) << ','
         << csv_escape(meta.base_model) << ','
         << csv_escape(meta.precision) << ','
@@ -549,6 +552,7 @@ void append_result_csv(const std::string& path,
         << csv_escape(host_arch()) << ','
         << csv_escape(host_os()) << ','
         << csv_escape(engine.runtime_version()) << ','
+        << csv_escape(diagnostics.inference_precision) << ','
         << csv_escape(diagnostics.requested_provider) << ','
         << csv_escape(diagnostics.resolved_provider) << ','
         << (diagnostics.fallback_occurred ? "true" : "false") << ','
@@ -592,10 +596,12 @@ void append_classifier_csv(const std::string& path, const npu_inference_bench::c
                                    : 0.0;
     out << csv_escape(utc_now_iso8601()) << ','
         << csv_escape(r.model) << ','
+        << csv_escape(r.model_sha256) << ','
         << csv_escape(r.requested_device) << ','
         << csv_escape(r.execution_provider) << ','
         << csv_escape(r.runtime) << ','
         << csv_escape(r.runtime_version) << ','
+        << csv_escape(r.inference_precision) << ','
         << csv_escape(r.host_arch) << ','
         << csv_escape(r.host_os) << ','
         << csv_escape(r.backend_name) << ','
@@ -663,10 +669,12 @@ int run_classify(const std::string& dir, npu_inference_bench::Device device, con
         js << std::fixed << std::setprecision(6) << "{";
         js << "\"ok\":true";
         js << ",\"model\":\"" << json_escape(r.model) << "\"";
+        js << ",\"model_sha256\":\"" << json_escape(r.model_sha256) << "\"";
         js << ",\"requested_device\":\"" << json_escape(r.requested_device) << "\"";
         js << ",\"execution_provider\":\"" << json_escape(r.execution_provider) << "\"";
         js << ",\"runtime\":\"" << json_escape(r.runtime) << "\"";
         js << ",\"runtime_version\":\"" << json_escape(r.runtime_version) << "\"";
+        js << ",\"inference_precision\":\"" << json_escape(r.inference_precision) << "\"";
         js << ",\"host_arch\":\"" << json_escape(r.host_arch) << "\"";
         js << ",\"host_os\":\"" << json_escape(r.host_os) << "\"";
         js << ",\"power_source\":\"" << json_escape(power_source()) << "\"";
@@ -974,6 +982,12 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
     const double p90 = percentile(lat, 90.0);
     const double rtf = mean / audio_len;
     const double size_mb = model_size_mb(opt.model_dir);
+    std::string model_sha256;
+    try {
+        model_sha256 = npu_inference_bench::model_artifacts_sha256(opt.model_dir);
+    } catch (const std::exception& e) {
+        return fail(5, std::string("Failed to hash model artifacts: ") + e.what());
+    }
 
     ErrorRate er;
     if (have_ref) er = compute_error_rate(reference, text);
@@ -983,7 +997,7 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
             append_result_csv(results_csv, requested_backend, *engine, opt.device, opt.model_dir,
                               audio_path, audio_len, runs, warmup, cache_dir,
                               cold_load, warm_load, mean, rtf, text,
-                              label, size_mb, last, have_ref, er);
+                              label, size_mb, model_sha256, last, have_ref, er);
         } catch (const std::exception& e) {
             return fail(5, std::string("Failed to append results CSV: ") + e.what());
         }
@@ -1005,10 +1019,13 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         js << ",\"host_arch\":\"" << json_escape(host_arch()) << "\"";
         js << ",\"host_os\":\"" << json_escape(host_os()) << "\"";
         js << ",\"runtime_version\":\"" << json_escape(engine->runtime_version()) << "\"";
+        js << ",\"inference_precision\":\""
+           << json_escape(engine->execution_diagnostics().inference_precision) << "\"";
         js << ",\"cpu_threads_requested\":" << cpu_threads;
         js << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
         js << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
         js << ",\"model_package\":\"" << json_escape(bench_meta.model_package) << "\"";
+        js << ",\"model_sha256\":\"" << json_escape(model_sha256) << "\"";
         js << ",\"variant_id\":\"" << json_escape(bench_meta.variant_id) << "\"";
         js << ",\"base_model\":\"" << json_escape(bench_meta.base_model) << "\"";
         js << ",\"precision\":\"" << json_escape(bench_meta.precision) << "\"";
