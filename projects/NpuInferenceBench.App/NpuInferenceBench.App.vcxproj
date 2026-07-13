@@ -41,7 +41,8 @@
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\common.props" />
-  <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.ort.props" Condition="'$(EnableOrt)'=='true'" />
+  <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.winml.props" Condition="'$(EnableWinML)'=='true'" />
+  <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.ort.props" Condition="'$(EnableOrt)'=='true' and '$(EnableWinML)'!='true'" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.intel.props" Condition="'$(EnableIntel)'=='true'" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.amd.props" Condition="'$(EnableAmd)'=='true'" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.qualcomm.props" Condition="'$(EnableQualcomm)'=='true'" />
@@ -98,6 +99,7 @@
       <!-- Core ONNX Runtime + DirectML (GPU) -->
       <UnifiedRuntime Include="$(OrtBinDir)\onnxruntime*.dll" Condition="'$(OrtBinDir)'!=''" />
       <UnifiedRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
+      <UnifiedRuntime Include="$(OrtBinDir)\Microsoft.Windows.AI.MachineLearning.dll" Condition="'$(EnableWinML)'=='true' and Exists('$(OrtBinDir)\Microsoft.Windows.AI.MachineLearning.dll')" />
       <!-- Intel OpenVINO EP (NPU/GPU/CPU). The provider DLL loads openvino.dll +
            its plugins by colocation, so every openvino_*/tbb DLL and the plugin
            catalog must land next to the exe. Gated on EnableOvep. -->

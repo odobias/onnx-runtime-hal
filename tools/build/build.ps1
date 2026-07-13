@@ -7,6 +7,7 @@
 #   .\build.ps1 -EnableAmd -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel
 #   .\build.ps1 -EnableDirectML -DisableIntel
+#   .\build.ps1 -EnableWinML -DisableIntel
 #   .\build.ps1 -EnableOrt -DisableIntel -OrtDir C:\onnxruntime
 #   .\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel  # native Snapdragon
 
@@ -19,6 +20,9 @@ param(
     # Use the official Microsoft.ML.OnnxRuntime.DirectML SDK assembled by
     # tools/fetch/get-onnxruntime-directml.ps1. Emits a separate *-dml build tree.
     [switch]$EnableDirectML,
+    # Windows ML self-contained ORT + dynamic EP catalog. Emits a separate
+    # <platform>-winml tree and cannot share a process with bundled EP runtimes.
+    [switch]$EnableWinML,
     # Intel native path via ONNX Runtime's OpenVINO EP. Makes the unified ORT binary
     # cover Intel NPU/GPU/CPU. Implies -EnableOrt and forces the OpenVINO GenAI
     # backend OFF (they need incompatible openvino.dll versions in one process).
@@ -70,6 +74,13 @@ Write-Host "Using MSBuild: $($found.msbuild)" -ForegroundColor Cyan
 Write-Host ("VS install   : {0}  {1}" -f $found.vs, ($(if ($isVs2026) { '(VS 2026)' } else { '(NOT VS 2026 -- fallback)' }))) -ForegroundColor $(if ($isVs2026) { 'Green' } else { 'Yellow' })
 
 $target = if ($Rebuild) { "Rebuild" } else { "Build" }
+if ($EnableWinML -and ($EnableDirectML -or $EnableOvep -or $EnableAmd -or $EnableQualcomm)) {
+    throw "-EnableWinML cannot be combined with bundled DirectML, OVEP, AMD, or Qualcomm runtimes."
+}
+if ($EnableWinML -and -not $DisableIntel) {
+    Write-Host "EnableWinML: forcing Intel (OpenVINO GenAI) backend OFF -- Windows ML owns the runtime and EP catalog." -ForegroundColor Yellow
+    $DisableIntel = $true
+}
 # OVEP and the OpenVINO GenAI backend both load openvino.dll, at versions that
 # cannot coexist in one process. Selecting OVEP therefore disables Intel-GenAI.
 if ($EnableOvep -and -not $DisableIntel) {
@@ -84,8 +95,16 @@ if ($EnableDirectML -and -not $OrtDir) {
     }
     $OrtDir = $directmlDir
 }
+if ($EnableWinML) {
+    $winmlDir = Join-Path $root "third_party\windows-ml"
+    if (-not (Test-Path (Join-Path $winmlDir "include\WinMLEpCatalog.h")) -or
+        -not (Test-Path (Join-Path $winmlDir "bin\$Platform\onnxruntime.dll"))) {
+        Write-Host "Windows ML SDK missing. Run: .\tools\setup\setup-winml.ps1 -Platform $Platform" -ForegroundColor Red
+        exit 1
+    }
+}
 $enableIntel = -not $DisableIntel
-$enableOrt = $EnableOrt -or $EnableDirectML -or $EnableOvep -or $EnableAmd -or $EnableQualcomm
+$enableOrt = $EnableOrt -or $EnableDirectML -or $EnableWinML -or $EnableOvep -or $EnableAmd -or $EnableQualcomm
 $args = @(
     $sln,
     "/t:$target",
@@ -93,6 +112,7 @@ $args = @(
     "/p:Platform=$Platform",
     "/p:EnableIntel=$([bool]$enableIntel)".ToLower(),
     "/p:EnableOrt=$([bool]$enableOrt)".ToLower(),
+    "/p:EnableWinML=$([bool]$EnableWinML)".ToLower(),
     "/p:EnableOvep=$([bool]$EnableOvep)".ToLower(),
     "/p:EnableAmd=$([bool]$EnableAmd)".ToLower(),
     "/p:EnableQualcomm=$([bool]$EnableQualcomm)".ToLower(),
@@ -117,6 +137,8 @@ if ($LASTEXITCODE -ne 0) { Write-Host "Build failed." -ForegroundColor Red; exit
 
 $platformOutTag = if ($EnableOvep) {
     "$Platform-ovep"
+} elseif ($EnableWinML) {
+    "$Platform-winml"
 } elseif ($EnableDirectML) {
     "$Platform-dml"
 } else {

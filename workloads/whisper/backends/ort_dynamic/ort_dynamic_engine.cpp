@@ -114,6 +114,9 @@ public:
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
+#ifdef NPU_INFERENCE_BENCH_WINML
+        ep::register_windows_ml_catalog(env_, options_.device);
+#endif
         // Walk the device fallback chain; keep the first EP that builds ALL three
         // sessions. On NPU EPs this is expected to fail (dynamic KV shapes) and
         // demote to GPU/CPU -- the explicit, recorded benchmark behavior.
@@ -307,6 +310,16 @@ public:
                         session->EndProfilingAllocated(alloc).get();
                     const auto stats = ep::parse_ort_profile(profile_path);
                     if (stats.measured) {
+#ifdef NPU_INFERENCE_BENCH_WINML
+                        if (!stats.providers.empty()) {
+                            const auto comma = stats.providers.find(',');
+                            diagnostics_.resolved_provider = stats.providers.substr(0, comma);
+                            active_provider_ = diagnostics_.resolved_provider;
+                            diagnostics_.fallback_occurred =
+                                options_.device != Device::CPU &&
+                                diagnostics_.resolved_provider == "CPUExecutionProvider";
+                        }
+#endif
                         diagnostics_.offload_measured = true;
                         diagnostics_.ep_nodes =
                             std::max(0, diagnostics_.ep_nodes) + stats.ep_nodes;
@@ -357,7 +370,7 @@ private:
 
     Ort::Env env_;
     EngineOptions options_;
-    std::string active_provider_;
+    mutable std::string active_provider_;
     mutable ExecutionDiagnostics diagnostics_;
     mutable bool diagnostics_finalized_ = false;
     int64_t sot_ = 50257;

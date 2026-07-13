@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -38,6 +39,7 @@ struct OffloadStats {
     int ep_nodes = -1;    // distinct nodes on the requested (non-CPU) EP
     int cpu_nodes = -1;   // distinct nodes that ran on CPUExecutionProvider
     std::string cpu_ops;  // histogram of the fallback op types, e.g. "Gather x3, Cast x2"
+    std::string providers;  // distinct profiler providers, accelerator first
 
     // -1 when unmeasured; 0..100 fraction of distinct profiler nodes assigned to CPU.
     // This is NOT a compute/time share: one accelerator node may represent a fused
@@ -117,19 +119,35 @@ inline OffloadStats parse_ort_profile(const std::filesystem::path& profile_json)
 
     int ep = 0, cpu = 0;
     std::map<std::string, int> cpu_op_hist;
+    std::set<std::string> accelerator_providers;
+    bool saw_cpu = false;
     for (const auto& [node, provider] : node_provider) {
         if (provider == "CPUExecutionProvider") {
             ++cpu;
+            saw_cpu = true;
             const std::string op = node_op.count(node) ? node_op[node] : "?";
             cpu_op_hist[op.empty() ? "?" : op] += 1;
         } else {
             ++ep;
+            accelerator_providers.insert(provider);
         }
     }
     st.measured = true;
     st.ep_nodes = ep;
     st.cpu_nodes = cpu;
     st.cpu_ops = format_op_hist(cpu_op_hist);
+    std::ostringstream providers;
+    bool first = true;
+    for (const auto& provider : accelerator_providers) {
+        if (!first) providers << ",";
+        providers << provider;
+        first = false;
+    }
+    if (saw_cpu) {
+        if (!first) providers << ",";
+        providers << "CPUExecutionProvider";
+    }
+    st.providers = providers.str();
     return st;
 }
 

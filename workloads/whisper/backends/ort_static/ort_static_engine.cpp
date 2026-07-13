@@ -157,6 +157,9 @@ public:
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
+#ifdef NPU_INFERENCE_BENCH_WINML
+        ep::register_windows_ml_catalog(env_, options_.device);
+#endif
         const std::string cache_base = cache_safe(dir.filename().string());
         const std::vector<std::string> chain = ep::fallback_chain(options_);
         diagnostics_.requested_provider =
@@ -309,6 +312,16 @@ public:
                         session->EndProfilingAllocated(alloc).get();
                     const auto stats = ep::parse_ort_profile(profile_path);
                     if (stats.measured) {
+#ifdef NPU_INFERENCE_BENCH_WINML
+                        if (!stats.providers.empty()) {
+                            const auto comma = stats.providers.find(',');
+                            diagnostics_.resolved_provider = stats.providers.substr(0, comma);
+                            active_provider_ = diagnostics_.resolved_provider;
+                            diagnostics_.fallback_occurred =
+                                options_.device != Device::CPU &&
+                                diagnostics_.resolved_provider == "CPUExecutionProvider";
+                        }
+#endif
                         diagnostics_.offload_measured = true;
                         diagnostics_.ep_nodes =
                             std::max(0, diagnostics_.ep_nodes) + stats.ep_nodes;
@@ -336,7 +349,7 @@ public:
 private:
     Ort::Env env_;
     EngineOptions options_;
-    std::string active_provider_;  // EP that actually built the sessions (post-fallback)
+    mutable std::string active_provider_;  // EP that actually built/executed the sessions
     mutable ExecutionDiagnostics diagnostics_;
     mutable bool diagnostics_finalized_ = false;
     int64_t max_tokens_ = kStaticMaxTokens;
@@ -369,7 +382,24 @@ bool available() { return true; }
 // NPU->GPU->CPU fallback chain validates the pick at session-build time, so a wrong
 // guess degrades gracefully rather than failing.
 Device best_available_device() {
-#ifdef NPU_INFERENCE_BENCH_QUALCOMM
+#ifdef NPU_INFERENCE_BENCH_WINML
+    try {
+        Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_winml_probe");
+        ep::register_windows_ml_catalog(env, Device::NPU);
+        bool gpu = false;
+        for (Ort::ConstEpDevice device : env.GetEpDevices()) {
+            if (device.Device().Type() == OrtHardwareDeviceType_NPU) return Device::NPU;
+            if (device.Device().Type() == OrtHardwareDeviceType_GPU &&
+                ep::lower(device.EpName()).find("dml") != std::string::npos) {
+                gpu = true;
+            }
+        }
+        if (gpu) return Device::GPU;
+    } catch (...) {
+        // Fall through to CPU; explicit device selection will retain the error.
+    }
+    return Device::CPU;
+#elif defined(NPU_INFERENCE_BENCH_QUALCOMM)
     // Qualcomm / ARM64: prefer a real QNN NPU, then the DirectML-backed Adreno GPU.
     // Session construction validates either pick and retains the normal CPU fallback.
     try {
