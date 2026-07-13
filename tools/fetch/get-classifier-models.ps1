@@ -58,16 +58,16 @@ if ($repoId -notmatch "/") {
 # Per-model include globs (HF filtering is fnmatch-style; '*' spans '/').
 $includes = @()
 if ($Models -contains "fakeaudio") {
-    # GAD model + the labeled real/deepfake clips its validator scores against.
-    $includes += "deepfake/fakeaudio/*"
+    # Fetch only the canonical model. Precision, split, and compiler-workaround
+    # variants are generated locally from these bytes by the fixture recipes.
+    $includes += "deepfake/fakeaudio/model.onnx"
+    # Labeled real/deepfake clips used by the validator.
     $includes += "deepfake/audio-samples/*"
     # Pre-baked C++ benchmark fixtures (model-ready tensors + CPU reference p), if
     # present on HF, so benchmark\run-suite.ps1 can run this classifier WITHOUT the Python
     # .venv. They are a snapshot of the validated preprocessing -- stale if the model
     # or preprocessing changes; regenerate with run-suite.ps1 -RegenerateFixtures.
-    # The 'fakeaudio*' glob also pulls the split-backbone variants, incl.
-    # fakeaudio-bb-npu-intel (the surgered backbone the Intel NPU benchmark replays).
-    $includes += "deepfake/fixtures/fakeaudio*/*"
+    $includes += "deepfake/fixtures/fakeaudio/*"
 }
 if ($Models -contains "tsc") {
     # DistilBERT/RoBERTa-tokenized scam classifier: model + vocab/merges +

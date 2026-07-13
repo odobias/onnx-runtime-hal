@@ -8,8 +8,10 @@ models/deepfake/fixtures/:
   fakeaudio-fp16safe     -> model.fp16-safe.onnx        (raw PCM input, whole-graph drop-in)
   fakeaudio-bb-fp32      -> model.backbone-fp32.onnx    (mel input; Qualcomm HTP runs this as-is)
   fakeaudio-bb-int8      -> model.backbone-int8.onnx    (mel input from the CPU front-end)
-  fakeaudio-bb-npu-intel -> model.backbone.npu-intel.onnx (generated here from the generic
-                            fp32 backbone by explicitly expanding attention bias broadcasts)
+  fakeaudio-bb-expanded-attention-bias
+                          -> model.backbone.expanded-attention-bias.onnx (generated here
+                             from the generic fp32 backbone by explicitly materializing
+                             attention bias broadcasts)
 
 expected_p in every fixture is the FULL fp32 model's CPU probability, so the C++
 harness' max_abs_p_diff measures end-to-end agreement vs the trusted CPU answer
@@ -183,12 +185,11 @@ def main():
         write_fixture("fakeaudio-bb-int8", "../../fakeaudio/model.backbone-int8.onnx",
                       bbi_in, "f32", mels, ref_p, labels)
 
-    # The Intel-NPU backbone: numerically identical to backbone-fp32 (same mel input,
-    # same reference p) but with each attention bias-Add's constant pre-expanded to the
-    # scores' full shape so OpenVINO's vpux SDPA fusion can't mis-broadcast it (the LLVM
-    # abort). This is the fixture run-suite replays for fakeaudio on the Intel NPU.
-    intel_bb = os.path.join(FA, "model.backbone.npu-intel.onnx")
-    patched = expand_attention_bias(generic_bb, intel_bb)
+    # Generic, semantics-equivalent backbone with each attention bias broadcast
+    # explicitly materialized. The OpenVINO NPU recipe uses it to avoid the VPUX
+    # SDPA fusion bug, but the graph contains no vendor-specific operators.
+    fixed_bb = os.path.join(FA, "model.backbone.expanded-attention-bias.onnx")
+    patched = expand_attention_bias(generic_bb, fixed_bb)
     if patched != 7:
         raise RuntimeError(
             f"expected 7 Add->Softmax attention biases, patched {patched}; "
@@ -196,13 +197,13 @@ def main():
         )
 
     generic_session = sess(generic_bb)
-    intel_session = sess(intel_bb)
+    fixed_session = sess(fixed_bb)
     generic_in = generic_session.get_inputs()[0].name
-    intel_in = intel_session.get_inputs()[0].name
+    fixed_in = fixed_session.get_inputs()[0].name
     max_logit_delta = max(
         float(np.max(np.abs(
             generic_session.run(None, {generic_in: mels[s]})[0] -
-            intel_session.run(None, {intel_in: mels[s]})[0]
+            fixed_session.run(None, {fixed_in: mels[s]})[0]
         )))
         for s in SAMPLES
     )
@@ -211,10 +212,10 @@ def main():
             f"attention expansion changed CPU logits by {max_logit_delta}"
         )
 
-    fixture_name = "fakeaudio-bb-npu-intel"
+    fixture_name = "fakeaudio-bb-expanded-attention-bias"
     write_fixture(
-        fixture_name, "../../fakeaudio/model.backbone.npu-intel.onnx",
-        intel_in, "f32", mels, ref_p, labels
+        fixture_name, "../../fakeaudio/model.backbone.expanded-attention-bias.onnx",
+        fixed_in, "f32", mels, ref_p, labels
     )
     metadata = {
         "schema_version": 1,
@@ -224,8 +225,8 @@ def main():
         "patched_attention_blocks": patched,
         "source_model": "../../fakeaudio/model.backbone-fp32.onnx",
         "source_model_sha256": sha256(generic_bb),
-        "generated_model": "../../fakeaudio/model.backbone.npu-intel.onnx",
-        "generated_model_sha256": sha256(intel_bb),
+        "generated_model": "../../fakeaudio/model.backbone.expanded-attention-bias.onnx",
+        "generated_model_sha256": sha256(fixed_bb),
         "max_cpu_logit_delta": max_logit_delta,
     }
     metadata_path = os.path.join(FIXROOT, fixture_name, "fixture-step.json")
@@ -233,7 +234,7 @@ def main():
         json.dump(metadata, stream, indent=2, sort_keys=True)
         stream.write("\n")
     print(
-        f"  generated Intel NPU backbone: {patched} attention blocks, "
+        f"  generated broadcast-expanded backbone: {patched} attention blocks, "
         f"max CPU logit delta {max_logit_delta:.3g}"
     )
 
