@@ -32,9 +32,28 @@
       "kind": "classifier",
       "backend": "onnx-fixture",
       "path": "models/deepfake/fixtures/fakeaudio",
-      "deviceFixtures": {
-        "npu": "models/deepfake/fixtures/fakeaudio-bb-npu-intel"
-      },
+      "executorFixtures": [
+        {
+          "provider": "openvino",
+          "device": "npu",
+          "path": "models/deepfake/fixtures/fakeaudio-bb-npu-intel",
+          "outputs": [
+            "models/deepfake/fakeaudio/model.backbone.npu-intel.onnx",
+            "models/deepfake/fixtures/fakeaudio-bb-npu-intel/model.tsv",
+            "models/deepfake/fixtures/fakeaudio-bb-npu-intel/fixture-step.json"
+          ],
+          "steps": [
+            {
+              "script": "tools/research/export_fakeaudio_variants.py",
+              "arguments": ["--skip-int8"]
+            },
+            {
+              "script": "tools/research/build_fakeaudio_variant_fixtures.py",
+              "arguments": ["--only", "intel-npu"]
+            }
+          ]
+        }
+      ],
       "devices": ["npu", "gpu", "cpu"],
       "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
     }

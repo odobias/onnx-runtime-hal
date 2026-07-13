@@ -41,6 +41,7 @@ const tscRows = [
 const fakeAudioRows = [
   ["Intel", "ORT OpenVINO EP CPU", "111.16 ms", "0.00000033", "Correct", "0 / 1 CPU nodes", "hash 549143bc… · battery"],
   ["Intel", "ORT OpenVINO EP GPU", "17.55 ms at f16", "NaN", "Wrong", "Rejected", "f32 fails OpenCL work-group launch"],
+  ["Intel", "ORT DirectML GPU", "124.77 ms at f32", "0.00000016", "Correct", "1 CPU Resize / 4 GPU nodes", "recorded; prior probe 76.51 ms · battery"],
   ["Intel", "ORT OpenVINO EP NPU", "unsupported", "—", "No result", "Compiler abort", "Attention dimensions 64 vs 16"],
   ["Intel", "CPU FE + NPU backbone", "~30 ms end-to-end", "0.0001", "Correct", "~80% work on NPU", "Needs attention-bias surgery"],
   ["Qualcomm", "CPU FE + QNN backbone", "114.94 ms + FE", "0.00084", "Correct", "0 / 1 CPU nodes in backbone", "Ledger excludes CPU FE time"],
@@ -68,9 +69,10 @@ function Overview() {
       <Callout title="Bottom line" tone="info">
         Intel GenAI remains the Whisper latency leader, but its bounded-KV decoder is not a pure
         silicon comparison. In the new battery run, Intel OpenVINO EP TSC is 4.0× faster on NPU
-        than AMD VitisAI while preserving 14/15 accuracy. Full-graph FakeAudio remains unusable
-        on Intel GPU/NPU: GPU emits NaNs and NPU compilation aborts. Exact Intel artifact hashes
-        are now recorded; historical AMD rows predate hashing, so identical model bytes are not yet proven.
+        than AMD VitisAI while preserving 14/15 accuracy. DirectML now runs full-graph FakeAudio
+        on Intel GPU at exact FP32 reference parity; the OpenVINO GPU path still emits NaNs and
+        NPU compilation still aborts. Exact Intel artifact hashes are recorded; historical AMD
+        rows predate hashing, so identical model bytes are not yet proven.
       </Callout>
 
       <Grid columns="1.35fr 1fr" gap={18}>
@@ -183,7 +185,7 @@ function Classifiers() {
           headers={["Vendor", "Path", "Latency", "Max probability delta", "Agreement", "Placement", "Important caveat"]}
           rows={fakeAudioRows}
           columnAlign={["left", "left", "right", "right", "left", "left", "left"]}
-          rowTone={["success", "danger", "danger", "success", "success", "success", "success", "danger", "danger", "danger"]}
+          rowTone={["success", "danger", "success", "danger", "success", "success", "success", "success", "danger", "danger", "danger"]}
           striped
           stickyHeader
         />
