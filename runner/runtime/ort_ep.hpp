@@ -14,11 +14,15 @@
 #ifdef NPU_INFERENCE_BENCH_ORT
 
 #include <onnxruntime_cxx_api.h>
+#ifdef NPU_INFERENCE_BENCH_WINML
+#include <windows.h>
+#include <WinMLEpCatalog.h>
+#endif
 #if defined(_WIN32) && __has_include(<dml_provider_factory.h>)
 #include <dml_provider_factory.h>
 #define NPU_INFERENCE_BENCH_ORT_HAS_DML 1
 #endif
-#if defined(NPU_INFERENCE_BENCH_QUALCOMM) && defined(_WIN32)
+#if defined(NPU_INFERENCE_BENCH_QUALCOMM) && defined(_WIN32) && !defined(NPU_INFERENCE_BENCH_WINML)
 #include <windows.h>
 #endif
 
@@ -27,6 +31,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -59,12 +64,34 @@ inline std::string openvino_device_type(const EngineOptions& options,
                                            : "CPU";
 }
 
+#ifdef NPU_INFERENCE_BENCH_WINML
+inline Device winml_token_device(const std::string& provider, Device fallback) {
+    const std::string p = lower(provider);
+    if (p.find("prefer_cpu") != std::string::npos) return Device::CPU;
+    if (p.find("prefer_gpu") != std::string::npos) return Device::GPU;
+    if (p.find("prefer_npu") != std::string::npos) return Device::NPU;
+    return fallback;
+}
+#endif
+
 // Provider-neutral policy. CPU/GPU default to reproducible FP32; NPU defaults
 // to device-preferred because accelerator compilers generally fix precision.
 inline std::string inference_precision_policy(const EngineOptions& options,
                                               const std::string& provider) {
     const std::string p = lower(provider);
+#ifdef NPU_INFERENCE_BENCH_WINML
+    const Device winml_device = winml_token_device(provider, options.device);
+    if (p.rfind("windowsml:", 0) == 0 && winml_device != Device::CPU) {
+        // The policy selector owns accelerator precision. Use "preferred" by
+        // default; an explicit f32/f16/bf16 request remains explicit and is
+        // rejected below because Windows ML cannot guarantee it provider-wide.
+        return precision_policy::resolve(options, Device::NPU);
+    }
+#endif
     Device actual_device = options.device;
+#ifdef NPU_INFERENCE_BENCH_WINML
+    if (p.rfind("windowsml:", 0) == 0) actual_device = winml_device;
+#endif
     if (p.find("cpu") != std::string::npos) {
         actual_device = Device::CPU;
     } else if (p.find("dml") != std::string::npos ||
@@ -108,11 +135,25 @@ inline bool is_qnn(const std::string& provider) {
     return lower(provider).find("qnn") != std::string::npos;
 }
 
+#ifdef NPU_INFERENCE_BENCH_WINML
+inline std::string winml_policy_token(Device device) {
+    switch (device) {
+        case Device::NPU: return "WindowsML:PREFER_NPU";
+        case Device::GPU: return "WindowsML:PREFER_GPU";
+        case Device::CPU:
+        default:          return "WindowsML:PREFER_CPU";
+    }
+}
+#endif
+
 // Ordered EP candidates for a logical device. Every vendor EP is compiled into
 // the same binary (their Append* calls resolve through the ORT API table at
 // runtime), so a single build self-selects across Intel / AMD / Qualcomm / any
 // DX12 GPU: the caller walks these and keeps the first that builds a session.
 inline std::vector<std::string> providers_for(Device device) {
+#ifdef NPU_INFERENCE_BENCH_WINML
+    return {winml_policy_token(device)};
+#else
     switch (device) {
         case Device::NPU: {
             std::vector<std::string> v;
@@ -131,11 +172,16 @@ inline std::vector<std::string> providers_for(Device device) {
         default:
             return {"CPUExecutionProvider"};
     }
+#endif
 }
 
 // Human-facing runtime tag for the shared benchmark schema, from the EP that
 // actually built the session.
 inline std::string runtime_for(const std::string& provider) {
+#ifdef NPU_INFERENCE_BENCH_WINML
+    (void)provider;
+    return "windows-ml";
+#else
     const std::string p = lower(provider);
     if (p.find("openvino") != std::string::npos) return "onnxruntime-openvino";
     if (p.find("qnn") != std::string::npos) return "onnxruntime-qnn";
@@ -143,6 +189,7 @@ inline std::string runtime_for(const std::string& provider) {
     if (p.find("dml") != std::string::npos || p.find("directml") != std::string::npos)
         return "onnxruntime-directml";
     return "onnxruntime";
+#endif
 }
 
 // The runtime EP fallback chain for a requested device. An explicit provider
@@ -163,6 +210,82 @@ inline std::vector<std::string> fallback_chain(const EngineOptions& options) {
     }
     return chain;
 }
+
+#ifdef NPU_INFERENCE_BENCH_WINML
+namespace winml_detail {
+struct RegisterContext {
+    Ort::Env* env = nullptr;
+    Device requested_device = Device::CPU;
+    std::string errors;
+};
+
+inline BOOL CALLBACK register_provider(WinMLEpHandle handle, const WinMLEpInfo* info,
+                                       void* opaque) {
+    auto* ctx = static_cast<RegisterContext*>(opaque);
+    if (!ctx || !ctx->env || !info || !info->name ||
+        info->certification != WinMLEpCertification_Certified) {
+        return TRUE;
+    }
+
+    // CPU and GPU are supplied by the Windows ML runtime itself. NPU preference
+    // may acquire the compatible vendor EP on first use; otherwise only register
+    // providers already installed on this machine.
+    if (info->readyState == WinMLEpReadyState_NotPresent &&
+        ctx->requested_device != Device::NPU) {
+        return TRUE;
+    }
+
+    HRESULT hr = WinMLEpEnsureReady(handle);
+    if (FAILED(hr)) {
+        ctx->errors += std::string(info->name) + " ensure failed (HRESULT " +
+                       std::to_string(static_cast<unsigned long>(hr)) + "); ";
+        return TRUE;
+    }
+
+    size_t path_size = 0;
+    hr = WinMLEpGetLibraryPathSize(handle, &path_size);
+    if (FAILED(hr) || path_size == 0) return TRUE;
+    std::string path(path_size, '\0');
+    hr = WinMLEpGetLibraryPath(handle, path.size(), path.data(), nullptr);
+    if (FAILED(hr)) return TRUE;
+    if (!path.empty() && path.back() == '\0') path.pop_back();
+
+    try {
+        ctx->env->RegisterExecutionProviderLibrary(info->name, fs::path(path).wstring());
+    } catch (const Ort::Exception& e) {
+        // Duplicate registration is harmless; a real incompatibility is retained
+        // for the session-policy failure message.
+        const std::string message = e.what();
+        if (lower(message).find("already") == std::string::npos) {
+            ctx->errors += std::string(info->name) + " register failed (" + message + "); ";
+        }
+    }
+    return TRUE;
+}
+}  // namespace winml_detail
+
+inline void register_windows_ml_catalog(Ort::Env& env, Device requested_device) {
+    WinMLEpCatalogHandle catalog = nullptr;
+    const HRESULT create_hr = WinMLEpCatalogCreate(&catalog);
+    if (FAILED(create_hr) || !catalog) {
+        throw std::runtime_error(
+            "Windows ML Execution Provider Catalog initialization failed (HRESULT " +
+            std::to_string(static_cast<unsigned long>(create_hr)) + ")");
+    }
+    winml_detail::RegisterContext context{&env, requested_device, {}};
+    const HRESULT enum_hr =
+        WinMLEpCatalogEnumProviders(catalog, winml_detail::register_provider, &context);
+    WinMLEpCatalogRelease(catalog);
+    if (FAILED(enum_hr)) {
+        throw std::runtime_error(
+            "Windows ML Execution Provider Catalog enumeration failed (HRESULT " +
+            std::to_string(static_cast<unsigned long>(enum_hr)) + ")");
+    }
+    if (!context.errors.empty()) {
+        std::cerr << "[npu-inference-bench] Windows ML catalog: " << context.errors << "\n";
+    }
+}
+#endif
 
 #ifdef NPU_INFERENCE_BENCH_QUALCOMM
 inline std::string qnn_ep_library_path() {
@@ -218,6 +341,87 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
                             const std::string& provider, const fs::path& model_dir,
                             const std::string& cache_key) {
     const std::string p = lower(provider);
+
+#ifdef NPU_INFERENCE_BENCH_WINML
+    if (p.rfind("windowsml:", 0) == 0 || p == "windowsml" || p == "winml") {
+        const Device selected_device = winml_token_device(provider, options.device);
+        const OrtExecutionProviderDevicePolicy policy =
+            selected_device == Device::NPU ? OrtExecutionProviderDevicePolicy_PREFER_NPU
+            : selected_device == Device::GPU ? OrtExecutionProviderDevicePolicy_PREFER_GPU
+                                             : OrtExecutionProviderDevicePolicy_PREFER_CPU;
+        if (lower(env_or("NPU_INFERENCE_BENCH_WINML_SELECTION", "explicit")) == "policy") {
+            so.SetEpSelectionPolicy(policy);
+            return;
+        }
+
+        if (selected_device != Device::CPU) {
+            const OrtHardwareDeviceType target =
+                selected_device == Device::NPU ? OrtHardwareDeviceType_NPU
+                                               : OrtHardwareDeviceType_GPU;
+            std::vector<Ort::ConstEpDevice> compatible;
+            for (Ort::ConstEpDevice candidate : env.GetEpDevices()) {
+                if (candidate.Device().Type() == target) compatible.push_back(candidate);
+            }
+            if (compatible.empty()) {
+                throw std::runtime_error(
+                    "Windows ML has no registered EP device for " +
+                    std::string(selected_device == Device::NPU ? "NPU" : "GPU"));
+            }
+            if (selected_device == Device::GPU) {
+                // PREFER_GPU may choose Qualcomm's QNN GPU device. DirectML is
+                // the portable and stable Windows GPU path, so prefer it when
+                // explicitly selecting a benchmark device.
+                std::stable_sort(
+                    compatible.begin(), compatible.end(),
+                    [](Ort::ConstEpDevice a, Ort::ConstEpDevice b) {
+                        const bool a_dml = lower(a.EpName()).find("dml") != std::string::npos;
+                        const bool b_dml = lower(b.EpName()).find("dml") != std::string::npos;
+                        return a_dml && !b_dml;
+                    });
+                compatible.resize(1);
+            }
+            std::unordered_map<std::string, std::string> empty_options;
+            Ort::KeyValuePairs ep_options(empty_options);
+            so.AppendExecutionProvider_V2(env, compatible, ep_options);
+            return;
+        }
+
+        if (selected_device == Device::CPU && options.cpu_threads > 0) {
+            so.SetIntraOpNumThreads(options.cpu_threads);
+            so.SetInterOpNumThreads(1);
+        }
+        return;
+    }
+
+    // Explicit --provider remains available in WinML builds. Select the catalog
+    // EP device by its ORT name instead of calling a provider-specific factory.
+    if (p != "cpu" && p != "cpuexecutionprovider") {
+        std::string requested = p;
+        const auto colon = requested.find(':');
+        if (colon != std::string::npos) requested.resize(colon);
+        std::vector<Ort::ConstEpDevice> selected;
+        for (Ort::ConstEpDevice candidate : env.GetEpDevices()) {
+            std::string ep_name = lower(candidate.EpName());
+            std::string short_name = ep_name;
+            const std::string suffix = "executionprovider";
+            if (short_name.size() >= suffix.size() &&
+                short_name.compare(short_name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                short_name.resize(short_name.size() - suffix.size());
+            }
+            if (requested == ep_name || requested == short_name ||
+                (requested == "directml" && short_name == "dml")) {
+                selected.push_back(candidate);
+            }
+        }
+        if (selected.empty()) {
+            throw std::runtime_error("Windows ML provider is not registered or compatible: " + provider);
+        }
+        std::unordered_map<std::string, std::string> empty_options;
+        Ort::KeyValuePairs ep_options(empty_options);
+        so.AppendExecutionProvider_V2(env, selected, ep_options);
+        return;
+    }
+#endif
 
     // Intel native path: OpenVINO EP. Accepts "openvino", "openvinoexecutionprovider",
     // or an "openvino:<DEVICE>" token; device_type comes from the suffix when present.

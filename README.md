@@ -182,6 +182,11 @@ The project targets Windows x64 and ARM64 using C++17 and MSBuild.
 # Qualcomm ARM64.
 .\tools\setup\setup-qualcomm.ps1
 .\tools\build\build.ps1 -Platform ARM64 -EnableQualcomm -DisableIntel
+
+# Windows ML (host architecture; isolated *-winml runtime tree).
+.\tools\setup\setup-winml.ps1
+.\tools\build\build.ps1 -EnableWinML -DisableIntel
+.\benchmark\run-suite.ps1 -Runtime winml -Device cpu,gpu,npu
 ```
 
 The Qualcomm setup stages one native ARM64 executable with both execution
@@ -190,6 +195,11 @@ The portable suite can exercise both with `-Device npu,gpu -Provider auto`.
 See [Qualcomm Snapdragon on Windows ARM64](docs/platforms/qualcomm-windows-arm64.md)
 for the tested CPU, GPU, and NPU requirements, supported workloads, verification
 criteria, and troubleshooting guidance.
+
+The Windows ML path obtains compatible vendor execution providers through its
+catalog and explicitly maps `-Device cpu|gpu|npu` to CPU, DirectML GPU, or the
+available NPU EP. See [Windows ML benchmark runtime](docs/platforms/windows-ml.md)
+for requirements, provider-policy mode, and verification guidance.
 
 Build output:
 

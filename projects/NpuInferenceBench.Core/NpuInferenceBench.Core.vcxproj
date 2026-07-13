@@ -40,7 +40,8 @@
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\common.props" />
-  <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.ort.props" Condition="'$(EnableOrt)'=='true'" />
+  <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.winml.props" Condition="'$(EnableWinML)'=='true'" />
+  <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.ort.props" Condition="'$(EnableOrt)'=='true' and '$(EnableWinML)'!='true'" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.intel.props" Condition="'$(EnableIntel)'=='true'" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.amd.props" Condition="'$(EnableAmd)'=='true'" />
   <Import Project="$(NpuInferenceBenchRoot)msbuild\backend.qualcomm.props" Condition="'$(EnableQualcomm)'=='true'" />

@@ -28,6 +28,7 @@
 #   .\benchmark\run-suite.ps1 -Device npu           # OpenVINO NPU (Intel AI Boost)
 #   .\benchmark\run-suite.ps1 -Device npu,cpu       # sweep several devices (OpenVINO)
 #   .\benchmark\run-suite.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
+#   .\benchmark\run-suite.ps1 -Runtime winml -Device npu,gpu,cpu
 #   .\benchmark\run-suite.ps1 -Device gpu -Provider DmlExecutionProvider
 #   .\benchmark\run-suite.ps1 -Precision preferred  # let each executor choose precision
 #   .\benchmark\run-suite.ps1 -Only whisper         # just the ASR model
@@ -45,6 +46,7 @@ param(
     [int]$ClassifierRuns = 20,
     [string]$Configuration = "Release",
     [string]$Provider = "openvino",
+    [ValidateSet("bundled", "winml")][string]$Runtime = "bundled",
     [ValidateSet("default", "f32", "f16", "bf16", "preferred")]
     [string]$Precision = "default",
     [string]$Audio = "",
@@ -63,6 +65,11 @@ Initialize-BenchmarkConsole
 # "auto" is the escape hatch back to the app's portable per-device EP fallback chain
 # (leave --provider off so ort_ep.hpp walks VitisAI/QNN/DirectML/OpenVINO/CPU).
 if ($Provider -eq "auto") { $Provider = "" }
+if ($Runtime -eq "winml") {
+    # Windows ML maps -Device to PREFER_NPU/GPU/CPU. Leave --provider unset so
+    # ORT's policy selector can choose among the catalog-registered EP devices.
+    $Provider = ""
+}
 if ($Precision -ne "default") {
     $env:NPU_INFERENCE_BENCH_PRECISION = $Precision
 }
@@ -82,7 +89,10 @@ $platform = $hostArch
 # plain build rather than failing every run -- and say how to produce the OVEP build.
 # Note: there is no OpenVINO EP build for ARM64, so on Snapdragon this always falls
 # through to the portable chain (which carries the QNN EP -> Hexagon NPU).
-if ($Provider -like "openvino*") {
+if ($Runtime -eq "winml") {
+    $platform = "$hostArch-winml"
+}
+elseif ($Provider -like "openvino*") {
     $ovepExe = Join-Path $root "build\$hostArch-ovep\$Configuration\NpuInferenceBench.exe"
     if (Test-Path $ovepExe) {
         $platform = "$hostArch-ovep"
@@ -113,7 +123,12 @@ elseif ($Provider -match "(?i)dml|directml") {
 }
 $exe = Join-Path $root "build\$platform\$Configuration\NpuInferenceBench.exe"
 if (-not (Test-Path $exe)) {
-    Write-Host "Not built: $exe  (run .\tools\build\build.ps1 -EnableOrt / -EnableDirectML / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
+    if ($Runtime -eq "winml") {
+        Write-Host "Not built: $exe  (run .\tools\setup\setup-winml.ps1; .\tools\build\build.ps1 -EnableWinML -DisableIntel)" -ForegroundColor Red
+    }
+    else {
+        Write-Host "Not built: $exe  (run .\tools\build\build.ps1 -EnableOrt / -EnableDirectML / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
+    }
     exit 1
 }
 

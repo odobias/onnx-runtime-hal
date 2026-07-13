@@ -240,6 +240,9 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     res.cache_dir = cache_dir;
 
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_classifier");
+#ifdef NPU_INFERENCE_BENCH_WINML
+    ort_common::register_windows_ml_catalog(env, device);
+#endif
 
     // Optional VitisAI compile config: prefer one next to the fixture, else next to
     // the model. Lets us pass VAIML accuracy knobs without any CLI change.
@@ -427,6 +430,16 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         const std::string prof_path = session->EndProfilingAllocated(alloc).get();
         const auto st = ort_common::parse_ort_profile(prof_path);
         if (st.measured) {
+#ifdef NPU_INFERENCE_BENCH_WINML
+            if (!st.providers.empty()) {
+                const auto comma = st.providers.find(',');
+                const std::string resolved = st.providers.substr(0, comma);
+                res.execution_provider = resolved;
+                res.diagnostics.resolved_provider = resolved;
+                res.diagnostics.fallback_occurred =
+                    device != Device::CPU && resolved == "CPUExecutionProvider";
+            }
+#endif
             res.offload_measured = true;
             res.ep_nodes = st.ep_nodes;
             res.cpu_nodes = st.cpu_nodes;

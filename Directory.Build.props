@@ -15,6 +15,10 @@
     <EnableIntel Condition="'$(EnableIntel)'==''">true</EnableIntel>
     <EnableAmd Condition="'$(EnableAmd)'==''">false</EnableAmd>
     <EnableQualcomm Condition="'$(EnableQualcomm)'==''">false</EnableQualcomm>
+    <!-- Windows ML uses its own ONNX Runtime distribution and EP catalog. It is
+         emitted into a separate <platform>-winml tree. -->
+    <EnableWinML Condition="'$(EnableWinML)'==''">false</EnableWinML>
+    <EnableOrt Condition="'$(EnableOrt)'=='' and '$(EnableWinML)'=='true'">true</EnableOrt>
 
     <!-- Intel native path through ONNX Runtime's OpenVINO EP (OVEP). This makes the
          unified ORT binary cover Intel NPU/GPU/CPU too, alongside AMD (VitisAI) and
