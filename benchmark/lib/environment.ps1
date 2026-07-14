@@ -57,11 +57,41 @@ function Get-BenchmarkEnvironmentSnapshot {
             -Name GlobalUserDisabled -ErrorAction Stop)
     } catch {}
     $powerSource = "unknown"
+    $batteryDetails = $null
     try {
         $battery = Get-CimInstance Win32_Battery -ErrorAction Stop | Select-Object -First 1
         if (-not $battery) { $powerSource = "AC" }
         elseif ($battery.BatteryStatus -in @(2, 6, 7, 8, 9, 11)) { $powerSource = "AC" }
         else { $powerSource = "battery" }
+        if ($battery) {
+            $batteryDetails = [ordered]@{
+                device_id = "$($battery.DeviceID)"
+                status = "$($battery.Status)"
+                battery_status = $battery.BatteryStatus
+                estimated_charge_remaining_pct = $battery.EstimatedChargeRemaining
+                estimated_runtime_minutes = $battery.EstimatedRunTime
+                design_voltage_mv = $battery.DesignVoltage
+                chemistry = $battery.Chemistry
+            }
+        }
+    } catch {}
+    $powerOverlays = [ordered]@{ ac = ""; dc = "" }
+    try {
+        $powerKey = Get-ItemProperty `
+            'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' `
+            -ErrorAction Stop
+        $powerOverlays.ac = "$($powerKey.ActiveOverlayAcPowerScheme)"
+        $powerOverlays.dc = "$($powerKey.ActiveOverlayDcPowerScheme)"
+    } catch {}
+    $thermalZones = @()
+    try {
+        foreach ($zone in @(Get-CimInstance -Namespace root/wmi `
+                -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop)) {
+            $thermalZones += [ordered]@{
+                instance_name = "$($zone.InstanceName)"
+                temperature_c = [math]::Round(($zone.CurrentTemperature / 10.0) - 273.15, 2)
+            }
+        }
     } catch {}
 
     $binaries = @()
@@ -117,6 +147,9 @@ function Get-BenchmarkEnvironmentSnapshot {
             source = $powerSource
             active_plan = $powerPlan
             energy_saver_enabled = $energySaver
+            overlay_scheme = $powerOverlays
+            battery = $batteryDetails
+            thermal_zones = $thermalZones
         }
         runtime_binaries = $binaries
         vendor_sdk_manifests = $sdkManifests
