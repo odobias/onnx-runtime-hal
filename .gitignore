@@ -21,7 +21,9 @@ workloads/classifiers/audio-samples/
 workloads/classifiers/fixtures/
 workloads/eval/
 workloads/audio/
-models/deepfake/
+# Legacy/generated payload root. Classifier assets still use models/deepfake
+# while the remaining model families migrate to workloads/.
+/models/
 *.wav
 *.blob
 *_openvino_model/
@@ -39,6 +41,7 @@ results/quantization-benchmark-detail.csv
 results/quantization-benchmark.md
 results/host-info.json
 results/ledgers/attempts.jsonl
+results/*-here.csv
 
 # Transient build/benchmark logs (e.g. build_ovep.log, bench_intel_whisper.log)
 *.log
