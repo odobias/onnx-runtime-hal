@@ -1,0 +1,31 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-14T15:19:04.5799219Z",
+    "execution_profile":  "npu-split-intel",
+    "graph_role":  "backbone",
+    "target_vendor":  "Intel",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\models\\deepfake\\fakeaudio\\model.backbone.expanded-attention-bias.onnx",
+    "artifact_sha256":  "ec215831f632ecfc84dd59272624430edca852ec09bec462e1aeed1f295bc5f9",
+    "source_model_sha256":  "39861136487bf9a2a6d81a674939df8d8015900a78e5f5f95b67667281650de8",
+    "compiler":  {
+                     "name":  "Intel execution-provider compiler",
+                     "version":  "unknown",
+                     "version_source":  "unknown: no authoritative SDK manifest or provider binary version was found"
+                 },
+    "compile_or_export_options":  {
+                                      "executor":  "OpenVINO NPU",
+                                      "generated_model":  "../../fakeaudio/model.backbone.expanded-attention-bias.onnx",
+                                      "generated_model_sha256":  "ec215831f632ecfc84dd59272624430edca852ec09bec462e1aeed1f295bc5f9",
+                                      "max_cpu_logit_delta":  0.0,
+                                      "patched_attention_blocks":  7,
+                                      "schema_version":  1,
+                                      "source_model":  "../../fakeaudio/model.backbone-fp32.onnx",
+                                      "source_model_sha256":  "39861136487bf9a2a6d81a674939df8d8015900a78e5f5f95b67667281650de8",
+                                      "transform":  "expand-add-softmax-attention-bias",
+                                      "vendor":  "Intel"
+                                  },
+    "transformation_recipe":  "expand-add-softmax-attention-bias",
+    "compilation_host_snapshot_id":  "934d91c1680a2e7aa20d",
+    "id":  "c4c21ca1fcc0e58c586a"
+}
