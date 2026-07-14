@@ -133,4 +133,3 @@ int run_classify(const std::string& dir, npu_inference_bench::Device device, con
     if (!results_csv.empty()) std::cout << "results csv: " << results_csv << "\n";
     return 0;
 }
-

@@ -256,4 +256,3 @@ std::vector<std::string> split_csv_row(const std::string& line) {
     fields.push_back(cur);
     return fields;
 }
-

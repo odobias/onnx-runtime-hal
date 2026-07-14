@@ -280,7 +280,6 @@ void append_result_csv(const std::string& path,
         << csv_escape(environment_value("NPU_INFERENCE_BENCH_MODEL_PROVENANCE_IDS")) << ','
         << "" << '\n';
 }
-
 // --- deepfake classifier mode -----------------------------------------------
 // Separate ledger from the ASR benchmark: classifiers have a different I/O
 // contract and metric set (accuracy + cross-EP probability agreement, not
