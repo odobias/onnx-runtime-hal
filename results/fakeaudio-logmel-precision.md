@@ -19,9 +19,10 @@ with the scripts in [Reproduce](#reproduce).
   `Log(0) = -∞`, and NaN propagates.
 - **bf16 fixes the front-end completely** (same 8-bit exponent as fp32, min normal
   ~1.2e-38): every front-end edge goes to `max|Δp| = 0.0000`.
-- It does **not** rescue the NPU: on AMD XDNA2 / VitisAI the HTSAT *backbone* diverges
-  independently (0.99 fed clean CPU log-mel; 0.51 as calibrated int8). fakeaudio is a
-  CPU/GPU model; the NPU is for whisper.
+- The earlier NPU failure was **stack-specific, not intrinsic to HTSAT**. Ryzen AI
+  1.8.0-beta produced probability deltas of 0.996 for the full model and 0.99 for the
+  isolated backbone. Revalidation with Ryzen AI 1.7.1 GA reduced the full-model delta
+  to **0.011589** while compiling **98.33% of original operations for AIE**.
 
 ## Exact location
 
@@ -115,14 +116,57 @@ Only one rewrite works: **take the `Log` earlier and do the mel pooling in the l
 `logmel[m] = max_f ℓ_f + log Σ_f W[m,f]·exp(ℓ_f − max_f ℓ_f)` with `ℓ_f = log P[f]`, and get
 `log P` straight from the STFT magnitude (`2·log|STFT|`) so the linear power spectrum is
 never materialized in fp16. Then every boundary tensor lives in `~[-35, 10]`, trivially
-fp16-safe. Caveats: it does **not** help the NPU (backbone diverges independently), it is
-**not needed** for CPU/GPU (the fp32 front-end is 4 MB / microseconds and exact), and it adds
-`Exp`/`Log` ops a fixed-function NPU may also mishandle. Worthwhile only if you specifically
-need a *uniformly*-fp16 front-end for a runtime that refuses mixed precision.
+fp16-safe. It is **not needed** for CPU/GPU or the validated Ryzen AI 1.7.1 path (the
+fp32 front-end is 4 MB / microseconds and exact), and it adds `Exp`/`Log` ops a
+fixed-function NPU may also mishandle. Worthwhile only if you specifically need a
+*uniformly*-fp16 front-end for a runtime that refuses mixed precision.
 
-## NPU reality (AMD XDNA2 / VitisAI, ORT 1.25.1)
+## NPU revalidation (AMD XDNA2 / Ryzen AI 1.7.1 GA)
 
-The front-end trap is only half the story. Measured on the NPU:
+Revalidated on 2026-07-14 with:
+
+- Ryzen AI 1.7.1 GA conda environment
+- AMD NPU driver `32.0.203.280`
+- ONNX Runtime VitisAI `1.23.3`
+- base model SHA-256
+  `549143bc35c75f7f531dc900a901a5f6c8835d47de3cf833ab2579f8be72dcbb`
+
+The full fp32 model compiled and completed inference without provider fallback:
+
+| result | value |
+|---|---:|
+| maximum probability delta from CPU | **0.011589** |
+| compiler-reported original operations on AIE | **98.33%** |
+| compiler-reported original operations on CPU | **1.67%** |
+| cold / hot load | 513.87 s / 122.39 s |
+| mean inference | 70.18 ms |
+| fixture accuracy | 3/5 (60%, matching the CPU fixture baseline) |
+
+ORT profiling reported one fused VitisAI node and 20 CPU nodes. Its resulting
+`cpu_offload_pct = 95.24%` is a count of post-partition profiler nodes, **not compute
+share**: the single VitisAI node contains the compiled AIE partition, while the CPU
+side retains small front-end and boundary operations (`Conv`, `Pow`, `MatMul`, `Clip`,
+`Log`, `Resize`, `Transpose`, and related plumbing). The compiler's original-operation
+placement is the meaningful figure here.
+
+The fail-safe partitioner did report unsupported operations, but this was informational,
+not a compilation failure:
+
+```text
+Partition completed with 2 partitions
+The fail-safe partitioner has detected operations that are not supported on AIE.
+98.33% of operations will run on AIE, 1.67% of operations will run on CPU.
+```
+
+The same `0.011589` probability delta had already been observed with the 1.7.1 runtime
+and the mismatched 1.8-beta driver. Installing driver `32.0.203.280` did not materially
+change FakeAudio; it fixed the separate Whisper static access violation. FakeAudio's
+numerical recovery therefore tracks the **1.7.1 runtime/compiler**, while the correct
+driver restores platform stability.
+
+## Historical NPU failure (Ryzen AI 1.8.0-beta, ORT 1.25.1)
+
+The earlier beta-stack measurements were:
 
 | model on NPU | NPU `max_abs_p_diff` | note |
 |---|---:|---|
@@ -131,16 +175,14 @@ The front-end trap is only half the story. Measured on the NPU:
 | **fp32 backbone only** (CPU-computed mel fed in) | **0.99** | backbone alone still blows up |
 | calibrated int8 backbone (our QDQ scales) | 0.51 | + ~12× slower; VAIML won't honor QDQ faithfully |
 
-So VAIML mishandles the **HTSAT backbone itself** (windowed attention, ~30 LayerNorms, 12
-Softmaxes, the patch-grid `Resize`) regardless of any ORT-side precision control — a second,
-independent failure from the front-end underflow. The backbone region is 2,354 nodes and is
-mostly dynamic-shape plumbing (934 `Constant`, 262 `Unsqueeze`, 167 `Gather`, 144 `Concat`,
-143 `Reshape`, 134 `Shape`), which is also what broke standalone shape inference until the mel
-shape `[1,1,965,64]` was pinned, and what VAIML's partitioner choked on around `Resize`.
+Those results showed a real beta-stack failure, but the 1.7.1 revalidation falsifies the
+stronger claim that VAIML inherently mishandles the HTSAT backbone. The likely fault domain
+is the 1.8.0-beta runtime/compiler path. The beta was published primarily for MLPerf and AMD
+did not recommend it for production validation.
 
-**Verdict:** fakeaudio runs on CPU/GPU with `model.fp16-safe.onnx`; the NPU is for whisper
-(which ports cleanly). The split / int8-backbone artifacts remain *untested* candidates for
-Intel OpenVINO / Qualcomm QNN — different compilers than VAIML, may behave; no such HW here.
+**Verdict:** FakeAudio runs accurately on CPU/GPU and on AMD XDNA2 with Ryzen AI 1.7.1 GA.
+The NPU path still has expensive compile/load times and leaves 1.67% of original operations
+on CPU, but it no longer exhibits the catastrophic probability divergence.
 
 ## Reproduce
 
