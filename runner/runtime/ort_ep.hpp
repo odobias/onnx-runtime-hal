@@ -476,6 +476,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
         if (!options.cache_dir.empty()) {
             vitis_opts["cache_dir"] = options.cache_dir;
             vitis_opts["cache_key"] = cache_key;
+            vitis_opts["enable_cache_file_io_in_mem"] = "0";
         }
         so.AppendExecutionProvider_VitisAI(vitis_opts);
         return;
