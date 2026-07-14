@@ -27,6 +27,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #if defined(_WIN32)
@@ -53,8 +54,15 @@ namespace {
 int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
     using namespace npu_inference_bench;
 
+    struct EvalClipSpec {
+        std::string id;
+        std::string audio;
+        std::string reference;
+    };
     std::vector<std::string> pos;
+    std::vector<EvalClipSpec> eval_clips;
     std::string cache_dir, reference, results_csv, label, provider_override, classify_dir;
+    std::string json_output_path;
     bool json_out = false, have_ref = false, hot_only = false;
     int cpu_threads = 0;
     if (argc > 1 && std::string(argv[1]) == "suite") {
@@ -79,6 +87,12 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         } else if (a == "--ref" && i + 1 < argc) {
             reference = argv[++i];
             have_ref = true;
+        } else if (a == "--eval-clip" && i + 3 < argc) {
+            EvalClipSpec clip;
+            clip.id = argv[++i];
+            clip.audio = argv[++i];
+            clip.reference = argv[++i];
+            eval_clips.push_back(std::move(clip));
         } else if (a == "--threads" && i + 1 < argc) {
             cpu_threads = std::max(0, std::atoi(argv[++i]));
         } else if ((a == "--provider" || a == "--device-override") && i + 1 < argc) {
@@ -86,6 +100,9 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         } else if (a == "--hot-only") {
             hot_only = true;
         } else if (a == "--json") {
+            json_out = true;
+        } else if (a == "--json-output" && i + 1 < argc) {
+            json_output_path = argv[++i];
             json_out = true;
         } else if (a == "--results" && i + 1 < argc) {
             results_csv = argv[++i];
@@ -131,9 +148,11 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
                   << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"
                   << "  --hot-only  : load once from a populated --cache (skip cold compile; cold=n/a)\n"
                   << "  --ref \"text\": reference transcript -> compute WER/CER\n"
+                  << "  --eval-clip <id> <audio> <ref>: repeat to evaluate clips in one loaded session\n"
                   << "  --threads N: CPU inference thread count (CPU device only)\n"
                   << "  --provider <ort-ep>: backend-specific provider override (e.g. VitisAIExecutionProvider)\n"
                   << "  --json: emit one machine-readable JSON record\n"
+                  << "  --json-output <path>: write JSON to a file, isolated from provider logs\n"
                   << "  --results <csv>: append a benchmark result row\n"
                   << "  --label <text>: tag the results row (e.g. quantization variant)\n"
                   << "\nClassifiers: run <tsc|fakeaudio> <fixture_dir> [device] [runs]\n"
@@ -168,9 +187,23 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
     const int warmup = 1;
     const std::string requested_backend = to_string(backend);
 
+    auto emit_json = [&](const std::string& payload) {
+        if (json_output_path.empty()) {
+            std::cout << payload << "\n";
+            return;
+        }
+        std::ofstream output(json_output_path, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            throw std::runtime_error("Failed to open JSON output: " + json_output_path);
+        }
+        output << payload << "\n";
+        if (!output) {
+            throw std::runtime_error("Failed to write JSON output: " + json_output_path);
+        }
+    };
     auto fail = [&](int code, const std::string& msg) {
         if (json_out) {
-            std::cout << "{\"ok\":false,\"error\":\"" << json_escape(msg) << "\"}\n";
+            emit_json("{\"ok\":false,\"error\":\"" + json_escape(msg) + "\"}");
         } else {
             std::cerr << msg << "\n";
         }
@@ -242,6 +275,111 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
                 if (!json_out) std::cerr << "Hot reload failed: " << e.what() << "\n";
             }
         }
+    }
+
+    if (!eval_clips.empty()) {
+        const double size_mb = model_size_mb(opt.model_dir);
+        std::string model_sha256;
+        try {
+            model_sha256 = npu_inference_bench::model_artifacts_sha256(opt.model_dir);
+        } catch (const std::exception& e) {
+            return fail(5, std::string("Failed to hash model artifacts: ") + e.what());
+        }
+
+        std::ostringstream output;
+        output << std::fixed << std::setprecision(6);
+        output << "{\"ok\":true,\"clips\":[";
+        for (std::size_t index = 0; index < eval_clips.size(); ++index) {
+            const auto& spec = eval_clips[index];
+            WavData clip_wav;
+            try {
+                clip_wav = read_wav(spec.audio);
+            } catch (const std::exception& e) {
+                return fail(2, std::string("Failed to read WAV '") + spec.id + "': " + e.what());
+            }
+            const double clip_audio_len =
+                static_cast<double>(clip_wav.samples.size()) /
+                static_cast<double>(clip_wav.sample_rate ? clip_wav.sample_rate : 16000);
+
+            TranscribeResult clip_result;
+            try {
+                if (index == 0) engine->transcribe(clip_wav.samples);
+                clip_result = engine->transcribe(clip_wav.samples);
+            } catch (const std::exception& e) {
+                return fail(4, std::string("Transcription failed for '") + spec.id + "': " + e.what());
+            }
+            const std::string clip_text = trim(clip_result.text);
+            const double clip_mean = clip_result.infer_seconds;
+            const double clip_rtf = clip_mean / clip_audio_len;
+            const ErrorRate clip_error = compute_error_rate(spec.reference, clip_text);
+            const auto clip_meta =
+                npu_inference_bench::benchmark_meta::resolve(opt.model_dir, label, *engine, clip_result);
+
+            if (index) output << ",";
+            output << "{";
+            output << "\"ok\":true";
+            output << ",\"eval_id\":\"" << json_escape(spec.id) << "\"";
+            output << ",\"backend\":\"" << json_escape(engine->backend_name()) << "\"";
+            output << ",\"device\":\"" << json_escape(engine->device_name()) << "\"";
+            output << ",\"device_full_name\":\"" << json_escape(engine->full_device_name()) << "\"";
+            output << ",\"power_source\":\"" << json_escape(power_source()) << "\"";
+            output << ",\"host_arch\":\"" << json_escape(host_arch()) << "\"";
+            output << ",\"host_os\":\"" << json_escape(host_os()) << "\"";
+            output << ",\"runtime_version\":\"" << json_escape(engine->runtime_version()) << "\"";
+            output << ",\"inference_precision\":\""
+                   << json_escape(engine->execution_diagnostics().inference_precision) << "\"";
+            output << ",\"cpu_threads_requested\":" << cpu_threads;
+            output << ",\"hw_concurrency\":" << std::thread::hardware_concurrency();
+            output << ",\"model_dir\":\"" << json_escape(opt.model_dir) << "\"";
+            output << ",\"model_package\":\"" << json_escape(clip_meta.model_package) << "\"";
+            output << ",\"model_sha256\":\"" << json_escape(model_sha256) << "\"";
+            output << ",\"variant_id\":\"" << json_escape(clip_meta.variant_id) << "\"";
+            output << ",\"base_model\":\"" << json_escape(clip_meta.base_model) << "\"";
+            output << ",\"precision\":\"" << json_escape(clip_meta.precision) << "\"";
+            output << ",\"quant_method\":\"" << json_escape(clip_meta.quant_method) << "\"";
+            output << ",\"execution_provider\":\"" << json_escape(clip_meta.execution_provider) << "\"";
+            append_diagnostics_json(output, engine->execution_diagnostics());
+            output << ",\"runtime\":\"" << json_escape(clip_meta.runtime) << "\"";
+            output << ",\"model_format\":\"" << json_escape(clip_meta.model_format) << "\"";
+            output << ",\"decode_strategy\":\"" << json_escape(clip_meta.decode_strategy) << "\"";
+            if (clip_meta.max_context > 0) output << ",\"max_context\":" << clip_meta.max_context;
+            output << ",\"model_size_mb\":" << size_mb;
+            output << ",\"audio\":\"" << json_escape(spec.audio) << "\"";
+            output << ",\"audio_len_s\":" << clip_audio_len;
+            output << ",\"runs\":1";
+            output << ",\"warmup\":" << (index == 0 ? 1 : 0);
+            output << ",\"hot_only\":false";
+            output << ",\"load_cold_s\":" << (index == 0 ? cold_load : -1.0);
+            output << ",\"load_hot_s\":" << (index == 0 ? warm_load : -1.0);
+            output << ",\"cold_load_seconds\":" << (index == 0 ? cold_load : -1.0);
+            output << ",\"hot_load_seconds\":" << (index == 0 ? warm_load : -1.0);
+            output << ",\"warm_load_seconds\":" << (index == 0 ? warm_load : -1.0);
+            output << ",\"mean_ms\":" << clip_mean * 1000.0;
+            output << ",\"median_ms\":" << clip_mean * 1000.0;
+            output << ",\"p90_ms\":" << clip_mean * 1000.0;
+            output << ",\"rtf\":" << clip_rtf;
+            output << ",\"xrt\":" << (clip_rtf > 0 ? 1.0 / clip_rtf : 0.0);
+            output << ",\"avg_logprob\":" << clip_result.avg_logprob;
+            output << ",\"sequence_logprob\":" << clip_result.sequence_logprob;
+            output << ",\"generated_tokens\":" << clip_result.generated_tokens;
+            output << ",\"ttft_ms\":" << clip_result.ttft_ms;
+            output << ",\"tpot_ms\":" << clip_result.tpot_ms;
+            output << ",\"throughput_tps\":" << clip_result.throughput_tps;
+            output << ",\"has_token_metrics\":"
+                   << (clip_result.has_token_metrics ? "true" : "false");
+            output << ",\"wer\":" << clip_error.wer;
+            output << ",\"cer\":" << clip_error.cer;
+            output << ",\"ref_words\":" << clip_error.ref_words;
+            output << ",\"word_edits\":" << clip_error.word_edits;
+            output << ",\"ref_chars\":" << clip_error.ref_chars;
+            output << ",\"char_edits\":" << clip_error.char_edits;
+            output << ",\"ref\":\"" << json_escape(spec.reference) << "\"";
+            output << ",\"text\":\"" << json_escape(clip_text) << "\"";
+            output << "}";
+        }
+        output << "]}";
+        emit_json(output.str());
+        return 0;
     }
 
     // Inference benchmark.

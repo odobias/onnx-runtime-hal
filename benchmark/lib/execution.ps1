@@ -4,6 +4,7 @@ function Invoke-BenchmarkNativeJson {
     param(
         [Parameter(Mandatory)][string]$Exe,
         [Parameter(Mandatory)][string[]]$Arguments,
+        [string]$JsonOutputPath = "",
         [switch]$EchoOutput
     )
     $oldEap = $ErrorActionPreference
@@ -19,7 +20,14 @@ function Invoke-BenchmarkNativeJson {
         $ErrorActionPreference = $oldEap
     }
     $payload = $null
+    if ($JsonOutputPath -and (Test-Path -LiteralPath $JsonOutputPath)) {
+        try {
+            $payload = Get-Content -LiteralPath $JsonOutputPath -Raw -Encoding UTF8 |
+                ConvertFrom-Json -ErrorAction Stop
+        } catch {}
+    }
     for ($i = $raw.Count - 1; $i -ge 0; --$i) {
+        if ($payload) { break }
         try {
             $candidate = ([string]$raw[$i]) | ConvertFrom-Json -ErrorAction Stop
             if ($null -ne $candidate.ok) { $payload = $candidate; break }
