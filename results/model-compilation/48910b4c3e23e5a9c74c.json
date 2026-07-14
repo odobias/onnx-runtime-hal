@@ -1,0 +1,23 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-14T16:10:36.7873032Z",
+    "execution_profile":  "npu-split-generic",
+    "graph_role":  "frontend",
+    "target_vendor":  "CPU",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Dobiashi\\.cursor\\worktrees\\whisper-npu-hal\\0erm\\models\\deepfake\\fakeaudio\\model.frontend-fp32.onnx",
+    "artifact_sha256":  "ac7e32413c4cfd37f7f99521df092363c58721ffb0b0de556560dbd266c7a5cc",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "unknown",
+                     "version":  "unknown",
+                     "version_source":  "unknown: no authoritative SDK manifest or provider binary version was found"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compilation_host_snapshot_id":  "a9a14fc16a2b9ace9e28",
+    "id":  "48910b4c3e23e5a9c74c"
+}

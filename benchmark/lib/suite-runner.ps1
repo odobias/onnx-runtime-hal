@@ -37,7 +37,9 @@ function Invoke-NativeBenchmark {
                 $script = Join-Path $root (([string]$step.script) -replace '/', '\')
                 $stepArgs = @($step.arguments | ForEach-Object { [string]$_ })
                 Write-Host "fixture step: $($step.script) $($stepArgs -join ' ')" -ForegroundColor DarkGray
-                & $vpy $script @stepArgs
+                & $vpy $script @stepArgs 2>&1 | ForEach-Object {
+                    Write-Host ([string]$_)
+                }
                 if ($LASTEXITCODE -ne 0) {
                     $message = "fixture step failed ($LASTEXITCODE): $($step.script)"
                     Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "fixture-failed" $message $null
@@ -101,29 +103,48 @@ function Invoke-NativeBenchmark {
             Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "assets-missing" $message $null $provenanceIds
             return $false
         }
-        $clipResults = @()
+        $clipSpecs = @()
         for ($i = 0; $i -lt $evalRows.Count; $i++) {
             $eval = $evalRows[$i]
             $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
             if (-not (Test-Path -LiteralPath $clipPath)) {
                 $clipPath = Join-Path $root "workloads\eval\$($eval.id).wav"
             }
-            $invoke = @{
-                Exe = $exe; ModelDir = $path; Audio = $clipPath
-                Backend = [string]$Workload.backend; Device = $RequestedDevice
-                Runs = 1; CacheDir = $cache; Ref = [string]$eval.ref; Provider = $Provider
-            }
-            if ($i -eq 0) { $invoke.EchoOutput = $true }
-            if ($i -gt 0) { $invoke.HotOnly = $true }
-            $clip = Invoke-BenchmarkClip @invoke
-            if (-not $clip.ok) {
-                $message = "Whisper evaluation clip '$($eval.id)' failed: $($clip.error)"
-                Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "executor-failed" $message $clip $provenanceIds
+            if (-not (Test-Path -LiteralPath $clipPath)) {
+                $message = "Whisper evaluation audio is missing: $clipPath"
+                Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "fixtures-missing" $message $null $provenanceIds
                 return $false
             }
-            $clip | Add-Member -NotePropertyName eval_id -NotePropertyValue ([string]$eval.id)
-            $clipResults += $clip
+            $clipSpecs += [pscustomobject]@{
+                id = [string]$eval.id
+                audio = $clipPath
+                ref = [string]$eval.ref
+            }
         }
+        $args = @(
+            "run", "whisper", $path, $clipSpecs[0].audio,
+            [string]$Workload.backend, $RequestedDevice, "1",
+            "--cache", $cache, "--json"
+        )
+        $jsonOutput = Join-Path $cache "batch-result.json"
+        Remove-Item -LiteralPath $jsonOutput -Force -ErrorAction SilentlyContinue
+        $args += @("--json-output", $jsonOutput)
+        if ($Provider) { $args += @("--provider", $Provider) }
+        foreach ($clipSpec in $clipSpecs) {
+            $args += @("--eval-clip", $clipSpec.id, $clipSpec.audio, $clipSpec.ref)
+        }
+        $native = Invoke-BenchmarkNativeJson -Exe $exe -Arguments $args `
+            -JsonOutputPath $jsonOutput -EchoOutput
+        if (-not $native.succeeded -or -not $native.payload.clips) {
+            $message = if ($native.payload.error) {
+                [string]$native.payload.error
+            } else {
+                "Whisper batch evaluation exited with code $($native.exit_code)"
+            }
+            Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "executor-failed" $message $native.payload $provenanceIds
+            return $false
+        }
+        $clipResults = @($native.payload.clips)
         $aggregate = Measure-BenchmarkClips $clipResults
         $aggregate | Add-Member -NotePropertyName clips -NotePropertyValue $clipResults
         $finite = (Test-BenchmarkFiniteNumber $aggregate.wer) -and

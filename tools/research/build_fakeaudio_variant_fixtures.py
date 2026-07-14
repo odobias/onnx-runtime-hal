@@ -155,8 +155,11 @@ def write_fixture(name, onnx_rel, in_name, dtype, tensors, ref_p, labels):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--only", choices=("all", "intel-npu"), default="all",
-        help="Build every research fixture or only the Intel OpenVINO NPU fixture."
+        "--only", choices=("all", "intel-npu", "generic-npu"), default="all",
+        help=(
+            "Build every research fixture, only the Intel OpenVINO NPU fixture, "
+            "or only the generic fp32-backbone NPU fixture."
+        )
     )
     args = parser.parse_args()
 
@@ -175,6 +178,13 @@ def main():
 
     generic_bb = os.path.join(FA, "model.backbone-fp32.onnx")
     bb_in = sess(generic_bb).get_inputs()[0].name
+
+    if args.only == "generic-npu":
+        write_fixture(
+            "fakeaudio-bb-fp32", "../../fakeaudio/model.backbone-fp32.onnx",
+            bb_in, "f32", mels, ref_p, labels
+        )
+        return
 
     if args.only == "all":
         bbi_in = sess(os.path.join(FA, "model.backbone-int8.onnx")).get_inputs()[0].name

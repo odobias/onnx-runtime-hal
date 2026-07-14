@@ -110,7 +110,7 @@
             },
             {
               "script": "tools/research/build_fakeaudio_variant_fixtures.py",
-              "arguments": ["--only", "all"]
+              "arguments": ["--only", "generic-npu"]
             }
           ]
         },
