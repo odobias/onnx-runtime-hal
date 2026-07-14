@@ -113,6 +113,7 @@ function Invoke-NativeBenchmark {
                 Backend = [string]$Workload.backend; Device = $RequestedDevice
                 Runs = 1; CacheDir = $cache; Ref = [string]$eval.ref; Provider = $Provider
             }
+            if ($i -eq 0) { $invoke.EchoOutput = $true }
             if ($i -gt 0) { $invoke.HotOnly = $true }
             $clip = Invoke-BenchmarkClip @invoke
             if (-not $clip.ok) {

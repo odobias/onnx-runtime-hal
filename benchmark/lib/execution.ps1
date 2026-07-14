@@ -8,14 +8,15 @@ function Invoke-BenchmarkNativeJson {
     )
     $oldEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
+    $raw = [System.Collections.Generic.List[object]]::new()
     try {
-        $raw = @(& $Exe @Arguments 2>&1)
+        & $Exe @Arguments 2>&1 | ForEach-Object {
+            $raw.Add($_)
+            if ($EchoOutput) { Write-Host ([string]$_) }
+        }
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $oldEap
-    }
-    if ($EchoOutput) {
-        foreach ($line in $raw) { Write-Host ([string]$line) }
     }
     $payload = $null
     for ($i = $raw.Count - 1; $i -ge 0; --$i) {
@@ -47,14 +48,15 @@ function Invoke-BenchmarkClip {
         [Parameter(Mandatory)] [string]$Ref,
         [int]$Threads = 0,
         [string]$Provider = "",
-        [switch]$HotOnly
+        [switch]$HotOnly,
+        [switch]$EchoOutput
     )
     $a = @("run", "whisper", $ModelDir, $Audio, $Backend, $Device, "$Runs", "--cache", $CacheDir, "--ref", $Ref, "--json")
     if ($Threads -gt 0) { $a += @("--threads", "$Threads") }
     if ($Provider) { $a += @("--provider", $Provider) }
     if ($HotOnly) { $a += "--hot-only" }
 
-    return (Invoke-BenchmarkNativeJson -Exe $Exe -Arguments $a).payload
+    return (Invoke-BenchmarkNativeJson -Exe $Exe -Arguments $a -EchoOutput:$EchoOutput).payload
 }
 
 # --- aggregation -------------------------------------------------------------
