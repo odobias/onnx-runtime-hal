@@ -353,7 +353,7 @@ private:
         const fs::path profile_prefix =
             fs::temp_directory_path() / ("npu_bench_" + cache_key);
         const std::wstring profile_prefix_w = profile_prefix.wstring();
-        so.EnableProfiling(profile_prefix_w.c_str());
+        if (options_.profile_execution) so.EnableProfiling(profile_prefix_w.c_str());
         ep::append_provider(env_, so, options_, provider, model_dir, cache_key);
         const std::wstring wpath = model_path.wstring();
         return std::make_unique<Ort::Session>(env_, wpath.c_str(), so);

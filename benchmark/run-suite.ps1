@@ -40,13 +40,15 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet("npu", "gpu", "cpu")][string[]]$Device = @("cpu"),
+    [ValidateSet("npu", "gpu", "cpu")][string[]]$Device = @("npu", "gpu", "cpu"),
     [ValidateSet("whisper", "tsc", "fakeaudio", "all")][string[]]$Only = @("all"),
-    [int]$Runs = 5,
-    [int]$ClassifierRuns = 20,
+    [ValidateSet("accuracy-quick", "latency")][string]$Mode = "accuracy-quick",
+    [string[]]$Profile = @("all"),
+    [int]$Runs = 1,
+    [int]$ClassifierRuns = 1,
     [string]$Configuration = "Release",
-    [string]$Provider = "openvino",
-    [ValidateSet("bundled", "winml")][string]$Runtime = "bundled",
+    [string]$Provider = "auto",
+    [ValidateSet("all", "bundled", "winml")][string]$Runtime = "all",
     [ValidateSet("default", "f32", "f16", "bf16", "preferred")]
     [string]$Precision = "default",
     [string]$Audio = "",
@@ -54,6 +56,7 @@ param(
     [string]$ClassifierResults = "",
     [string]$Manifest = "",
     [string]$AttemptLedger = "",
+    [string]$AccuracyLedger = "",
     [switch]$RegenerateFixtures,
     [switch]$NoResults
 )
@@ -75,11 +78,40 @@ if ($Precision -ne "default") {
 }
 
 $root = Split-Path $PSScriptRoot -Parent
+$hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "ARM64" } else { "x64" }
+
+if ($Runtime -eq "all") {
+    $runtimeFailures = 0
+    foreach ($targetRuntime in @("bundled", "winml")) {
+        $targetTag = if ($targetRuntime -eq "winml") { "$hostArch-winml" } else { $hostArch }
+        $targetExe = Join-Path $root "build\$targetTag\$Configuration\NpuInferenceBench.exe"
+        if (-not (Test-Path -LiteralPath $targetExe)) {
+            Write-Host "Skipping unavailable runtime '$targetRuntime' ($targetExe)." -ForegroundColor DarkYellow
+            continue
+        }
+        $childArgs = @{
+            Runtime = $targetRuntime; Device = $Device; Only = $Only; Mode = $Mode
+            Profile = $Profile; Runs = $Runs; ClassifierRuns = $ClassifierRuns
+            Configuration = $Configuration; Provider = $Provider; Precision = $Precision
+        }
+        foreach ($pair in @(
+            @("Audio", $Audio), @("Results", $Results), @("ClassifierResults", $ClassifierResults),
+            @("Manifest", $Manifest), @("AttemptLedger", $AttemptLedger), @("AccuracyLedger", $AccuracyLedger)
+        )) {
+            if ($pair[1]) { $childArgs[$pair[0]] = $pair[1] }
+        }
+        if ($RegenerateFixtures) { $childArgs.RegenerateFixtures = $true }
+        if ($NoResults) { $childArgs.NoResults = $true }
+        & $PSCommandPath @childArgs
+        if ($LASTEXITCODE -ne 0) { $runtimeFailures++ }
+    }
+    if ($runtimeFailures) { exit 1 }
+    exit 0
+}
 
 # Target the HOST architecture's build tree by default: x64 boxes get build\x64\,
 # ARM64 (Snapdragon) boxes get build\ARM64\. Use OSArchitecture so this is correct
 # whether PowerShell runs native or x64-emulated on ARM64.
-$hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "ARM64" } else { "x64" }
 $platform = $hostArch
 
 # The OpenVINO EP lives in a SEPARATE build tree: -EnableOvep emits build\<plat>-ovep\
@@ -136,7 +168,9 @@ if ($Only -contains "all") { $Only = @("whisper", "tsc", "fakeaudio") }
 if (-not $Results) { $Results = Join-Path $root "results\ledgers\asr.csv" }
 if (-not $ClassifierResults) { $ClassifierResults = Join-Path $root "results\ledgers\classifiers.csv" }
 if (-not $AttemptLedger) { $AttemptLedger = Join-Path $root "results\ledgers\attempts.jsonl" }
+if (-not $AccuracyLedger) { $AccuracyLedger = Join-Path $root "results\ledgers\accuracy.jsonl" }
 if (-not $Manifest) { $Manifest = Join-Path $root "benchmark\manifests\portable.json" }
+$audioExplicit = [bool]$Audio
 if (-not $Audio) { $Audio = Join-Path $root "workloads\eval\ls_000.wav" }
 
 if (-not (Test-Path $Manifest)) {
@@ -144,6 +178,11 @@ if (-not (Test-Path $Manifest)) {
     exit 1
 }
 $workloads = @((Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).workloads)
+$hardware = Get-BenchmarkHardware
+$hostVendor = [string]$hardware.cpu.vendor
+$environmentSnapshot = Get-BenchmarkEnvironmentSnapshot `
+    -Root $root -Exe $exe -RuntimeTarget $Runtime -BuildTree $platform
+Write-Host "environment: $($environmentSnapshot.id) -> $($environmentSnapshot.path)" -ForegroundColor DarkCyan
 # Classifier fixtures + their ONNX models are colocated under models/deepfake/ (the
 # model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx, so fixtures must
 # live beside the models). tools/fixtures/generate.py writes here too. (The workloads/
@@ -151,205 +190,16 @@ $workloads = @((Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).wo
 $fixRoot = Join-Path $root "models\deepfake\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
-# Keep benchmark caches isolated by binary platform + provider + model + device.
-# This avoids cross-EP blob contamination and makes deletion safe and targeted.
 $providerTag = if ($Provider) { $Provider } else { "auto" }
-$providerTag = $providerTag -replace '[^A-Za-z0-9_.-]', '_'
-$benchmarkCacheRoot = Join-Path $root "build\cache\benchmark-onnx\$platform\$providerTag"
-
-function New-ColdBenchmarkCache {
-    param([string]$ModelTag, [string]$DeviceTag)
-    $path = Join-Path $benchmarkCacheRoot "$ModelTag\$DeviceTag"
-    if (Test-Path $path) { Remove-Item $path -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $path | Out-Null
-    Write-Host "cache      : reset -> $path" -ForegroundColor DarkGray
-    return $path
-}
-
-# --- best-effort whisper reference (WER) from the eval manifest --------------
-function Get-EvalRef {
-    param([string]$AudioPath)
-    $evalJsonl = Join-Path $root "workloads\eval\eval.jsonl"
-    if (-not (Test-Path $evalJsonl)) { return "" }
-    $id = [System.IO.Path]::GetFileNameWithoutExtension($AudioPath)
-    foreach ($line in Get-Content $evalJsonl) {
-        if (-not $line.Trim()) { continue }
-        try { $row = $line | ConvertFrom-Json } catch { continue }
-        if ($row.id -eq $id) { return [string]$row.ref }
-    }
-    return ""
-}
-
-# --- ensure classifier fixtures exist (generate via the validated Python) ----
-function Ensure-Fixtures {
-    param([string[]]$Models)
-    $need = @()
-    foreach ($m in $Models) {
-        if ($RegenerateFixtures -or -not (Test-Path (Join-Path $classifierFix[$m] "model.tsv"))) { $need += $m }
-    }
-    if ($need.Count -eq 0) { return }
-
-    $vpy = Join-Path $root ".venv\Scripts\python.exe"
-    if (-not (Test-Path $vpy)) {
-        Write-Host "Fixtures missing for: $($need -join ', '); no .venv to generate them." -ForegroundColor Yellow
-        Write-Host "  Install tools\research\requirements.txt plus one ONNX Runtime wheel." -ForegroundColor Yellow
-        return
-    }
-    Write-Host "Generating classifier fixtures: $($need -join ', ') ..." -ForegroundColor Cyan
-    $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
-    & $vpy (Join-Path $root "tools\fixtures\generate.py") --models @need
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Fixture generation failed (models present? deepfake pipeline deps installed?)." -ForegroundColor Yellow
-    }
-}
 
 $ran = @()
 $skipped = @()
-$attemptParent = Split-Path $AttemptLedger -Parent
-New-Item -ItemType Directory -Force -Path $attemptParent | Out-Null
-
-function Write-Attempt {
-    param(
-        [object]$Workload,
-        [string]$RequestedDevice,
-        [string]$Status,
-        [string]$ErrorMessage,
-        [object]$Result
-    )
-    $record = [ordered]@{
-        timestamp_utc = [DateTime]::UtcNow.ToString("o")
-        suite = "portable"
-        workload = [string]$Workload.id
-        kind = [string]$Workload.kind
-        backend = [string]$Workload.backend
-        requested_device = $RequestedDevice
-        requested_provider = $(if ($Provider) { $Provider } else { "auto" })
-        status = $Status
-        error = $ErrorMessage
-        result = $Result
-    }
-    Add-Content -LiteralPath $AttemptLedger -Value ($record | ConvertTo-Json -Depth 12 -Compress) -Encoding UTF8
-}
-
-function Invoke-NativeBenchmark {
-    param([object]$Workload, [string]$RequestedDevice)
-
-    # A workload may define a provider+device fixture recipe. FakeAudio uses this
-    # for OpenVINO NPU: export the generic fp32 frontend/backbone split, apply the
-    # explicit attention-bias expansion, then replay the generated mel fixture.
-    # Other providers and devices keep the base whole-model fixture.
-    $relPath = [string]$Workload.path
-    $fixtureSpec = $null
-    if (($Workload.PSObject.Properties.Name -contains 'executorFixtures') -and $Workload.executorFixtures) {
-        $requestedProvider = ([string]$Provider).ToLowerInvariant()
-        foreach ($candidate in @($Workload.executorFixtures)) {
-            $candidateProvider = ([string]$candidate.provider).ToLowerInvariant()
-            if (
-                ([string]$candidate.device).ToLowerInvariant() -eq $RequestedDevice.ToLowerInvariant() -and
-                $requestedProvider.StartsWith($candidateProvider)
-            ) {
-                $fixtureSpec = $candidate
-                break
-            }
-        }
-    }
-    if ($fixtureSpec) {
-        $needsBuild = [bool]$RegenerateFixtures
-        foreach ($output in @($fixtureSpec.outputs)) {
-            if (-not (Test-Path (Join-Path $root (([string]$output) -replace '/', '\')))) {
-                $needsBuild = $true
-            }
-        }
-        if ($needsBuild) {
-            $vpy = Join-Path $root ".venv\Scripts\python.exe"
-            if (-not (Test-Path $vpy)) {
-                $message = "fixture recipe requires the project .venv: $($fixtureSpec.path)"
-                Write-Host $message -ForegroundColor Yellow
-                Write-Host "  Install tools\research\requirements.txt plus one ONNX Runtime wheel." -ForegroundColor Yellow
-                Write-Attempt $Workload $RequestedDevice "assets-missing" $message $null
-                return $false
-            }
-            foreach ($step in @($fixtureSpec.steps)) {
-                $script = Join-Path $root (([string]$step.script) -replace '/', '\')
-                $stepArgs = @($step.arguments | ForEach-Object { [string]$_ })
-                Write-Host "fixture step: $($step.script) $($stepArgs -join ' ')" -ForegroundColor DarkGray
-                & $vpy $script @stepArgs
-                if ($LASTEXITCODE -ne 0) {
-                    $message = "fixture step failed ($LASTEXITCODE): $($step.script)"
-                    Write-Host $message -ForegroundColor Yellow
-                    Write-Attempt $Workload $RequestedDevice "fixture-failed" $message $null
-                    return $false
-                }
-            }
-            foreach ($output in @($fixtureSpec.outputs)) {
-                $outputPath = Join-Path $root (([string]$output) -replace '/', '\')
-                if (-not (Test-Path $outputPath)) {
-                    $message = "fixture recipe did not produce: $outputPath"
-                    Write-Host $message -ForegroundColor Yellow
-                    Write-Attempt $Workload $RequestedDevice "fixture-failed" $message $null
-                    return $false
-                }
-            }
-        }
-        $relPath = [string]$fixtureSpec.path
-        Write-Host "fixture    : $($fixtureSpec.provider)/$RequestedDevice -> $relPath" -ForegroundColor DarkGray
-    }
-    $path = Join-Path $root ($relPath -replace '/', '\')
-    if (-not (Test-Path $path)) {
-        $message = "workload assets missing: $path"
-        Write-Host $message -ForegroundColor Yellow
-        Write-Attempt $Workload $RequestedDevice "assets-missing" $message $null
-        return $false
-    }
-
-    $args = @()
-    $cache = Join-Path $root "build\cache\$($Workload.id)\$RequestedDevice"
-    if (Test-Path $cache) { Remove-Item -LiteralPath $cache -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $cache | Out-Null
-    if ($Workload.kind -eq "asr") {
-        $args += @("run", "whisper", $path, $Audio, [string]$Workload.backend, $RequestedDevice, "$Runs")
-        $args += @("--cache", $cache, "--json")
-        $ref = Get-EvalRef -AudioPath $Audio
-        if ($ref) { $args += @("--ref", $ref) }
-        if (-not $NoResults) { $args += @("--results", $Results, "--label", [string]$Workload.id) }
-    } else {
-        $args += @("run", [string]$Workload.id, $path, $RequestedDevice, "$ClassifierRuns", "--json")
-        $args += @("--cache", $cache)
-        if (-not $NoResults) { $args += @("--results", $ClassifierResults) }
-    }
-    if ($Provider) { $args += @("--provider", $Provider) }
-
-    $oldEap = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    $nativeOutput = [System.Collections.Generic.List[object]]::new()
-    try {
-        & $exe @args 2>&1 | ForEach-Object {
-            $nativeOutput.Add($_)
-            Write-Host ([string]$_)
-        }
-        $exitCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $oldEap
-    }
-    $result = $null
-    for ($i = $nativeOutput.Count - 1; $i -ge 0; --$i) {
-        $line = $nativeOutput[$i]
-        try {
-            $candidate = ([string]$line) | ConvertFrom-Json -ErrorAction Stop
-            if ($null -ne $candidate.ok) { $result = $candidate; break }
-        } catch {}
-    }
-    if ($exitCode -eq 0 -and $result -and $result.ok) {
-        Write-Attempt $Workload $RequestedDevice "ok" "" $result
-        return $true
-    }
-    $message = if ($result -and $result.error) { [string]$result.error } else { "executor exited with code $exitCode" }
-    Write-Attempt $Workload $RequestedDevice "executor-failed" $message $result
-    return $false
-}
 
 $wantClassifiers = @($Only | Where-Object { $_ -in @("tsc", "fakeaudio") })
-if ($wantClassifiers.Count -gt 0) { Ensure-Fixtures -Models $wantClassifiers }
+if ($wantClassifiers.Count -gt 0) {
+    Ensure-BenchmarkClassifierFixtures -Root $root -FixtureDirectories $classifierFix `
+        -Models $wantClassifiers -Regenerate:$RegenerateFixtures
+}
 
 foreach ($dev in $Device) {
     Write-Host "`n==================== device: $dev ====================" -ForegroundColor Magenta
@@ -357,24 +207,39 @@ foreach ($dev in $Device) {
     foreach ($workload in $workloads) {
         $selector = if ($workload.kind -eq "asr") { "whisper" } else { [string]$workload.id }
         if ($Only -notcontains $selector) { continue }
-        $tag = "$($workload.id)/$dev"
-        if (@($workload.devices) -notcontains $dev) {
-            $message = "device '$dev' is unsupported by workload '$($workload.id)'"
+        $profiles = @(Get-BenchmarkExecutionProfiles -Workload $workload -Device $dev `
+            -Selectors $Profile -HostVendor $hostVendor)
+        if (-not $profiles.Count) {
+            $profileLabel = if ($Profile -contains "all") { "no-valid-profile" } else { $Profile -join "," }
+            $unsupportedProfile = [pscustomobject]@{
+                id = $profileLabel; graphRole = ""; accuracyEligible = $false
+            }
+            $message = "no selected execution profile supports '$($workload.id)' on $hostVendor $dev"
             Write-Host $message -ForegroundColor DarkYellow
-            Write-Attempt $workload $dev "unsupported" $message $null
-            $skipped += $tag
+            Write-SuiteAttempt $workload $unsupportedProfile $dev "unsupported" $message $null
+            $skipped += "$($workload.id)/$profileLabel/$dev"
             continue
         }
-        Write-Host "`n--- $($workload.id) [$($workload.kind)] ---" -ForegroundColor Cyan
-        if (Invoke-NativeBenchmark $workload $dev) { $ran += $tag } else { $skipped += $tag }
+        foreach ($executionProfile in $profiles) {
+            $tag = "$($workload.id)/$($executionProfile.id)/$dev"
+            Write-Host "`n--- $($workload.id) [$($executionProfile.id), $($workload.kind)] ---" -ForegroundColor Cyan
+            if (Invoke-NativeBenchmark $workload $executionProfile $dev) {
+                $ran += $tag
+            } else {
+                $skipped += $tag
+            }
+        }
     }
 }
 
 Write-Host "`n==================== summary ====================" -ForegroundColor Magenta
 Write-Host "ran    : $(if ($ran.Count) { $ran -join ', ' } else { '(nothing)' })" -ForegroundColor Green
 if ($skipped.Count) { Write-Host "skipped: $($skipped -join ', ')" -ForegroundColor Yellow }
-if (-not $NoResults) {
+if ($Mode -eq "latency" -and -not $NoResults) {
     Write-Host "ASR ledger        : $Results" -ForegroundColor DarkGray
     Write-Host "classifier ledger : $ClassifierResults" -ForegroundColor DarkGray
+}
+if ($Mode -eq "accuracy-quick") {
+    Write-Host "accuracy ledger   : $AccuracyLedger" -ForegroundColor DarkGray
 }
 Write-Host "attempt ledger    : $AttemptLedger" -ForegroundColor DarkGray

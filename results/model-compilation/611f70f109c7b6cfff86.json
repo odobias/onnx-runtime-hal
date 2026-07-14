@@ -1,0 +1,23 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-14T13:43:41.3325985Z",
+    "execution_profile":  "npu-split-generic",
+    "graph_role":  "backbone",
+    "target_vendor":  "Qualcomm",
+    "target_architecture":  "Arm64",
+    "artifact_path":  "C:\\Projects\\whisper-npu-hal\\models\\deepfake\\fakeaudio\\model.backbone-fp32.onnx",
+    "artifact_sha256":  "39861136487bf9a2a6d81a674939df8d8015900a78e5f5f95b67667281650de8",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "Qualcomm execution-provider compiler",
+                     "version":  "2.47.0.0",
+                     "version_source":  "runtime binary file version: QnnHtp.dll"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compilation_host_snapshot_id":  "abed3be31d85d74cd117",
+    "id":  "611f70f109c7b6cfff86"
+}

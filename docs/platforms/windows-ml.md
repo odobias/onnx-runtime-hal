@@ -4,6 +4,8 @@ Windows ML is an isolated runtime option for the existing native C++ benchmark.
 It uses the ONNX Runtime and Execution Provider Catalog from
 `Microsoft.WindowsAppSDK.ML`, while preserving the same models, fixtures,
 metrics, cold/hot-load procedure, and result ledgers as the bundled runtimes.
+The default suite mode is accuracy-first and writes `accuracy.jsonl`; latency
+CSV output requires `-Mode latency`.
 
 ## Requirements
 
@@ -45,6 +47,7 @@ Run the same suite with a selected processing unit:
 .\benchmark\run-suite.ps1 -Runtime winml -Device gpu
 .\benchmark\run-suite.ps1 -Runtime winml -Device npu
 .\benchmark\run-suite.ps1 -Runtime winml -Device cpu,gpu,npu
+.\benchmark\run-suite.ps1 -Runtime winml -Profile npu-split-generic -Device npu
 ```
 
 For reproducible measurements, the benchmark explicitly selects a Windows ML
@@ -77,9 +80,12 @@ With Windows ML 2.1.70 (ONNX Runtime 1.24.6):
 - CPU resolved to `CPUExecutionProvider`.
 - GPU resolved to `DmlExecutionProvider`.
 - NPU resolved to `QNNExecutionProvider`.
-- Whisper static, TSC, and FakeAudio ran on all three processing units.
+- Whisper static and TSC ran on all three processing units.
+- FakeAudio NPU uses the explicit CPU-frontend/NPU-backbone split profile.
 - Whisper dynamic-KV ran on CPU and GPU; NPU remains intentionally unsupported.
 
-FakeAudio on QNN still has large numerical divergence from the fp32 reference.
-Windows ML changes provider acquisition and selection; it does not fix that
-model-level precision problem.
+Whole-graph FakeAudio on QNN has large numerical divergence from the fp32
+reference and is diagnostic-only. Windows ML changes provider acquisition and
+selection; it does not fix that model-level precision problem. The split
+profile is valid only when its recorded full-model CPU reference decisions
+agree and QNN resolves without fallback.

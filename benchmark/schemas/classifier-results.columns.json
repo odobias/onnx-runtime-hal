@@ -7,6 +7,8 @@
     "median_infer_ms", "p90_infer_ms", "model_size_mb", "eval_samples",
     "correct", "accuracy", "max_abs_p_diff", "ep_nodes", "cpu_nodes",
     "cpu_offload_pct", "cpu_offload_ops", "power_source", "eval_detail", "status",
-    "requested_provider", "resolved_provider", "fallback_occurred", "provider_attempts", "error"
+    "requested_provider", "resolved_provider", "fallback_occurred", "provider_attempts",
+    "measurement_purpose", "execution_profile", "graph_role",
+    "environment_snapshot_id", "model_compilation_provenance_ids", "error"
   ]
 }

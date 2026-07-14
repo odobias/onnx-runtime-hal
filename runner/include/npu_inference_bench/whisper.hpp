@@ -67,6 +67,10 @@ struct EngineOptions {
     // "f16", "bf16", or "preferred" (let the executor choose). Providers must
     // reject policies they cannot guarantee instead of silently mislabeling runs.
     std::string precision_policy;
+
+    // Benchmark harnesses disable profiling on the throw-away cold session and
+    // enable it only on the hot session that performs measured inference.
+    bool profile_execution = true;
 };
 
 // Backend-neutral result + metrics. Every backend fills `text`/`infer_seconds`;

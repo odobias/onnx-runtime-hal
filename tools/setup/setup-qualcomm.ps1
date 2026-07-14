@@ -122,6 +122,19 @@ if (-not [Environment]::GetEnvironmentVariable("ORT_DIR", "User")) {
     [Environment]::SetEnvironmentVariable("ORT_DIR", $ortDir, "User")
 }
 
+$sdkMetadata = [ordered]@{
+    schema_version = 1
+    vendor = "Qualcomm"
+    package = "onnxruntime-qnn"
+    qnn_ep_package_version = $QnnVersion
+    onnxruntime_package = $ortPackage
+    onnxruntime_version = $OrtVersion
+    directml_version = $DirectMLVersion
+    source = $qnnSource
+}
+($sdkMetadata | ConvertTo-Json -Depth 5) |
+    Set-Content -LiteralPath (Join-Path $qnnDir "VERSION.json") -Encoding UTF8
+
 Write-Host "Qualcomm toolchain ready:" -ForegroundColor Green
 Write-Host "  Platform: $Platform (NuGet rid=$nugetRid)"
 Write-Host "  ORT SDK : $ortDir ($ortPackage $OrtVersion + DirectML $DirectMLVersion)"
