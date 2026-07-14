@@ -26,6 +26,9 @@ record for every requested workload/device/provider attempt, including:
 A missing CSV measurement is therefore distinguishable from a combination that
 was never requested.
 
+Validate a current attempt ledger with
+`benchmark/validate-attempts.ps1 -Ledger <path>`.
+
 Each accuracy record carries the execution profile, graph role, model and
 fixture hashes, runtime environment snapshot ID, compilation-provenance IDs,
 requested/resolved provider, fallback status, workload metrics, and a
@@ -99,6 +102,7 @@ Machine-readable schemas live in:
 - `../benchmark/schemas/asr-results.columns.json`
 - `../benchmark/schemas/classifier-results.columns.json`
 - `../benchmark/schemas/accuracy-record.schema.json`
+- `../benchmark/schemas/attempt-record.schema.json`
 
 The C++ writer and PowerShell harness follow those column orders.
 Run `benchmark/validate-schemas.ps1` to verify both writers against the JSON

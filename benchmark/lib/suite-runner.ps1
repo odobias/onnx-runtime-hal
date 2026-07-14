@@ -98,7 +98,7 @@ function Invoke-NativeBenchmark {
         $evalRows = Get-BenchmarkEvalRows -Root $root -Audio $(if ($audioExplicit) { $Audio } else { "" })
         if (-not $evalRows.Count) {
             $message = "no Whisper evaluation rows were found"
-            Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "fixtures-missing" $message $null $provenanceIds
+            Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "assets-missing" $message $null $provenanceIds
             return $false
         }
         $clipResults = @()

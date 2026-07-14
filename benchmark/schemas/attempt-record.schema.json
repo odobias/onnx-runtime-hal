@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/odobias/whisper-npu-hal/benchmark/schemas/attempt-record.schema.json",
+  "title": "Portable benchmark attempt record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "timestamp_utc",
+    "suite",
+    "measurement_purpose",
+    "workload",
+    "kind",
+    "backend",
+    "execution_profile",
+    "graph_role",
+    "requested_device",
+    "requested_provider",
+    "status",
+    "error",
+    "environment_snapshot_id",
+    "model_compilation_provenance_ids",
+    "result"
+  ],
+  "properties": {
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "suite": {
+      "const": "portable"
+    },
+    "measurement_purpose": {
+      "enum": ["accuracy-quick", "latency"]
+    },
+    "workload": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": ["asr", "classifier"]
+    },
+    "backend": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "graph_role": {
+      "type": "string"
+    },
+    "requested_device": {
+      "enum": ["npu", "gpu", "cpu"]
+    },
+    "requested_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "unsupported",
+        "assets-missing",
+        "fixture-failed",
+        "executor-failed",
+        "accuracy-valid",
+        "accuracy-invalid"
+      ]
+    },
+    "error": {
+      "type": "string"
+    },
+    "environment_snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_compilation_provenance_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "result": {
+      "type": ["object", "null"]
+    }
+  }
+}
