@@ -135,6 +135,17 @@ inline bool is_qnn(const std::string& provider) {
     return lower(provider).find("qnn") != std::string::npos;
 }
 
+inline bool is_fallback_provider_for_device(Device requested_device,
+                                            const std::string& resolved_provider) {
+    const std::string provider = lower(resolved_provider);
+    const bool cpu = provider == "cpuexecutionprovider";
+    if (requested_device == Device::NPU) {
+        return cpu || provider.find("dml") != std::string::npos ||
+               provider.find("directml") != std::string::npos;
+    }
+    return requested_device == Device::GPU && cpu;
+}
+
 #ifdef NPU_INFERENCE_BENCH_WINML
 inline std::string winml_policy_token(Device device) {
     switch (device) {
@@ -367,7 +378,19 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
                     "Windows ML has no registered EP device for " +
                     std::string(selected_device == Device::NPU ? "NPU" : "GPU"));
             }
-            if (selected_device == Device::GPU) {
+            if (selected_device == Device::NPU) {
+                // Multiple catalog EPs may expose NPU devices. ORT rejects a
+                // mixed-EP device vector, so prefer a vendor NPU EP over DML
+                // and append one hardware-typed NPU device.
+                std::stable_sort(
+                    compatible.begin(), compatible.end(),
+                    [](Ort::ConstEpDevice a, Ort::ConstEpDevice b) {
+                        const bool a_dml = lower(a.EpName()).find("dml") != std::string::npos;
+                        const bool b_dml = lower(b.EpName()).find("dml") != std::string::npos;
+                        return !a_dml && b_dml;
+                    });
+                compatible.resize(1);
+            } else if (selected_device == Device::GPU) {
                 // PREFER_GPU may choose Qualcomm's QNN GPU device. DirectML is
                 // the portable and stable Windows GPU path, so prefer it when
                 // explicitly selecting a benchmark device.

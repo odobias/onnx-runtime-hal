@@ -36,6 +36,15 @@ foreach ($record in $records) {
     if ([int]$record.reference_agreement.decision_flips -ne 0) {
         $errors.Add("$($record.workload_id)/$($record.execution_profile): reference decision flip")
     }
+    $intended = Test-BenchmarkIntendedProvider $record.metrics ([string]$record.requested_device)
+    if ([bool]$record.trust_gate.intended_provider_resolved -ne $intended) {
+        $errors.Add(
+            "$($record.workload_id)/$($record.execution_profile): recorded intended-provider result " +
+            "does not match provider evidence")
+    }
+    if ($record.trust_gate.valid -and -not $intended) {
+        $errors.Add("$($record.workload_id)/$($record.execution_profile): valid record used fallback provider")
+    }
     if (-not $AllowInvalid -and -not $record.trust_gate.valid) {
         $errors.Add("$($record.workload_id)/$($record.execution_profile): trust gate invalid")
     }

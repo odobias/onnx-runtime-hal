@@ -316,8 +316,9 @@ public:
                             diagnostics_.resolved_provider = stats.providers.substr(0, comma);
                             active_provider_ = diagnostics_.resolved_provider;
                             diagnostics_.fallback_occurred =
-                                options_.device != Device::CPU &&
-                                diagnostics_.resolved_provider == "CPUExecutionProvider";
+                                diagnostics_.fallback_occurred ||
+                                ep::is_fallback_provider_for_device(
+                                    options_.device, diagnostics_.resolved_provider);
                         }
 #endif
                         diagnostics_.offload_measured = true;

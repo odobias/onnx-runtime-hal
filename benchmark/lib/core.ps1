@@ -270,7 +270,7 @@ function Get-BenchmarkPlatform {
     $npuDevice = ''; $npuPresent = $false
     try {
         $pnp = @(Get-PnpDevice -PresentOnly -ErrorAction Stop |
-                Where-Object { $_.FriendlyName -match 'AI Boost|IPU|XDNA|NPU|Hexagon|Neural Proc' })
+                Where-Object { $_.FriendlyName -match 'AI Boost|\bIPU\b|XDNA|\bNPU\b|Hexagon|Neural Proc' })
         if ($pnp.Count) { $npuPresent = $true; $npuDevice = $pnp[0].FriendlyName }
     } catch { }
 

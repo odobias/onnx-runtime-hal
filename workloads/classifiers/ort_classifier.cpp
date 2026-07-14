@@ -438,7 +438,8 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
                 res.execution_provider = resolved;
                 res.diagnostics.resolved_provider = resolved;
                 res.diagnostics.fallback_occurred =
-                    device != Device::CPU && resolved == "CPUExecutionProvider";
+                    res.diagnostics.fallback_occurred ||
+                    ort_common::is_fallback_provider_for_device(device, resolved);
             }
 #endif
             res.offload_measured = true;

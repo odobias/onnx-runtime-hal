@@ -227,10 +227,12 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         // Hot start (imports cached blob) to quantify the caching win.
         if (!cache_dir.empty()) {
             try {
+#ifndef NPU_INFERENCE_BENCH_WINML
                 const auto cold_diagnostics = engine->execution_diagnostics();
                 if (!cold_diagnostics.resolved_provider.empty()) {
                     opt.device_override = cold_diagnostics.resolved_provider;
                 }
+#endif
                 engine.reset();
                 opt.profile_execution = true;
                 auto hot = create_engine(backend, opt);

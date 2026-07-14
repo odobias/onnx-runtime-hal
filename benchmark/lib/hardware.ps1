@@ -59,7 +59,7 @@ function Get-BenchmarkHardware {
     }
     try {
         $dev = @(Get-PnpDevice -PresentOnly -ErrorAction Stop |
-                Where-Object { $_.FriendlyName -match 'AI Boost|IPU|XDNA|NPU|Hexagon|Neural Proc' })
+                Where-Object { $_.FriendlyName -match 'AI Boost|\bIPU\b|XDNA|\bNPU\b|Hexagon|Neural Proc' })
         if ($dev.Count) {
             $d = $dev[0]
             $npu.present = $true

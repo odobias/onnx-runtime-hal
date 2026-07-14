@@ -1,12 +1,12 @@
 ﻿{
     "schema_version":  1,
-    "created_utc":  "2026-07-14T16:16:22.9212039Z",
-    "execution_profile":  "whole-fp32",
+    "created_utc":  "2026-07-14T17:22:05.0802884Z",
+    "execution_profile":  "static-onnx",
     "graph_role":  "whole",
     "target_vendor":  "Intel",
     "target_architecture":  "X64",
-    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\models\\deepfake\\tsc\\model.onnx",
-    "artifact_sha256":  "08b2c466cc9336934e52697e95e30858fb6faa24db73a28654ce5b63510ed44e",
+    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\workloads\\whisper\\models\\static-onnx",
+    "artifact_sha256":  "dee360f33410f4fa189a4d6a722e21b1cd52f97d48479beb95ccb97baf3f9fbe",
     "source_model_sha256":  "unknown",
     "compiler":  {
                      "name":  "Intel execution-provider compiler",
@@ -18,6 +18,6 @@
                                       "reason":  "no generated fixture-step metadata"
                                   },
     "transformation_recipe":  "none-recorded",
-    "compilation_host_snapshot_id":  "11558754f9662e4b55e2",
-    "id":  "00ac45225540bc07beeb"
+    "compilation_host_snapshot_id":  "1d8c6f63b3b74b9020ed",
+    "id":  "53e0c18c91349354e21c"
 }
