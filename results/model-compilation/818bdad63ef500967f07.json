@@ -1,12 +1,12 @@
 ﻿{
     "schema_version":  1,
-    "created_utc":  "2026-07-14T16:02:50.8120547Z",
-    "execution_profile":  "whole-fp32",
-    "graph_role":  "whole",
+    "created_utc":  "2026-07-14T16:53:22.2131171Z",
+    "execution_profile":  "npu-split-generic",
+    "graph_role":  "backbone",
     "target_vendor":  "AMD",
     "target_architecture":  "X64",
-    "artifact_path":  "C:\\Users\\Dobiashi\\.cursor\\worktrees\\whisper-npu-hal\\0erm\\models\\deepfake\\tsc\\model.onnx",
-    "artifact_sha256":  "08b2c466cc9336934e52697e95e30858fb6faa24db73a28654ce5b63510ed44e",
+    "artifact_path":  "C:\\Users\\Dobiashi\\.cursor\\worktrees\\whisper-npu-hal\\0erm\\models\\deepfake\\fakeaudio\\model.backbone-fp32.onnx",
+    "artifact_sha256":  "39861136487bf9a2a6d81a674939df8d8015900a78e5f5f95b67667281650de8",
     "source_model_sha256":  "unknown",
     "compiler":  {
                      "name":  "AMD execution-provider compiler",
@@ -18,6 +18,6 @@
                                       "reason":  "no generated fixture-step metadata"
                                   },
     "transformation_recipe":  "none-recorded",
-    "compilation_host_snapshot_id":  "8250785ea107ae8607e9",
-    "id":  "62c983dce0916328ddd0"
+    "compilation_host_snapshot_id":  "a4723dd84b69aa0e22f4",
+    "id":  "818bdad63ef500967f07"
 }
