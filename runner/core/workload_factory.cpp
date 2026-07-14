@@ -71,8 +71,21 @@ std::unique_ptr<IWhisperEngine> create_engine(Backend backend, const EngineOptio
             }
             return ort_static::create(o);
         }
+        std::string failures;
         for (Backend b : available_backends()) {
-            return create_engine(b, options);
+            try {
+                auto engine = create_engine(b, options);
+                if (engine) return engine;
+                if (!failures.empty()) failures += "; ";
+                failures += std::string(to_string(b)) + ": returned no engine";
+            } catch (const std::exception& e) {
+                if (!failures.empty()) failures += "; ";
+                failures += std::string(to_string(b)) + ": " + e.what();
+            }
+        }
+        if (!failures.empty()) {
+            throw std::runtime_error(
+                "all compiled Whisper workload backends failed: " + failures);
         }
         throw std::runtime_error(
             "no Whisper workload backend is compiled into this build "
