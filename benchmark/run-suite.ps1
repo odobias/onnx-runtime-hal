@@ -321,13 +321,16 @@ function Invoke-NativeBenchmark {
 
     $oldEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
+    $nativeOutput = [System.Collections.Generic.List[object]]::new()
     try {
-        $nativeOutput = @(& $exe @args 2>&1)
+        & $exe @args 2>&1 | ForEach-Object {
+            $nativeOutput.Add($_)
+            Write-Host ([string]$_)
+        }
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $oldEap
     }
-    foreach ($line in $nativeOutput) { Write-Host ([string]$line) }
     $result = $null
     for ($i = $nativeOutput.Count - 1; $i -ge 0; --$i) {
         $line = $nativeOutput[$i]
