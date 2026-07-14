@@ -1,0 +1,18 @@
+{
+  "note": "Canonical mapping between benchmark-first repository paths and the Hugging Face asset snapshot. Both paths are relative to their respective repository roots.",
+  "map": [
+    { "local": "workloads/whisper/models/static-onnx", "hf": "whisper/en-static-onnx" },
+    { "local": "workloads/whisper/models/dynamic-onnx", "hf": "whisper/en-onnx" },
+    { "local": "workloads/whisper/models/ov-ir", "hf": "whisper/en-ov" },
+    { "local": "workloads/whisper/models/vendor/amd", "hf": "whisper/amd" },
+    { "local": "workloads/whisper/manifest.json", "hf": "manifest.json", "kind": "file" },
+    { "local": "workloads/whisper/manifest.research.json", "hf": "manifest.research.json", "kind": "file" },
+    { "local": "workloads/audio/jfk.wav", "hf": "audio/jfk.wav", "kind": "file" },
+    { "local": "workloads/eval", "hf": "eval" },
+    { "local": "models/deepfake/fakeaudio/model.onnx", "hf": "deepfake/fakeaudio/model.onnx", "kind": "file" },
+    { "local": "models/deepfake/tsc", "hf": "deepfake/tsc" },
+    { "local": "models/deepfake/audio-samples", "hf": "deepfake/audio-samples" },
+    { "local": "models/deepfake/fixtures/fakeaudio", "hf": "deepfake/fixtures/fakeaudio" },
+    { "local": "models/deepfake/fixtures/tsc", "hf": "deepfake/fixtures/tsc" }
+  ]
+}

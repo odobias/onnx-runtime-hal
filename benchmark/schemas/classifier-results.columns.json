@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "columns": [
+    "timestamp_utc", "model", "model_sha256", "requested_device", "execution_provider", "runtime",
+    "runtime_version", "inference_precision", "host_arch", "host_os", "backend_name", "runs", "cache_dir",
+    "load_seconds", "cold_load_seconds", "hot_load_seconds", "mean_infer_ms",
+    "median_infer_ms", "p90_infer_ms", "model_size_mb", "eval_samples",
+    "correct", "accuracy", "max_abs_p_diff", "ep_nodes", "cpu_nodes",
+    "cpu_offload_pct", "cpu_offload_ops", "power_source", "eval_detail", "status",
+    "requested_provider", "resolved_provider", "fallback_occurred", "provider_attempts", "error"
+  ]
+}

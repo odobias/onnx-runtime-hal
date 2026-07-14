@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "suite": "portable",
+  "description": "Portable inference benchmark workloads and supported executor classes.",
+  "workloads": [
+    {
+      "id": "whisper-tiny-static",
+      "kind": "asr",
+      "backend": "onnx-static",
+      "path": "workloads/whisper/models/static-onnx",
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "whisper-tiny-dynamic",
+      "kind": "asr",
+      "backend": "onnx-dynamic",
+      "path": "workloads/whisper/models/dynamic-onnx",
+      "devices": ["gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "tsc",
+      "kind": "classifier",
+      "backend": "onnx-fixture",
+      "path": "models/deepfake/fixtures/tsc",
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
+    },
+    {
+      "id": "fakeaudio",
+      "kind": "classifier",
+      "backend": "onnx-fixture",
+      "path": "models/deepfake/fixtures/fakeaudio",
+      "executorFixtures": [
+        {
+          "provider": "openvino",
+          "device": "npu",
+          "path": "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias",
+          "outputs": [
+            "models/deepfake/fakeaudio/model.backbone.expanded-attention-bias.onnx",
+            "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
+            "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
+          ],
+          "steps": [
+            {
+              "script": "tools/research/export_fakeaudio_variants.py",
+              "arguments": ["--skip-int8"]
+            },
+            {
+              "script": "tools/research/build_fakeaudio_variant_fixtures.py",
+              "arguments": ["--only", "intel-npu"]
+            }
+          ]
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
+    }
+  ]
+}
