@@ -26,14 +26,15 @@ VitisAI divergence we documented still reproduces, or was an artifact of the bet
 
 ## What in this repo currently pins 1.8.0-beta (change these for 1.7.1 GA)
 
-- `scripts/setup-amd.ps1`:
-  - `-Version` default `"1.8.0-beta"`      -> `1.7.1`
-  - `-SdkUrl`  default `.../RyzenAI/1.8.0b0/ryzen-ai-lt-1.8.0-beta.exe`
-  - `-DriverUrl` default `.../RyzenAI/1.8.0b0/NPU_RAI_376_WHQL.zip`
-  - `-MinDriverVersion` `32.0.20101.3760`   (the 1.8.0b0 driver; 1.7.1 GA pairs with its own driver)
-  - `-InstallDir` -> `C:\Program Files\RyzenAI\1.7.1`, conda env -> `ryzen-ai-1.7.1`
-- `README.md` (~L291-292): "installs Ryzen AI (default C:\Program Files\RyzenAI\1.8.0-beta,
-  conda env ryzen-ai-1.8.0-beta) and the matching NPU driver (min 32.0.20101.3760)".
+- `tools/setup/setup-amd.ps1` (moved from `scripts/` in the repo restructure):
+  - `-Version` default `"1.8.0-beta"` (L15)      -> `1.7.1`
+  - `-SdkUrl`  default `.../RyzenAI/1.8.0b0/ryzen-ai-lt-1.8.0-beta.exe` (L18)
+  - `-DriverUrl` default `.../RyzenAI/1.8.0b0/NPU_RAI_376_WHQL.zip` (L19)
+  - `-MinDriverVersion` `32.0.20101.3760` (L20)   (the 1.8.0b0 driver; 1.7.1 GA pairs with its own driver)
+  - conda env is derived as `ryzen-ai-$Version` (L35) -> pass `-Version 1.7.1` and it becomes `ryzen-ai-1.7.1`
+  - `-InstallDir` defaults to `C:\Program Files\RyzenAI\$Version`
+- README no longer states the RAI version after the restructure (it was rewritten), so
+  the only place still pinning 1.8.0-beta is the `setup-amd.ps1` defaults above.
 
 Get the 1.7.1 GA installer + matching NPU driver from AMD's install docs
 (https://ryzenai.docs.amd.com/en/latest/inst.html) — do NOT trust the hardcoded
@@ -57,9 +58,11 @@ re-checked:
 2. Install RAI 1.7.1 GA from the AMD docs; confirm conda env `ryzen-ai-1.7.1` exists.
 3. Record the NPU driver version:  `pnputil /enum-drivers`  (or the setup script's
    `Get-CimInstance Win32_PnPSignedDriver | ? { $_.DeviceName -match 'NPU|AMD.*AI' }`).
-4. Build/run the VitisAI path FROM INSIDE the `ryzen-ai-1.7.1` conda env:
-   `conda run -n ryzen-ai-1.7.1  .\scripts\build.ps1 -EnableAmd -DisableIntel -RyzenAiDir "C:\Program Files\RyzenAI\1.7.1"`
-   then `.\scripts\run.ps1 -Backend amd -Device npu` and the FakeAudio classifier on NPU.
+4. Build/run the VitisAI path FROM INSIDE the `ryzen-ai-1.7.1` conda env (build script
+   moved to `tools/build/`, and the old `scripts/run.ps1` is gone — use `benchmark/`):
+   `conda run -n ryzen-ai-1.7.1  .\tools\build\build.ps1 -EnableAmd -DisableIntel -RyzenAiDir "C:\Program Files\RyzenAI\1.7.1"`
+   then run the Whisper + FakeAudio NPU workloads via `benchmark\run-whisper.ps1` /
+   `benchmark\run-suite.ps1` (check their params for the amd/npu device selection).
 5. Compare `max_abs_p_diff` against the fp32-baseline probabilities and fill in below.
 
 ## To report back to AMD
