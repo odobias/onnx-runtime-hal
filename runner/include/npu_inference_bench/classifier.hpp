@@ -25,6 +25,7 @@ struct SampleResult {
     std::string id;
     std::string label;      // ground truth: "scam"/"clean"/"deepfake"/"real", or "unknown"
     std::string predicted;  // predicted label on this EP
+    std::string expected_predicted;  // CPU-reference decision baked into the fixture
     double p = 0.0;         // p(positive class) measured on this EP
     double expected_p = 0.0;  // CPU reference p baked into the fixture
     bool has_label = false;   // false when there's no ground truth (label=="unknown")

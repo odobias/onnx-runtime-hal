@@ -98,7 +98,7 @@ std::unique_ptr<Ort::Session> build_session(Ort::Env& env, const EngineOptions& 
         const fs::path profile_prefix =
             fs::temp_directory_path() / ("npu_bench_" + cache_key);
         const std::wstring profile_prefix_w = profile_prefix.wstring();
-        so.EnableProfiling(profile_prefix_w.c_str());
+        if (options.profile_execution) so.EnableProfiling(profile_prefix_w.c_str());
         ep::append_provider(env, so, options, provider, model_dir, cache_key);
         if (generate_ctx) {
             const std::string p = ctx_path.string();

@@ -5,9 +5,12 @@ reports.
 
 ## Authoritative ledgers
 
-`ledgers/asr.csv` contains successful Whisper measurements.
+`ledgers/accuracy.jsonl` contains accuracy-first evidence. The default suite mode
+is `accuracy-quick`; it runs every valid execution profile once and never appends
+to either performance CSV.
 
-`ledgers/classifiers.csv` contains successful TSC and FakeAudio measurements.
+`ledgers/asr.csv` and `ledgers/classifiers.csv` contain latency measurements
+created only by explicit `-Mode latency` runs.
 
 `ledgers/attempts.jsonl` is the suite-level source of truth. It contains one JSON
 record for every requested workload/device/provider attempt, including:
@@ -16,10 +19,31 @@ record for every requested workload/device/provider attempt, including:
 - `unsupported`
 - `assets-missing`
 - `executor-failed`
+- `accuracy-valid`
+- `accuracy-invalid`
 - provider initialization and inference errors
 
 A missing CSV measurement is therefore distinguishable from a combination that
 was never requested.
+
+Each accuracy record carries the execution profile, graph role, model and
+fixture hashes, runtime environment snapshot ID, compilation-provenance IDs,
+requested/resolved provider, fallback status, workload metrics, and a
+`trust_gate`. A record is valid only when outputs are finite, CPU-reference
+decisions do not flip, the intended provider resolves, and the profile is
+accuracy-eligible. Invalid and diagnostic payloads remain in the ledgers but
+must not enter valid summaries.
+
+Use selectors to narrow the default matrix:
+
+```powershell
+.\benchmark\run-suite.ps1 -Runtime bundled -Only fakeaudio -Device npu
+.\benchmark\run-suite.ps1 -Profile npu-split-generic
+.\benchmark\run-suite.ps1 -Mode latency -Runtime winml -Device gpu
+```
+
+Static and dynamic-KV Whisper have different workload/profile IDs and must
+remain separate cohorts.
 
 ## Executor diagnostics
 
@@ -42,9 +66,8 @@ CPU offload is based on distinct ORT profiler nodes, not compute share.
 `ep_nodes` and `cpu_nodes` expose the underlying counts; one accelerator event
 may represent hundreds of fused ONNX operations while cheap shape/control
 operations remain individual CPU nodes. The same profiler parser is used for
-OpenVINO, VitisAI, QNN, and DirectML, so the audit is vendor-neutral. Whisper
-profiling ends after the first transcription (normally warmup), before measured
-latency runs.
+OpenVINO, VitisAI, QNN, and DirectML, so the audit is vendor-neutral. Only the
+hot session that performs inference is profiled.
 
 Classifier startup is measured twice against a dedicated cache:
 
@@ -52,12 +75,30 @@ Classifier startup is measured twice against a dedicated cache:
 - `hot_load_seconds`: second session creation from the artifact cold produced.
 - `load_seconds`: compatibility alias for the cold value.
 
+Whisper follows the same policy. `warm_load_seconds` remains only as a migration
+alias for historical ASR rows.
+
+## Immutable context
+
+`host-snapshots/<id>.json` captures the executable and runtime DLL hashes and
+versions, hardware identities and driver metadata, Windows build/UBR,
+BIOS/firmware, memory, architecture, AC state, active power plan, and available
+SDK package manifests.
+
+`model-compilation/<id>.json` captures transformed/compiled artifact hashes,
+source hashes when known, target architecture, transformation metadata, and an
+authoritative vendor SDK/compiler version source. Unknown versions are recorded
+as unknown with a reason; they are never guessed from a vendor name. Split
+FakeAudio records link separate CPU-frontend and NPU-backbone provenance and
+hashes.
+
 ## Schema authority
 
 Machine-readable schemas live in:
 
 - `../benchmark/schemas/asr-results.columns.json`
 - `../benchmark/schemas/classifier-results.columns.json`
+- `../benchmark/schemas/accuracy-record.schema.json`
 
 The C++ writer and PowerShell harness follow those column orders.
 

@@ -408,6 +408,7 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         SampleResult sr;
         sr.id = s.id;
         sr.label = s.label;
+        sr.expected_predicted = s.expected_pred;
         sr.p = p;
         sr.expected_p = s.expected_p;
         sr.predicted = (p > fx.threshold) ? fx.positive_label : fx.negative_label;

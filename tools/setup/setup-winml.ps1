@@ -68,6 +68,14 @@ Copy-Item (Join-Path $includeSource "*.h") $includeDest -Force
 Copy-Item (Join-Path $libSource "*.lib") $libDest -Force
 Copy-Item (Join-Path $binSource "*.dll") $binDest -Force
 Set-Content -Path (Join-Path $staging "VERSION") -Value "Microsoft.WindowsAppSDK.ML=$Version`nRID=$rid" -Encoding UTF8
+([ordered]@{
+    schema_version = 1
+    vendor = "Microsoft"
+    package = "Microsoft.WindowsAppSDK.ML"
+    version = $Version
+    rid = $rid
+    source = "NuGet package metadata"
+} | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath (Join-Path $staging "VERSION.json") -Encoding UTF8
 
 Write-Host "Windows ML $Version staged for $Platform in $staging" -ForegroundColor Green
 Write-Host "Build: .\tools\build\build.ps1 -Platform $Platform -EnableWinML -DisableIntel" -ForegroundColor Cyan

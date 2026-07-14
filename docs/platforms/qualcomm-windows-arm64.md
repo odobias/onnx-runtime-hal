@@ -131,21 +131,21 @@ Currently supported benchmark workloads:
 
 - Whisper static.
 - TSC.
+- FakeAudio using the `npu-split-generic` profile: fp32 CPU log-mel frontend
+  fixture plus the generic fp32 backbone on QNN.
 
 Whisper dynamic-KV is intentionally unsupported because its growing cache
 shapes cannot be compiled as the fixed HTP graph used by this benchmark.
-FakeAudio's manifest now applies the expanded-attention-bias split only to the
-Intel OpenVINO NPU, so Qualcomm correctly receives the canonical whole model.
-That graph compiles and fully offloads to QNN, but it is not numerically valid:
-the measured maximum probability drift from the fp32 CPU reference is about
-`0.93`. A Qualcomm-specific precision/split fixture is still required. Do not
-report Whisper dynamic or the current FakeAudio result as a successful,
-comparable NPU measurement.
+Whole-graph FakeAudio NPU is known-invalid and is available only as the explicit
+`npu-whole-diagnostic` profile. It is excluded from the default matrix. Split
+FakeAudio preserves the full-fp32 CPU probabilities as its end-to-end reference;
+the trust gate rejects the result if any decision flips or the intended QNN
+provider does not resolve.
 
 Run the supported NPU workloads with:
 
 ```powershell
-.\benchmark\run-suite.ps1 -Device npu -Provider auto -Only whisper,tsc
+.\benchmark\run-suite.ps1 -Runtime bundled -Device npu -Only whisper,tsc,fakeaudio
 ```
 
 A successful NPU result reports:
@@ -167,10 +167,9 @@ Run every declared combination with:
 .\benchmark\run-suite.ps1 -Device npu,gpu,cpu -Provider auto
 ```
 
-Successful rows are appended to `results/ledgers/asr.csv` and
-`results/ledgers/classifiers.csv`. Every attempt, including unsupported
-workloads, missing assets, provider failures, and fallbacks, is written to
-`results/ledgers/attempts.jsonl`.
+The default `accuracy-quick` run writes `results/ledgers/accuracy.jsonl`,
+immutable host/SDK sidecars, and `results/ledgers/attempts.jsonl`; it does not
+touch latency CSVs. Use `-Mode latency` explicitly to append performance rows.
 
 For comparable performance measurements:
 

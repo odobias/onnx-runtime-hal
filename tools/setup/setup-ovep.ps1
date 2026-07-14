@@ -86,5 +86,13 @@ Copy-Item (Join-Path $ovlibs "*") (Join-Path $tp "bin") -Recurse -Force
 
 $dllCount = (Get-ChildItem (Join-Path $tp "bin") -Filter *.dll).Count
 $hdrCount = (Get-ChildItem (Join-Path $tp "include") -Filter *.h).Count
+([ordered]@{
+    schema_version = 1
+    vendor = "Intel"
+    package = "onnxruntime-openvino"
+    onnxruntime_version = $OrtVersion
+    openvino_version = $OpenvinoVersion
+    source = "pinned Python wheels plus official ONNX Runtime headers/import library"
+} | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath (Join-Path $tp "VERSION.json") -Encoding UTF8
 Write-Host ("OVEP distro ready: {0} headers, import lib, {1} runtime DLLs -> {2}" -f $hdrCount, $dllCount, $tp) -ForegroundColor Green
 Write-Host "Build the unified Intel binary with:  .\tools\build\build.ps1 -EnableOvep" -ForegroundColor Cyan

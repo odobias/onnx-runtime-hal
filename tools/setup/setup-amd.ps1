@@ -81,6 +81,22 @@ function Test-SdkInstalled {
     return ($haveDir -and $haveEnv)
 }
 
+function Write-SdkMetadata {
+    $metadataDir = Join-Path $root "third_party\amd-ryzenai"
+    New-Item -ItemType Directory -Force -Path $metadataDir | Out-Null
+    ([ordered]@{
+        schema_version = 1
+        vendor = "AMD"
+        package = "Ryzen AI SDK"
+        version = $Version
+        install_dir = $InstallDir
+        conda_environment = $CondaEnv
+        npu_driver_version = Get-NpuDriverVersion
+        source = "setup-amd.ps1 installer parameters and installed driver metadata"
+    } | ConvertTo-Json -Depth 5) |
+        Set-Content -LiteralPath (Join-Path $metadataDir "VERSION.json") -Encoding UTF8
+}
+
 function Download-File {
     param([string]$Uri, [string]$OutFile, [long]$ExpectedBytes = 0)
     if (Test-Path $OutFile) {
@@ -115,6 +131,7 @@ if (Test-SdkInstalled -Conda $conda) {
         [Environment]::SetEnvironmentVariable('RYZEN_AI_INSTALLATION_PATH', $InstallDir, 'User')
         Write-Host "  set RYZEN_AI_INSTALLATION_PATH (User) = $InstallDir" -ForegroundColor DarkGray
     }
+    Write-SdkMetadata
     return
 }
 
@@ -192,6 +209,7 @@ if (-not [Environment]::GetEnvironmentVariable('RYZEN_AI_INSTALLATION_PATH', 'Us
     [Environment]::SetEnvironmentVariable('RYZEN_AI_INSTALLATION_PATH', $InstallDir, 'User')
     Write-Host "  set RYZEN_AI_INSTALLATION_PATH (User) = $InstallDir" -ForegroundColor DarkGray
 }
+Write-SdkMetadata
 
 Write-Host ""
 Write-Host "Ryzen AI $Version ready." -ForegroundColor Green
