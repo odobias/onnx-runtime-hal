@@ -11,15 +11,34 @@ function Test-BenchmarkFiniteNumber($Value) {
 function Test-BenchmarkIntendedProvider {
     param([object]$Result, [string]$RequestedDevice)
     if (-not $Result) { return $false }
-    if ($Result.fallback_occurred -eq $true) { return $false }
-    $resolved = if ($Result.resolved_provider) {
-        [string]$Result.resolved_provider
+    $effective = if ($Result.first_row) { $Result.first_row } else { $Result }
+    if ($effective.fallback_occurred -eq $true) { return $false }
+    $resolved = if ($effective.resolved_provider) {
+        [string]$effective.resolved_provider
     } else {
-        [string]$Result.execution_provider
+        [string]$effective.execution_provider
     }
     if (-not $resolved) { return $false }
     if ($RequestedDevice -ne "cpu" -and $resolved -match "(?i)^CPUExecutionProvider$") {
         return $false
+    }
+    if ($RequestedDevice -eq "npu" -and $resolved -match "(?i)dml|directml") {
+        return $false
+    }
+    $requestedProvider = [string]$effective.requested_provider
+    if ($RequestedDevice -eq "npu" -and $requestedProvider -match "(?i)prefer_(gpu|cpu)") {
+        return $false
+    }
+    foreach ($attempt in @($effective.provider_attempts)) {
+        if (-not $attempt.success) { continue }
+        $provider = [string]$attempt.provider
+        if ($RequestedDevice -eq "npu" -and $provider -match "(?i)prefer_(gpu|cpu)") {
+            return $false
+        }
+        if ($RequestedDevice -eq "gpu" -and $provider -match "(?i)prefer_cpu") {
+            return $false
+        }
+        break
     }
     return $true
 }

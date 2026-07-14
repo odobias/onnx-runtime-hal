@@ -1,6 +1,6 @@
 ﻿{
     "schema_version":  1,
-    "created_utc":  "2026-07-14T16:16:27.3787671Z",
+    "created_utc":  "2026-07-14T17:24:39.0565862Z",
     "execution_profile":  "npu-split-intel",
     "graph_role":  "backbone",
     "target_vendor":  "Intel",
@@ -26,6 +26,6 @@
                                       "vendor":  "Intel"
                                   },
     "transformation_recipe":  "expand-add-softmax-attention-bias",
-    "compilation_host_snapshot_id":  "11558754f9662e4b55e2",
-    "id":  "ecd8ca2469a4da61f73c"
+    "compilation_host_snapshot_id":  "1d8c6f63b3b74b9020ed",
+    "id":  "2e1461be8bf1628dd8b1"
 }
