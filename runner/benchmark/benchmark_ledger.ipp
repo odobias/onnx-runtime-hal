@@ -352,4 +352,3 @@ void append_classifier_csv(const std::string& path, const npu_inference_bench::c
         << csv_escape(environment_value("NPU_INFERENCE_BENCH_MODEL_PROVENANCE_IDS")) << ','
         << "" << '\n';
 }
-
