@@ -101,6 +101,8 @@ Machine-readable schemas live in:
 - `../benchmark/schemas/accuracy-record.schema.json`
 
 The C++ writer and PowerShell harness follow those column orders.
+Run `benchmark/validate-schemas.ps1` to verify both writers against the JSON
+contracts.
 
 `model_sha256` identifies the exact inference artifacts used by a row. Each
 ONNX, OpenVINO XML/BIN, or external data artifact is hashed by content; the
