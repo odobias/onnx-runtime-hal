@@ -17,17 +17,17 @@
 # those models are absent this script SKIPS the classifiers and still runs the full
 # HF-hosted Whisper matrix -- so a plain HF checkout benchmarks Whisper end to end.
 #
-# EP default: the OpenVINO EP (ovep). The benchmark defaults -Provider to "openvino",
-# so every device maps to its OpenVINO target (cpu -> openvino:CPU, gpu -> openvino:GPU,
-# npu -> openvino:NPU) instead of plain ORT CPU / DirectML. To run the portable,
-# vendor-agnostic EP fallback chain instead (VitisAI / QNN / DirectML / OpenVINO / CPU
-# -- required on AMD/Qualcomm boxes), pass -Provider auto. Any explicit EP name is
-# honored verbatim (e.g. -Provider DmlExecutionProvider, -Provider VitisAIExecutionProvider).
+# EP default: the portable vendor-neutral fallback chain (`-Provider auto`).
+# To force Intel's bundled OpenVINO EP, pass `-Provider openvino`; every device then
+# maps to its OpenVINO target (cpu -> openvino:CPU, gpu -> openvino:GPU,
+# npu -> openvino:NPU) through the ABI-isolated build/<platform>-ovep tree. Any
+# explicit EP name is honored verbatim (for example DmlExecutionProvider or
+# VitisAIExecutionProvider) and fails rather than silently changing providers.
 #
-#   .\benchmark\run-suite.ps1                       # all three models on OpenVINO CPU
-#   .\benchmark\run-suite.ps1 -Device npu           # OpenVINO NPU (Intel AI Boost)
-#   .\benchmark\run-suite.ps1 -Device npu,cpu       # sweep several devices (OpenVINO)
-#   .\benchmark\run-suite.ps1 -Provider auto        # portable EP fallback chain (non-Intel)
+#   .\benchmark\run-suite.ps1                       # portable auto-provider matrix
+#   .\benchmark\run-suite.ps1 -Provider openvino -Device npu
+#   .\benchmark\run-suite.ps1 -Provider openvino -Device npu,gpu,cpu
+#   .\benchmark\run-suite.ps1 -Provider auto -Device npu
 #   .\benchmark\run-suite.ps1 -Runtime winml -Device npu,gpu,cpu
 #   .\benchmark\run-suite.ps1 -Device gpu -Provider DmlExecutionProvider
 #   .\benchmark\run-suite.ps1 -Precision preferred  # let each executor choose precision
@@ -115,12 +115,10 @@ if ($Runtime -eq "all") {
 $platform = $hostArch
 
 # The OpenVINO EP lives in a SEPARATE build tree: -EnableOvep emits build\<plat>-ovep\
-# (carrying onnxruntime_providers_openvino.dll + the OpenVINO runtime), while a plain
-# ORT/DirectML/QNN build emits build\<plat>\. When OpenVINO is the (default) provider,
-# target the -ovep build; if it isn't there, fall back to the portable EP chain on the
-# plain build rather than failing every run -- and say how to produce the OVEP build.
-# Note: there is no OpenVINO EP build for ARM64, so on Snapdragon this always falls
-# through to the portable chain (which carries the QNN EP -> Hexagon NPU).
+# (carrying onnxruntime_providers_openvino.dll + the matched OpenVINO runtime), while
+# a plain ORT/DirectML/QNN build emits build\<plat>\. An explicit OpenVINO request
+# must use that tree and must fail if it is unavailable; silently switching to the
+# portable chain would mislabel the executor being measured.
 if ($Runtime -eq "winml") {
     $platform = "$hostArch-winml"
 }
@@ -130,15 +128,14 @@ elseif ($Provider -like "openvino*") {
         $platform = "$hostArch-ovep"
     }
     else {
-        Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\$hostArch-ovep\$Configuration." -ForegroundColor Yellow
+        Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\$hostArch-ovep\$Configuration." -ForegroundColor Red
         if ($hostArch -eq "ARM64") {
-            Write-Host "  (OpenVINO has no ARM64 EP build; the portable chain uses the QNN EP -> Hexagon NPU instead.)" -ForegroundColor Yellow
+            Write-Host "  OpenVINO has no ARM64 EP build; use -Provider auto for the QNN path." -ForegroundColor Red
         }
         else {
-            Write-Host "  -> build it with:  pwsh -File tools\setup\setup-ovep.ps1 ; pwsh -File tools\build\build.ps1 -EnableOvep" -ForegroundColor Yellow
+            Write-Host "  -> build it with: .\tools\setup\setup-ovep.ps1; .\tools\build\build.ps1 -EnableOvep" -ForegroundColor Red
         }
-        Write-Host "  Falling back to the portable EP chain (-Provider auto) on the plain build." -ForegroundColor Yellow
-        $Provider = ""
+        exit 1
     }
 }
 elseif ($Provider -match "(?i)dml|directml") {
