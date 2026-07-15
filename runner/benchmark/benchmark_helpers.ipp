@@ -87,6 +87,12 @@ void append_diagnostics_json(
            << (total > 0 ? 100.0 * diagnostics.cpu_nodes / total : 0.0);
         js << ",\"cpu_offload_ops\":\"" << json_escape(diagnostics.cpu_offload_ops) << "\"";
     }
+    if (diagnostics.operation_assignment_measured) {
+        js << ",\"assigned_ops_cpu\":" << diagnostics.assigned_ops_cpu;
+        js << ",\"assigned_ops_npu\":" << diagnostics.assigned_ops_npu;
+        js << ",\"operation_assignment_source\":\""
+           << json_escape(diagnostics.operation_assignment_source) << "\"";
+    }
 }
 
 std::string provider_attempts_json(

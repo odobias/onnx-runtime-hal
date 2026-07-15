@@ -45,6 +45,7 @@ function Get-BenchmarkResultColumns {
         "host_arch", "host_os", "runtime_version", "inference_precision",
         "requested_provider", "resolved_provider", "fallback_occurred", "provider_attempts",
         "ep_nodes", "cpu_nodes", "cpu_offload_pct", "cpu_offload_ops",
+        "assigned_ops_cpu", "assigned_ops_npu", "operation_assignment_source",
         "measurement_purpose", "execution_profile", "graph_role",
         "environment_snapshot_id", "model_compilation_provenance_ids", "error"
     )
