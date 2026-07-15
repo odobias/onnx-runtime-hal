@@ -40,6 +40,7 @@ results/quantization-benchmark.csv
 results/quantization-benchmark-detail.csv
 results/quantization-benchmark.md
 results/host-info.json
+# Rolling local state; completed runs publish results/run-attempts/<snapshot>.jsonl.
 results/ledgers/attempts.jsonl
 results/*-here.csv
 

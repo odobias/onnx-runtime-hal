@@ -12,8 +12,11 @@ to either performance CSV.
 `ledgers/asr.csv` and `ledgers/classifiers.csv` contain latency measurements
 created only by explicit `-Mode latency` runs.
 
-`ledgers/attempts.jsonl` is the suite-level source of truth. It contains one JSON
-record for every requested workload/device/provider attempt, including:
+`ledgers/attempts.jsonl` is ignored rolling local state. At the end of each
+completed suite invocation, the runner extracts that invocation's records into
+`run-attempts/<environment-snapshot-id>.jsonl`. Those immutable, run-scoped
+files are the published source of truth for requested workload/device/provider
+attempts, including:
 
 - `ok`
 - `unsupported`
@@ -26,7 +29,9 @@ record for every requested workload/device/provider attempt, including:
 A missing CSV measurement is therefore distinguishable from a combination that
 was never requested.
 
-Validate a current attempt ledger with
+The published file makes unsupported and failed combinations auditable beside
+successful accuracy rows instead of relying on an uncommitted developer
+workspace. Validate either a published or rolling attempt ledger with
 `benchmark/validate-attempts.ps1 -Ledger <path>`.
 
 Each accuracy record carries the execution profile, graph role, model and
@@ -88,12 +93,19 @@ versions, hardware identities and driver metadata, Windows build/UBR,
 BIOS/firmware, memory, architecture, AC state, active power plan, and available
 SDK package manifests.
 
-`model-compilation/<id>.json` captures transformed/compiled artifact hashes,
-source hashes when known, target architecture, transformation metadata, and an
-authoritative vendor SDK/compiler version source. Unknown versions are recorded
-as unknown with a reason; they are never guessed from a vendor name. Split
-FakeAudio records link separate CPU-frontend and NPU-backbone provenance and
-hashes.
+`model-compilation/<id>.json` and `model_compilation_provenance_ids` retain
+their names for schema compatibility. They identify the exact graph presented
+to the provider before runtime compilation, plus source hashes when known,
+target architecture, transformation metadata, and compiler/runtime version
+context. They do **not** identify a compiled provider-cache artifact.
+
+New records make this explicit with `provenance_scope`,
+`artifact_stage=provider-input`, and
+`compiled_cache_artifact.status=not-captured`. Older records without those
+fields have the same input-artifact semantics; absence must never be interpreted
+as a compiled-cache hash. Unknown versions and options are recorded with a
+reason rather than guessed. Split FakeAudio records link separate CPU-frontend
+and NPU-backbone input artifacts.
 
 ## Schema authority
 

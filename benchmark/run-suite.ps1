@@ -232,6 +232,9 @@ foreach ($dev in $Device) {
     }
 }
 
+$publishedAttempts = Write-BenchmarkRunAttemptSnapshot -Root $root `
+    -RollingLedger $AttemptLedger -EnvironmentSnapshotId $environmentSnapshot.id
+
 Write-Host "`n==================== summary ====================" -ForegroundColor Magenta
 Write-Host "ran    : $(if ($ran.Count) { $ran -join ', ' } else { '(nothing)' })" -ForegroundColor Green
 if ($skipped.Count) { Write-Host "skipped: $($skipped -join ', ')" -ForegroundColor Yellow }
@@ -243,3 +246,4 @@ if ($Mode -eq "accuracy-quick") {
     Write-Host "accuracy ledger   : $AccuracyLedger" -ForegroundColor DarkGray
 }
 Write-Host "attempt ledger    : $AttemptLedger" -ForegroundColor DarkGray
+Write-Host "published attempts: $($publishedAttempts.path) ($($publishedAttempts.count) records)" -ForegroundColor DarkGray
