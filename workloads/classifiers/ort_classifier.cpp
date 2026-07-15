@@ -290,6 +290,30 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     std::string out_name = session->GetOutputNameAllocated(0, alloc).get();
     const char* out_names[] = {out_name.c_str()};
 
+    // Resolve the actual catalog EP and stop ORT profiling before measured
+    // inference. Leaving profiling active through every classifier sample can
+    // materially distort accelerator latency, especially WinML-hosted QNN.
+    ExecutionDiagnostics hot_diagnostics;
+    bool hot_diagnostics_ready = false;
+    if (provider_options.profile_execution && !fx.samples.empty()) {
+        try {
+            const auto& audit_sample = fx.samples.front();
+            std::vector<const char*> audit_names;
+            audit_names.reserve(audit_sample.inputs.size());
+            for (const auto& tensor : audit_sample.inputs)
+                audit_names.push_back(tensor.name.c_str());
+            auto audit_values = make_values(audit_sample);
+            session->Run(Ort::RunOptions{nullptr}, audit_names.data(),
+                         audit_values.data(), audit_values.size(), out_names, 1);
+            hot_session.finalize_profiling();
+            hot_diagnostics = hot_session.diagnostics();
+            hot_diagnostics_ready = true;
+        } catch (const std::exception&) {
+            // Diagnostics remain best-effort; the benchmark still measures the
+            // requested provider and reports unmeasured offload if unavailable.
+        }
+    }
+
     std::vector<double> lat_ms;
     lat_ms.reserve(fx.samples.size() * static_cast<size_t>(res.runs));
 
@@ -348,11 +372,14 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     res.median_infer_ms = percentile(lat_ms, 50.0);
     res.p90_infer_ms = percentile(lat_ms, 90.0);
 
-    // CPU-offload audit: flush the profile trace and tally the per-node provider
-    // assignments (deduped across all runs). Best-effort -- never fail the benchmark.
+    // Apply the pre-measurement profiler/assignment audit. Best-effort -- never
+    // fail the benchmark when diagnostics are unavailable.
     try {
-        hot_session.finalize_profiling();
-        const ExecutionDiagnostics& hot_diagnostics = hot_session.diagnostics();
+        if (!hot_diagnostics_ready) {
+            hot_session.finalize_profiling();
+            hot_diagnostics = hot_session.diagnostics();
+            hot_diagnostics_ready = true;
+        }
         res.execution_provider = hot_diagnostics.resolved_provider;
         res.runtime = hot_session.runtime_name();
         res.diagnostics.resolved_provider = hot_diagnostics.resolved_provider;

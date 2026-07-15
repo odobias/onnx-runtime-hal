@@ -95,6 +95,21 @@ void test_provider_policy() {
                 Device::NPU, "DmlExecutionProvider"),
             "NPU to GPU demotion is fallback");
 
+#ifdef NPU_INFERENCE_BENCH_WINML
+    options = runtime::RuntimeOptions{};
+    options.device = Device::NPU;
+    const auto qnn_options = ort_common::winml_catalog_provider_options(
+        options, "QNNExecutionProvider", Device::NPU, {}, "test");
+    const auto performance_mode = qnn_options.find("htp_performance_mode");
+    require(performance_mode != qnn_options.end() &&
+                performance_mode->second == "burst",
+            "WinML QNN NPU must request HTP burst mode");
+    const auto dml_options = ort_common::winml_catalog_provider_options(
+        options, "DmlExecutionProvider", Device::GPU, {}, "test");
+    require(dml_options.find("htp_performance_mode") == dml_options.end(),
+            "WinML GPU must not receive QNN HTP options");
+#endif
+
     options = runtime::RuntimeOptions{};
     options.device = Device::CPU;
     options.precision_policy = "fp8";
