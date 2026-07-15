@@ -184,6 +184,7 @@ struct ModelSession::Impl {
     ExecutionDiagnostics diagnostics;
     std::string runtime_name;
     std::string runtime_version;
+    std::string cache_key;
     double load_seconds = 0.0;
     bool profiling_enabled = false;
     bool profiling_finalized = false;
@@ -326,6 +327,18 @@ void ModelSession::finalize_profiling() {
             impl_->diagnostics.fallback_occurred =
                 impl_->diagnostics.resolved_device != requested_device_class(impl_->options.device);
         }
+        if (!impl_->options.cache_dir.empty() &&
+            ort_common::lower(impl_->diagnostics.resolved_provider).find("vitis") !=
+                std::string::npos) {
+            const auto assignment = ort_common::parse_vitis_operation_assignment(
+                fs::path(impl_->options.cache_dir), {impl_->cache_key});
+            if (assignment.measured) {
+                impl_->diagnostics.operation_assignment_measured = true;
+                impl_->diagnostics.assigned_ops_cpu = assignment.cpu_operations;
+                impl_->diagnostics.assigned_ops_npu = assignment.npu_operations;
+                impl_->diagnostics.operation_assignment_source = assignment.source;
+            }
+        }
         enforce_requested_device(impl_->options, impl_->diagnostics);
     } catch (const RuntimeError&) {
         throw;
@@ -360,6 +373,9 @@ void LoadedModelSet::finalize_profiling() {
     diagnostics.offload_measured = false;
     diagnostics.ep_nodes = 0;
     diagnostics.cpu_nodes = 0;
+    diagnostics.operation_assignment_measured = false;
+    diagnostics.assigned_ops_cpu = 0;
+    diagnostics.assigned_ops_npu = 0;
     std::set<std::string> cpu_ops;
     for (ModelSession& session : sessions) {
         session.finalize_profiling();
@@ -373,10 +389,22 @@ void LoadedModelSet::finalize_profiling() {
             diagnostics.cpu_nodes += current.cpu_nodes;
             if (!current.cpu_offload_ops.empty()) cpu_ops.insert(current.cpu_offload_ops);
         }
+        if (current.operation_assignment_measured) {
+            diagnostics.operation_assignment_measured = true;
+            diagnostics.assigned_ops_cpu += current.assigned_ops_cpu;
+            diagnostics.assigned_ops_npu += current.assigned_ops_npu;
+            diagnostics.operation_assignment_source =
+                current.operation_assignment_source;
+        }
     }
     if (!diagnostics.offload_measured) {
         diagnostics.ep_nodes = -1;
         diagnostics.cpu_nodes = -1;
+    }
+    if (!diagnostics.operation_assignment_measured) {
+        diagnostics.assigned_ops_cpu = -1;
+        diagnostics.assigned_ops_npu = -1;
+        diagnostics.operation_assignment_source.clear();
     }
     std::string combined;
     for (const std::string& ops : cpu_ops) {
@@ -481,6 +509,7 @@ LoadedModelSet RuntimeContext::load(const std::vector<ModelSpec>& models) {
                         : (!impl_->options.cache_key.empty()
                                ? impl_->options.cache_key
                                : model.model_path.stem().string()));
+                state->cache_key = cache_key;
                 fs::path qnn_context;
                 if (ort_common::is_qnn(provider) && !impl_->options.cache_dir.empty()) {
                     qnn_context = fs::path(impl_->options.cache_dir) /

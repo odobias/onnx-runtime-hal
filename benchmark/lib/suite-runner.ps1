@@ -12,6 +12,13 @@ function Write-SuiteAttempt {
         -Status $Status -ErrorMessage $ErrorMessage -Result $Result `
         -EnvironmentSnapshotId $environmentSnapshot.id `
         -CompilationProvenanceIds $CompilationProvenanceIds
+    if ($Status -in @("assets-missing", "fixtures-missing", "fixture-failed")) {
+        $script:prerequisiteSkips += [pscustomobject]@{
+            tag = "$($Workload.id)/$($ExecutionProfile.id)/$RequestedDevice"
+            status = $Status
+            reason = $ErrorMessage
+        }
+    }
 }
 
 function Invoke-NativeBenchmark {

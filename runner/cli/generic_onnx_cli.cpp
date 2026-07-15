@@ -326,8 +326,14 @@ int run(int argc, char* argv[]) {
                   << ",\"load_seconds\":" << session.load_seconds()
                   << ",\"inference_seconds\":" << inference_seconds
                   << ",\"ep_nodes\":" << diagnostics.ep_nodes
-                  << ",\"cpu_nodes\":" << diagnostics.cpu_nodes
-                  << ",\"outputs\":[";
+                  << ",\"cpu_nodes\":" << diagnostics.cpu_nodes;
+        if (diagnostics.operation_assignment_measured) {
+            std::cout << ",\"assigned_ops_cpu\":" << diagnostics.assigned_ops_cpu
+                      << ",\"assigned_ops_npu\":" << diagnostics.assigned_ops_npu
+                      << ",\"operation_assignment_source\":\""
+                      << json_escape(diagnostics.operation_assignment_source) << "\"";
+        }
+        std::cout << ",\"outputs\":[";
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             if (i) std::cout << ",";
             std::cout << "{\"name\":\"" << json_escape(outputs[i].name) << "\""
