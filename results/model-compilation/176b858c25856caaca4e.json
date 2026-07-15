@@ -1,0 +1,29 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-15T12:12:55.6794470Z",
+    "provenance_scope":  "pre-execution-input-artifact-and-compiler-context",
+    "artifact_stage":  "provider-input",
+    "execution_profile":  "whole-fp32",
+    "graph_role":  "whole",
+    "target_vendor":  "AMD",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Dobiashi\\.cursor\\worktrees\\whisper-npu-hal\\0erm\\models\\deepfake\\fakeaudio\\model.onnx",
+    "artifact_sha256":  "d4b2dde8f4f95862ecb9f5e90821d853adea3774e7c48857f60ee6084d5e85c6",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "AMD execution-provider compiler",
+                     "version":  "1.7.0,2551",
+                     "version_source":  "runtime binary file version: onnxruntime_vitisai_ep.dll"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compiled_cache_artifact":  {
+                                    "status":  "not-captured",
+                                    "reason":  "provider compilation occurs during session creation after this input-artifact record is generated"
+                                },
+    "compilation_host_snapshot_id":  "a921240c24ec43f35efc",
+    "id":  "176b858c25856caaca4e"
+}

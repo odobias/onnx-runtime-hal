@@ -1,0 +1,235 @@
+﻿{
+    "schema_version":  1,
+    "collected_utc":  "2026-07-15T12:11:25.1450579Z",
+    "runtime_target":  "bundled",
+    "build_tree":  "x64",
+    "executable":  {
+                       "path":  "C:\\Users\\Dobiashi\\.cursor\\worktrees\\whisper-npu-hal\\0erm\\build\\x64\\Release\\NpuInferenceBench.exe",
+                       "sha256":  "5a5d273ddeaab73066d572c4c894b7a1bb5d9857786d5e12d0773bf96d889ec5"
+                   },
+    "host":  {
+                 "hostname":  "RYZENAI9HX",
+                 "architecture":  "X64",
+                 "os_caption":  "Microsoft Windows 11 Pro",
+                 "os_version":  "10.0.26200",
+                 "windows_build":  "26200",
+                 "ubr":  8655,
+                 "memory_bytes":  33413771264,
+                 "system_product":  "ASUS Zenbook S 16 UM5606WA_UM5606WA",
+                 "system_vendor":  "ASUSTeK COMPUTER INC.",
+                 "bios_vendor":  "American Megatrends International, LLC.",
+                 "bios_version":  "UM5606WA.318",
+                 "bios_release_date":  "2025-05-14T02:00:00.0000000+02:00"
+             },
+    "hardware":  {
+                     "collected_utc":  "2026-07-15T12:11:22Z",
+                     "hostname":  "RYZENAI9HX",
+                     "os":  "Microsoft Windows 11 Pro",
+                     "memory_gb":  31.1,
+                     "cpu":  {
+                                 "name":  "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+                                 "vendor":  "AMD",
+                                 "cores":  12,
+                                 "threads":  24,
+                                 "max_clock_mhz":  2000,
+                                 "description":  "AMD64 Family 26 Model 36 Stepping 0"
+                             },
+                     "gpus":  [
+                                  {
+                                      "name":  "AMD Radeon(TM) 890M Graphics",
+                                      "video_processor":  "AMD Radeon Graphics Processor (0x150E)",
+                                      "driver_version":  "32.0.13058.2",
+                                      "driver_date":  "2025-05-13T02:00:00.0000000+02:00",
+                                      "pnp_id":  "PCI\\VEN_1002\u0026DEV_150E\u0026SUBSYS_1DF31043\u0026REV_C1\\4\u002635FE04F8\u00260\u00260041",
+                                      "vram_mb_approx":  512,
+                                      "resolution":  "2880x1800"
+                                  }
+                              ],
+                     "npu":  {
+                                 "name":  "NPU Compute Accelerator Device",
+                                 "architecture":  "AMD XDNA 2 (Strix / Krackan Point)",
+                                 "present":  true,
+                                 "manufacturer":  "AMD",
+                                 "pci_id":  "1022:17F0",
+                                 "driver_version":  "32.0.203.280",
+                                 "driver_date":  "2025-05-16T02:00:00.0000000+02:00",
+                                 "instance_id":  "PCI\\VEN_1022\u0026DEV_17F0\u0026SUBSYS_20CF1043\u0026REV_10\\4\u002623445453\u00260\u00260142"
+                             }
+                 },
+    "power":  {
+                  "source":  "battery",
+                  "active_plan":  "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+                  "energy_saver_enabled":  null,
+                  "overlay_scheme":  {
+                                         "ac":  "",
+                                         "dc":  ""
+                                     },
+                  "battery":  {
+                                  "device_id":  " ASUSTeKASUS Battery",
+                                  "status":  "OK",
+                                  "battery_status":  1,
+                                  "estimated_charge_remaining_pct":  45,
+                                  "estimated_runtime_minutes":  144,
+                                  "design_voltage_mv":  7659,
+                                  "chemistry":  2
+                              },
+                  "thermal_zones":  [
+
+                                    ]
+              },
+    "runtime_binaries":  [
+                             {
+                                 "name":  "aiecompiler_client.dll",
+                                 "sha256":  "2532d9e12ccb9f972058f562ce22469c9c1973f3cd7a685f5a069ffa6d8cddfb",
+                                 "file_version":  "1.7.0,2162335",
+                                 "product_version":  "1.7.0+2162335+20260319T175644Z"
+                             },
+                             {
+                                 "name":  "concrt140.dll",
+                                 "sha256":  "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "DirectML.dll",
+                                 "sha256":  "9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1",
+                                 "file_version":  "1.15.4+241025-1615.1.dml-1.15.fac7597",
+                                 "product_version":  "1.15.4+241025-1615.1.dml-1.15.fac7597"
+                             },
+                             {
+                                 "name":  "dyn_bins.dll",
+                                 "sha256":  "ec71b21caf3a1528d83a541b1183cc5805577b4a0910d1fad36f0ea9ad9124ee",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "dyn_dispatch_core.dll",
+                                 "sha256":  "b72c5b04cf5696c737528028248a96ea97b6013a4600c4c5d0366804b0660382",
+                                 "file_version":  "1.7.0,2551",
+                                 "product_version":  "1.7.0+2551+20260320T222627Z"
+                             },
+                             {
+                                 "name":  "msvcp140.dll",
+                                 "sha256":  "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_1.dll",
+                                 "sha256":  "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_2.dll",
+                                 "sha256":  "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_atomic_wait.dll",
+                                 "sha256":  "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_codecvt_ids.dll",
+                                 "sha256":  "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "NpuInferenceBench.exe",
+                                 "sha256":  "5a5d273ddeaab73066d572c4c894b7a1bb5d9857786d5e12d0773bf96d889ec5",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "onnxruntime.dll",
+                                 "sha256":  "e7eedec6a6f26dc39dc948276a75ef6d2bee3fff944d874ceed0bbd3b97bff40",
+                                 "file_version":  "1.24.20260316.9.2d92497",
+                                 "product_version":  "1.24.20260316.9.2d92497"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_shared.dll",
+                                 "sha256":  "265c8daf29637cb259cac8be9f08f2cd45f3883f0f0e4949cbfddd5b4cbec3b6",
+                                 "file_version":  "1.24.20260316.9.2d92497",
+                                 "product_version":  "1.24.20260316.9.2d92497"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_vitisai.dll",
+                                 "sha256":  "53a75bfd8dc37dc04adb2a7b941f8f50c742559302d1d5218e43ceeedb67ec51",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "onnxruntime_vitis_ai_custom_ops.dll",
+                                 "sha256":  "bc27769528f41fcc546f2d92f268946c4797887af8cbde24b94ff7dd1c6d4e9a",
+                                 "file_version":  "1.7.0,2551",
+                                 "product_version":  "1.7.0+2551+20260320T223959Z"
+                             },
+                             {
+                                 "name":  "onnxruntime_vitisai_ep.dll",
+                                 "sha256":  "64f360d6afcd48329b77c3d8cce13a769c14e60863f358c77e04b50c6d52743e",
+                                 "file_version":  "1.7.0,2551",
+                                 "product_version":  "1.7.0+2551+20260320T223959Z"
+                             },
+                             {
+                                 "name":  "vaiml.dll",
+                                 "sha256":  "09763bb0be21501f24ce1976228e1650ad77e08f5436f7c27061e9264705d457",
+                                 "file_version":  "1.7.0,2165663",
+                                 "product_version":  "1.7.0+2165663+20260320T063252Z"
+                             },
+                             {
+                                 "name":  "vccorlib140.dll",
+                                 "sha256":  "19839407c3fdbc824e5bce189bf68ddf8097f12ec28b757797ffa0415c144ddd",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140.dll",
+                                 "sha256":  "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_1.dll",
+                                 "sha256":  "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_threads.dll",
+                                 "sha256":  "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "z.dll",
+                                 "sha256":  "eb7f2e9f55ba957070644cd256b904c8d33e8bfe26e119e70bfaff9822a07bb1",
+                                 "file_version":  "1.3.2",
+                                 "product_version":  "1.3.2"
+                             },
+                             {
+                                 "name":  "zstd.dll",
+                                 "sha256":  "05c84a01423265d7722b0ae0b591852c56ee66a474638face6814b78f6e21d0c",
+                                 "file_version":  "1.5.5",
+                                 "product_version":  "1.5.5"
+                             }
+                         ],
+    "vendor_sdk_manifests":  [
+                                 {
+                                     "path":  "third_party/windows-ml/VERSION.json",
+                                     "sha256":  "1e9bf17b04dc7a1d10cee79f9b89db7ec422108ebeb61c6c751aa3479d7a6228",
+                                     "metadata":  {
+                                                      "schema_version":  1,
+                                                      "vendor":  "Microsoft",
+                                                      "package":  "Microsoft.WindowsAppSDK.ML",
+                                                      "version":  "2.1.70",
+                                                      "rid":  "win-x64",
+                                                      "source":  "NuGet package metadata"
+                                                  }
+                                 }
+                             ],
+    "id":  "a921240c24ec43f35efc"
+}
