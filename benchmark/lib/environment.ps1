@@ -37,7 +37,8 @@ function Get-BenchmarkEnvironmentSnapshot {
         [Parameter(Mandatory)][string]$Root,
         [Parameter(Mandatory)][string]$Exe,
         [Parameter(Mandatory)][string]$RuntimeTarget,
-        [Parameter(Mandatory)][string]$BuildTree
+        [Parameter(Mandatory)][string]$BuildTree,
+        [string]$RunnerId = ""
     )
     $hardware = Get-BenchmarkHardware
     $os = $null; $bios = $null; $system = $null
@@ -124,6 +125,7 @@ function Get-BenchmarkEnvironmentSnapshot {
         collected_utc = [DateTime]::UtcNow.ToString("o")
         runtime_target = $RuntimeTarget
         build_tree = $BuildTree
+        runner_id = $RunnerId
         executable = [ordered]@{
             path = $Exe
             sha256 = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant()

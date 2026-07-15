@@ -222,6 +222,30 @@ Build output:
 build/<platform>[/variant]/<configuration>/NpuInferenceBench.exe
 ```
 
+## Publish isolated runners
+
+One distribution is produced per CPU architecture. Runtime DLL families stay in
+separate runner directories while benchmark scripts, workloads, and models are
+copied once:
+
+```powershell
+.\tools\build\build-runner-package.ps1 -Architecture ARM64 -Clean
+.\tools\build\build-runner-package.ps1 -Architecture x64 -Clean
+```
+
+Unavailable vendor SDKs are recorded in `runner-package.json` as skipped.
+Matching runner artifacts from CI or another SDK host can be merged with
+`-AdditionalRunnerRoot`. The packaged entry point preserves the suite options:
+
+```powershell
+.\run-benchmark.ps1 --list-runners
+.\run-benchmark.ps1 --explain -Runtime bundled -Provider auto
+.\run-benchmark.ps1 -Device npu,gpu,cpu -Provider auto
+```
+
+See [Isolated runner distributions](docs/distribution.md) for the package
+layout, selection rules, external-artifact contract, and publishing workflow.
+
 ## Single-workload CLI
 
 ```powershell

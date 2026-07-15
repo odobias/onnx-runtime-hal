@@ -57,6 +57,8 @@ param(
     [string]$Manifest = "",
     [string]$AttemptLedger = "",
     [string]$AccuracyLedger = "",
+    [string]$RunnerManifest = "",
+    [switch]$ExplainRunnerSelection,
     [switch]$RegenerateFixtures,
     [switch]$NoResults
 )
@@ -81,6 +83,10 @@ $root = Split-Path $PSScriptRoot -Parent
 $hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "ARM64" } else { "x64" }
 $hardware = Get-BenchmarkHardware
 $hostVendor = [string]$hardware.cpu.vendor
+$runnerPackage = $null
+if ($RunnerManifest) {
+    $runnerPackage = Get-BenchmarkRunnerPackageManifest -Path $RunnerManifest
+}
 $bundledTag = switch ($hostVendor) {
     'AMD'      { "$hostArch-amd" }
     'Qualcomm' { "$hostArch-qualcomm" }
@@ -128,11 +134,29 @@ function Write-MissingRuntimeRuns {
 if ($Runtime -eq "all") {
     $runtimeFailures = 0
     foreach ($targetRuntime in @("bundled", "winml")) {
-        $targetTag = if ($targetRuntime -eq "winml") { "$hostArch-winml" } else { $bundledTag }
-        $targetExe = Join-Path $root "build\$targetTag\$Configuration\NpuInferenceBench.exe"
-        if (-not (Test-Path -LiteralPath $targetExe)) {
-            Write-MissingRuntimeRuns -RuntimeName $targetRuntime -Executable $targetExe
-            continue
+        if ($runnerPackage) {
+            try {
+                $null = Resolve-BenchmarkRunnerPack -PackageManifest $runnerPackage `
+                    -Runtime $targetRuntime -Provider $Provider -HostVendor $hostVendor `
+                    -HostArchitecture $hostArch
+            } catch {
+                Write-Host "NOT PERFORMED: runtime '$targetRuntime' is unavailable." -ForegroundColor Yellow
+                Write-Host "  missing prerequisite: $($_.Exception.Message)" -ForegroundColor Yellow
+                foreach ($tag in @(Get-RequestedBenchmarkTags -RuntimeName $targetRuntime)) {
+                    Write-Host "  - $tag" -ForegroundColor DarkYellow
+                }
+                if ($targetRuntime -eq "bundled") {
+                    $runtimeFailures++
+                }
+                continue
+            }
+        } else {
+            $targetTag = if ($targetRuntime -eq "winml") { "$hostArch-winml" } else { $bundledTag }
+            $targetExe = Join-Path $root "build\$targetTag\$Configuration\NpuInferenceBench.exe"
+            if (-not (Test-Path -LiteralPath $targetExe)) {
+                Write-MissingRuntimeRuns -RuntimeName $targetRuntime -Executable $targetExe
+                continue
+            }
         }
         $childArgs = @{
             Runtime = $targetRuntime; Device = $Device; Only = $Only; Mode = $Mode
@@ -145,6 +169,8 @@ if ($Runtime -eq "all") {
         )) {
             if ($pair[1]) { $childArgs[$pair[0]] = $pair[1] }
         }
+        if ($RunnerManifest) { $childArgs.RunnerManifest = $RunnerManifest }
+        if ($ExplainRunnerSelection) { $childArgs.ExplainRunnerSelection = $true }
         if ($RegenerateFixtures) { $childArgs.RegenerateFixtures = $true }
         if ($NoResults) { $childArgs.NoResults = $true }
         & $PSCommandPath @childArgs
@@ -158,56 +184,67 @@ if ($Runtime -eq "all") {
 # ARM64 (Snapdragon) boxes get build\ARM64\. Use OSArchitecture so this is correct
 # whether PowerShell runs native or x64-emulated on ARM64.
 $platform = $bundledTag
-
-# The OpenVINO EP lives in a SEPARATE build tree: -EnableOvep emits build\<plat>-ovep\
-# (carrying onnxruntime_providers_openvino.dll + the OpenVINO runtime), while a plain
-# ORT/DirectML/QNN build emits build\<plat>\. When OpenVINO is the (default) provider,
-# target the -ovep build; if it isn't there, fall back to the portable EP chain on the
-# plain build rather than failing every run -- and say how to produce the OVEP build.
-# Note: there is no OpenVINO EP build for ARM64, so on Snapdragon this always falls
-# through to the portable chain (which carries the QNN EP -> Hexagon NPU).
-if ($Runtime -eq "winml") {
-    $platform = "$hostArch-winml"
-}
-elseif ($Provider -like "openvino*") {
-    $ovepExe = Join-Path $root "build\$hostArch-ovep\$Configuration\NpuInferenceBench.exe"
-    if (Test-Path $ovepExe) {
-        $platform = "$hostArch-ovep"
+$runnerIsolationRoot = ""
+$selectedRunnerId = ""
+if ($runnerPackage) {
+    try {
+        $selectedRunner = Resolve-BenchmarkRunnerPack -PackageManifest $runnerPackage `
+            -Runtime $Runtime -Provider $Provider -HostVendor $hostVendor `
+            -HostArchitecture $hostArch
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        exit 1
     }
-    else {
-        Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\$hostArch-ovep\$Configuration." -ForegroundColor Yellow
-        if ($hostArch -eq "ARM64") {
-            Write-Host "  (OpenVINO has no ARM64 EP build; the portable chain uses the QNN EP -> Hexagon NPU instead.)" -ForegroundColor Yellow
+    $exe = $selectedRunner.exe
+    $platform = $selectedRunner.platform_tag
+    $runnerIsolationRoot = $selectedRunner.root
+    $selectedRunnerId = $selectedRunner.id
+    Write-Host ("runner     : {0} -> {1}" -f $selectedRunnerId, $exe) -ForegroundColor Cyan
+    if ($ExplainRunnerSelection) {
+        Write-Host ("selection  : runtime={0}, provider={1}, vendor={2}, architecture={3}, platform={4}" -f
+            $Runtime, $(if ($Provider) { $Provider } else { "auto" }),
+            $hostVendor, $hostArch, $platform)
+        exit 0
+    }
+} else {
+    # Development-tree selection retains the historical build/<tag> behavior.
+    if ($Runtime -eq "winml") {
+        $platform = "$hostArch-winml"
+    }
+    elseif ($Provider -like "openvino*") {
+        $ovepExe = Join-Path $root "build\$hostArch-ovep\$Configuration\NpuInferenceBench.exe"
+        if (Test-Path $ovepExe) {
+            $platform = "$hostArch-ovep"
         }
         else {
-            Write-Host "  -> build it with:  pwsh -File tools\setup\setup-ovep.ps1 ; pwsh -File tools\build\build.ps1 -EnableOvep" -ForegroundColor Yellow
+            Write-Host "OpenVINO EP requested ('$Provider') but no OVEP build at build\$hostArch-ovep\$Configuration." -ForegroundColor Yellow
+            if ($hostArch -eq "ARM64") {
+                Write-Host "  (OpenVINO has no ARM64 EP build; the portable chain uses QNN instead.)" -ForegroundColor Yellow
+            }
+            Write-Host "  Falling back to the portable EP chain (-Provider auto) on the plain build." -ForegroundColor Yellow
+            $Provider = ""
         }
-        Write-Host "  Falling back to the portable EP chain (-Provider auto) on the plain build." -ForegroundColor Yellow
-        $Provider = ""
     }
-}
-elseif ($Provider -match "(?i)dml|directml") {
-    # A first-class DirectML build has its own tree so building OVEP or another
-    # ORT distribution cannot silently replace onnxruntime.dll underneath it.
-    $dmlExe = Join-Path $root "build\$hostArch-dml\$Configuration\NpuInferenceBench.exe"
-    if (Test-Path $dmlExe) {
-        $platform = "$hostArch-dml"
+    elseif ($Provider -match "(?i)dml|directml") {
+        $dmlExe = Join-Path $root "build\$hostArch-dml\$Configuration\NpuInferenceBench.exe"
+        if (Test-Path $dmlExe) {
+            $platform = "$hostArch-dml"
+        }
+        else {
+            Write-Host "No dedicated DirectML build at build\$hostArch-dml\$Configuration; trying the plain ORT build." -ForegroundColor Yellow
+        }
     }
-    else {
-        Write-Host "No dedicated DirectML build at build\$hostArch-dml\$Configuration; trying the plain ORT build." -ForegroundColor Yellow
-        Write-Host "  -> create it with: .\tools\fetch\get-onnxruntime-directml.ps1 ; .\tools\build\build.ps1 -EnableDirectML -DisableIntel" -ForegroundColor Yellow
+    $exe = Join-Path $root "build\$platform\$Configuration\NpuInferenceBench.exe"
+    if (-not (Test-Path $exe)) {
+        Write-MissingRuntimeRuns -RuntimeName $Runtime -Executable $exe
+        if ($Runtime -eq "winml") {
+            Write-Host "Not built: $exe  (run .\tools\setup\setup-winml.ps1; .\tools\build\build.ps1 -EnableWinML -DisableIntel)" -ForegroundColor Red
+        }
+        else {
+            Write-Host "Not built: $exe  (run .\tools\build\build.ps1 -EnableOrt / -EnableDirectML / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
+        }
+        exit 1
     }
-}
-$exe = Join-Path $root "build\$platform\$Configuration\NpuInferenceBench.exe"
-if (-not (Test-Path $exe)) {
-    Write-MissingRuntimeRuns -RuntimeName $Runtime -Executable $exe
-    if ($Runtime -eq "winml") {
-        Write-Host "Not built: $exe  (run .\tools\setup\setup-winml.ps1; .\tools\build\build.ps1 -EnableWinML -DisableIntel)" -ForegroundColor Red
-    }
-    else {
-        Write-Host "Not built: $exe  (run .\tools\build\build.ps1 -EnableOrt / -EnableDirectML / -EnableOvep or bootstrap.ps1)" -ForegroundColor Red
-    }
-    exit 1
 }
 
 if ($Only -contains "all") { $Only = @("whisper", "tsc", "fakeaudio") }
@@ -225,7 +262,8 @@ if (-not (Test-Path $Manifest)) {
 }
 $workloads = @((Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).workloads)
 $environmentSnapshot = Get-BenchmarkEnvironmentSnapshot `
-    -Root $root -Exe $exe -RuntimeTarget $Runtime -BuildTree $platform
+    -Root $root -Exe $exe -RuntimeTarget $Runtime -BuildTree $platform `
+    -RunnerId $selectedRunnerId
 Write-Host "environment: $($environmentSnapshot.id) -> $($environmentSnapshot.path)" -ForegroundColor DarkCyan
 # Classifier fixtures + their ONNX models are colocated under models/deepfake/ (the
 # model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx, so fixtures must

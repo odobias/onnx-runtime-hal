@@ -43,6 +43,7 @@ from tokenizers import ByteLevelBPETokenizer
 from tokenizers.processors import RobertaProcessing
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(ROOT, "tools", "research"))
 TSC_DIR = os.path.join(ROOT, "models", "deepfake", "tsc")
 MODEL_PATH = os.path.join(TSC_DIR, "model.onnx")
 
@@ -80,7 +81,9 @@ def build_tokenizer(max_length: int):
         merges=os.path.join(TSC_DIR, "merges.txt"),
     )
     # RoBERTa wraps every sequence as <s> ... </s>; ids taken from vocab.json itself.
-    tokenizer.post_processor = RobertaProcessing(sep=("</s>", 2), cls=("<s>", 0))
+    tokenizer.post_processor = RobertaProcessing(
+        sep=("</s>", 2), cls_token=("<s>", 0)
+    )
     tokenizer.enable_truncation(max_length=max_length)
     tokenizer.enable_padding(length=max_length, pad_id=1, pad_token="<pad>")
     return tokenizer
