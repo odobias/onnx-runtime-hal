@@ -1,6 +1,7 @@
 #pragma once
 
-#include "npu_inference_bench/whisper.hpp"
+#include "npu_inference_bench/runtime/runtime_options.hpp"
+#include "npu_inference_bench/runtime/runtime_error.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -17,7 +18,7 @@ inline std::string lower(std::string value) {
     return value;
 }
 
-inline std::string resolve(const EngineOptions& options, Device default_device) {
+inline std::string resolve(const runtime::RuntimeOptions& options, Device default_device) {
     std::string precision = options.precision_policy;
     if (precision.empty()) {
         const char* environment = std::getenv("NPU_INFERENCE_BENCH_PRECISION");
@@ -32,14 +33,15 @@ inline std::string resolve(const EngineOptions& options, Device default_device) 
     if (precision == "auto" || precision == "default") precision = "preferred";
     if (precision != "preferred" && precision != "f32" &&
         precision != "f16" && precision != "bf16") {
-        throw std::runtime_error(
+        throw runtime::RuntimeError(
+            runtime::RuntimeErrorCode::InvalidArgument,
             "unsupported inference precision policy: " + precision +
             " (expected f32, f16, bf16, or preferred)");
     }
     return precision;
 }
 
-inline std::string resolve(const EngineOptions& options) {
+inline std::string resolve(const runtime::RuntimeOptions& options) {
     return resolve(options, options.device);
 }
 

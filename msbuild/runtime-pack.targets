@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stage exactly the runtime flavor selected for this build. Never point the
+     properties at mixed bundled/WinML/OVEP/AMD/Qualcomm directories. -->
+<Project>
+  <Target Name="CopyOnnxRuntimeHalRuntime" AfterTargets="Build"
+          Condition="'$(EnableOrt)'=='true' or '$(EnableQualcomm)'=='true' or '$(EnableAmd)'=='true'">
+    <ItemGroup>
+      <!-- A prior build may have used this directory before runtime flavors were
+           split. Remove DLL families that do not belong to the selected pack so
+           incremental builds cannot retain an incompatible provider by accident. -->
+      <OnnxRuntimeHalConflict Include="$(OutDir)onnxruntime_providers_qnn.dll;$(OutDir)Qnn*.dll;$(OutDir)Genie.dll;$(OutDir)*Skel.so;$(OutDir)*qnn*.cat"
+                              Condition="'$(EnableQualcomm)'!='true'" />
+      <OnnxRuntimeHalConflict Include="$(OutDir)onnxruntime_providers_openvino.dll;$(OutDir)openvino*.dll;$(OutDir)tbb*.dll;$(OutDir)plugins.xml"
+                              Condition="'$(EnableOvep)'!='true'" />
+      <OnnxRuntimeHalConflict Include="$(OutDir)onnxruntime_providers_vitisai.dll;$(OutDir)dyn_dispatch_core.dll;$(OutDir)dyn_bins.dll;$(OutDir)vaiml.dll;$(OutDir)aiecompiler_client.dll;$(OutDir)z.dll;$(OutDir)zstd.dll"
+                              Condition="'$(EnableAmd)'!='true'" />
+
+      <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\onnxruntime*.dll"
+                            Condition="'$(OrtBinDir)'!='' and '$(EnableAmd)'!='true'" />
+      <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\Microsoft.Windows.AI.MachineLearning.dll"
+                            Condition="'$(EnableWinML)'=='true' and Exists('$(OrtBinDir)\Microsoft.Windows.AI.MachineLearning.dll')" />
+
+      <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\openvino*.dll"
+                            Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
+      <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\tbb*.dll"
+                            Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
+      <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\*.xml"
+                            Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
+
+      <OnnxRuntimeHalRuntime Include="$(QnnEpDir)\onnxruntime_providers_qnn.dll"
+                            Condition="'$(EnableQualcomm)'=='true' and Exists('$(QnnEpDir)\onnxruntime_providers_qnn.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(QnnEpDir)\Qnn*.dll"
+                            Condition="'$(EnableQualcomm)'=='true' and Exists('$(QnnEpDir)')" />
+      <OnnxRuntimeHalRuntime Include="$(QnnEpDir)\Genie.dll"
+                            Condition="'$(EnableQualcomm)'=='true' and Exists('$(QnnEpDir)\Genie.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(QnnEpDir)\*Skel.so"
+                            Condition="'$(EnableQualcomm)'=='true' and Exists('$(QnnEpDir)')" />
+      <OnnxRuntimeHalRuntime Include="$(QnnEpDir)\*.cat"
+                            Condition="'$(EnableQualcomm)'=='true' and Exists('$(QnnEpDir)')" />
+
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\onnxruntime*.dll"
+                            Condition="'$(EnableAmd)'=='true' and '$(OrtAmdBinDir)'!=''" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\dyn_dispatch_core.dll" Condition="Exists('$(OrtAmdBinDir)\dyn_dispatch_core.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\dyn_bins.dll" Condition="Exists('$(OrtAmdBinDir)\dyn_bins.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\vaiml.dll" Condition="Exists('$(OrtAmdBinDir)\vaiml.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\aiecompiler_client.dll" Condition="Exists('$(OrtAmdBinDir)\aiecompiler_client.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\DirectML.dll" Condition="Exists('$(OrtAmdBinDir)\DirectML.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\z.dll" Condition="Exists('$(OrtAmdBinDir)\z.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\zstd.dll" Condition="Exists('$(OrtAmdBinDir)\zstd.dll')" />
+    </ItemGroup>
+    <Delete Files="@(OnnxRuntimeHalConflict)" TreatErrorsAsWarnings="false"
+            Condition="'@(OnnxRuntimeHalConflict)' != ''" />
+    <Copy SourceFiles="@(OnnxRuntimeHalRuntime)" DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" Condition="'@(OnnxRuntimeHalRuntime)' != ''" />
+    <Message Importance="high"
+             Text="Staged ONNX Runtime HAL pack (%(OnnxRuntimeHalRuntime.Filename)%(OnnxRuntimeHalRuntime.Extension)) to $(OutDir)"
+             Condition="'@(OnnxRuntimeHalRuntime)' != ''" />
+  </Target>
+</Project>

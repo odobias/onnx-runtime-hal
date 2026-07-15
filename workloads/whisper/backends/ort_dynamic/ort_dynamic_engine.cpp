@@ -29,8 +29,10 @@
 #include <vector>
 
 #include "npu_inference_bench/whisper_frontend.hpp"
+#include "npu_inference_bench/runtime/runtime_context.hpp"
 #include "ort_ep.hpp"
 #include "ort_offload.hpp"
+#include "ort_session_access.hpp"
 
 #ifdef NPU_INFERENCE_BENCH_ORT
 #include <onnxruntime_cxx_api.h>
@@ -94,7 +96,7 @@ bool is_present(const std::string& name) { return name.rfind("present.", 0) == 0
 class OrtDynamicEngine final : public IWhisperEngine {
 public:
     explicit OrtDynamicEngine(const EngineOptions& options)
-        : env_(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_ort_dynamic"), options_(options) {
+        : options_(options), context_(options) {
         const fs::path dir(options.model_dir);
         const fs::path enc_path = dir / "encoder_model.onnx";
         const fs::path dec_path = dir / "decoder_model.onnx";
@@ -114,50 +116,17 @@ public:
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
-#ifdef NPU_INFERENCE_BENCH_WINML
-        ep::register_windows_ml_catalog(env_, options_.device);
-#endif
-        // Walk the device fallback chain; keep the first EP that builds ALL three
-        // sessions. On NPU EPs this is expected to fail (dynamic KV shapes) and
-        // demote to GPU/CPU -- the explicit, recorded benchmark behavior.
-        const std::vector<std::string> chain = ep::fallback_chain(options_);
-        diagnostics_.requested_provider =
-            options_.device_override.empty() ? std::string("auto") : options_.device_override;
-        std::string last_err;
-        for (size_t i = 0; i < chain.size(); ++i) {
-            const std::string& provider = chain[i];
-            try {
-                const auto t0 = std::chrono::steady_clock::now();
-                encoder_ = build_session(provider, enc_path, dir, "dyn_encoder");
-                decoder_ = build_session(provider, dec_path, dir, "dyn_decoder");
-                decoder_past_ = build_session(provider, decp_path, dir, "dyn_decoder_past");
-                load_seconds_ =
-                    std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-                active_provider_ = provider;
-                diagnostics_.attempts.push_back({provider, true, {}});
-                diagnostics_.resolved_provider = provider;
-                diagnostics_.inference_precision =
-                    ep::resolved_inference_precision(options_, provider);
-                diagnostics_.fallback_occurred = provider != chain.front();
-                break;
-            } catch (const std::exception& e) {
-                last_err = e.what();
-                diagnostics_.attempts.push_back({provider, false, last_err});
-                encoder_.reset();
-                decoder_.reset();
-                decoder_past_.reset();
-                if (i + 1 < chain.size()) {
-                    std::cerr << "[npu-inference-bench] dynamic EP '" << provider << "' unavailable ("
-                              << e.what() << "); falling back to '" << chain[i + 1] << "'\n";
-                }
-            }
-        }
-        if (!encoder_ || !decoder_ || !decoder_past_) {
-            throw std::runtime_error(
-                "no ONNX Runtime EP could build the dynamic (with-past) sessions -- the NPU EPs "
-                "reject the growing KV cache, so this backend needs CPU or GPU (last error: " +
-                last_err + ")");
-        }
+        models_ = context_.load({
+            {enc_path, dir, "dyn_encoder"},
+            {dec_path, dir, "dyn_decoder"},
+            {decp_path, dir, "dyn_decoder_past"},
+        });
+        load_seconds_ = models_.load_seconds;
+        diagnostics_ = models_.diagnostics;
+        active_provider_ = diagnostics_.resolved_provider;
+        encoder_ = &runtime::detail::OrtSessionAccess::get(models_.sessions[0]);
+        decoder_ = &runtime::detail::OrtSessionAccess::get(models_.sessions[1]);
+        decoder_past_ = &runtime::detail::OrtSessionAccess::get(models_.sessions[2]);
 
         decp_input_names_ = session_input_names(*decoder_past_);
         dec_output_names_ = session_output_names(*decoder_);
@@ -302,64 +271,19 @@ public:
     ExecutionDiagnostics execution_diagnostics() const override {
         if (!diagnostics_finalized_) {
             diagnostics_finalized_ = true;
-            auto audit = [&](const std::unique_ptr<Ort::Session>& session) {
-                if (!session) return;
-                try {
-                    Ort::AllocatorWithDefaultOptions alloc;
-                    const std::string profile_path =
-                        session->EndProfilingAllocated(alloc).get();
-                    const auto stats = ep::parse_ort_profile(profile_path);
-                    if (stats.measured) {
-#ifdef NPU_INFERENCE_BENCH_WINML
-                        if (!stats.providers.empty()) {
-                            const auto comma = stats.providers.find(',');
-                            diagnostics_.resolved_provider = stats.providers.substr(0, comma);
-                            active_provider_ = diagnostics_.resolved_provider;
-                            diagnostics_.fallback_occurred =
-                                diagnostics_.fallback_occurred ||
-                                ep::is_fallback_provider_for_device(
-                                    options_.device, diagnostics_.resolved_provider);
-                        }
-#endif
-                        diagnostics_.offload_measured = true;
-                        diagnostics_.ep_nodes =
-                            std::max(0, diagnostics_.ep_nodes) + stats.ep_nodes;
-                        diagnostics_.cpu_nodes =
-                            std::max(0, diagnostics_.cpu_nodes) + stats.cpu_nodes;
-                        if (!stats.cpu_ops.empty()) {
-                            if (!diagnostics_.cpu_offload_ops.empty())
-                                diagnostics_.cpu_offload_ops += "; ";
-                            diagnostics_.cpu_offload_ops += stats.cpu_ops;
-                        }
-                    }
-                    std::error_code ec;
-                    fs::remove(profile_path, ec);
-                } catch (const std::exception&) {
-                    // Profiling is diagnostic only.
-                }
-            };
-            audit(encoder_);
-            audit(decoder_);
-            audit(decoder_past_);
+            try {
+                models_.finalize_profiling();
+                diagnostics_ = models_.diagnostics;
+                active_provider_ = diagnostics_.resolved_provider;
+            } catch (const std::exception&) {
+                if (options_.require_requested_device) throw;
+            }
         }
         return diagnostics_;
     }
     double load_seconds() const override { return load_seconds_; }
 
 private:
-    std::unique_ptr<Ort::Session> build_session(const std::string& provider, const fs::path& model_path,
-                                                const fs::path& model_dir, const std::string& cache_key) {
-        Ort::SessionOptions so;
-        so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-        const fs::path profile_prefix =
-            fs::temp_directory_path() / ("npu_bench_" + cache_key);
-        const std::wstring profile_prefix_w = profile_prefix.wstring();
-        if (options_.profile_execution) so.EnableProfiling(profile_prefix_w.c_str());
-        ep::append_provider(env_, so, options_, provider, model_dir, cache_key);
-        const std::wstring wpath = model_path.wstring();
-        return std::make_unique<Ort::Session>(env_, wpath.c_str(), so);
-    }
-
     void apply_suppress(std::vector<float>& logit, int64_t vocab, bool first) {
         const float neg = -std::numeric_limits<float>::infinity();
         for (const int64_t s : suppress_)
@@ -369,8 +293,9 @@ private:
                 if (s >= 0 && s < vocab) logit[static_cast<size_t>(s)] = neg;
     }
 
-    Ort::Env env_;
     EngineOptions options_;
+    runtime::RuntimeContext context_;
+    mutable runtime::LoadedModelSet models_;
     mutable std::string active_provider_;
     mutable ExecutionDiagnostics diagnostics_;
     mutable bool diagnostics_finalized_ = false;
@@ -382,9 +307,9 @@ private:
     std::vector<float> mel_filters_;
     std::unordered_map<int64_t, std::string> vocab_;
     double load_seconds_ = 0.0;
-    std::unique_ptr<Ort::Session> encoder_;
-    std::unique_ptr<Ort::Session> decoder_;       // no-past prefill
-    std::unique_ptr<Ort::Session> decoder_past_;  // with-past steps
+    Ort::Session* encoder_ = nullptr;
+    Ort::Session* decoder_ = nullptr;       // no-past prefill
+    Ort::Session* decoder_past_ = nullptr;  // with-past steps
     std::vector<std::string> decp_input_names_;
     std::vector<std::string> dec_output_names_;
     std::vector<std::string> decp_output_names_;

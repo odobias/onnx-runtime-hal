@@ -77,6 +77,11 @@ $target = if ($Rebuild) { "Rebuild" } else { "Build" }
 if ($EnableWinML -and ($EnableDirectML -or $EnableOvep -or $EnableAmd -or $EnableQualcomm)) {
     throw "-EnableWinML cannot be combined with bundled DirectML, OVEP, AMD, or Qualcomm runtimes."
 }
+$packSelections = @($EnableDirectML, $EnableOvep, $EnableAmd, $EnableQualcomm) |
+    Where-Object { $_ }
+if (@($packSelections).Count -gt 1) {
+    throw "Select only one isolated runtime pack: DirectML, OVEP, AMD, or Qualcomm."
+}
 if ($EnableWinML -and -not $DisableIntel) {
     Write-Host "EnableWinML: forcing Intel (OpenVINO GenAI) backend OFF -- Windows ML owns the runtime and EP catalog." -ForegroundColor Yellow
     $DisableIntel = $true
@@ -85,6 +90,12 @@ if ($EnableWinML -and -not $DisableIntel) {
 # cannot coexist in one process. Selecting OVEP therefore disables Intel-GenAI.
 if ($EnableOvep -and -not $DisableIntel) {
     Write-Host "EnableOvep: forcing Intel (OpenVINO GenAI) backend OFF -- OVEP replaces it (openvino.dll version conflict)." -ForegroundColor Yellow
+    $DisableIntel = $true
+}
+$requestedOrtPack = $EnableOrt -or $EnableDirectML -or $EnableWinML -or
+    $EnableOvep -or $EnableAmd -or $EnableQualcomm
+if ($requestedOrtPack -and -not $DisableIntel) {
+    Write-Host "ONNX Runtime pack selected: forcing Intel OpenVINO GenAI backend OFF to keep runtime DLLs isolated." -ForegroundColor Yellow
     $DisableIntel = $true
 }
 if ($EnableDirectML -and -not $OrtDir) {
@@ -104,7 +115,7 @@ if ($EnableWinML) {
     }
 }
 $enableIntel = -not $DisableIntel
-$enableOrt = $EnableOrt -or $EnableDirectML -or $EnableWinML -or $EnableOvep -or $EnableAmd -or $EnableQualcomm
+$enableOrt = $requestedOrtPack
 $args = @(
     $sln,
     "/t:$target",
@@ -141,6 +152,10 @@ $platformOutTag = if ($EnableOvep) {
     "$Platform-winml"
 } elseif ($EnableDirectML) {
     "$Platform-dml"
+} elseif ($EnableAmd) {
+    "$Platform-amd"
+} elseif ($EnableQualcomm) {
+    "$Platform-qualcomm"
 } else {
     $Platform
 }

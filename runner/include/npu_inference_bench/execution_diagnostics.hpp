@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "npu_inference_bench/runtime/device.hpp"
+
 namespace npu_inference_bench {
 
 struct ProviderAttempt {
@@ -12,6 +14,8 @@ struct ProviderAttempt {
 };
 
 struct ExecutionDiagnostics {
+    Device requested_device = Device::NPU;
+    runtime::ResolvedDevice resolved_device = runtime::ResolvedDevice::Unknown;
     std::string requested_provider;
     std::string resolved_provider;
     std::string inference_precision;

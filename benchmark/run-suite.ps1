@@ -79,11 +79,18 @@ if ($Precision -ne "default") {
 
 $root = Split-Path $PSScriptRoot -Parent
 $hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "ARM64" } else { "x64" }
+$hardware = Get-BenchmarkHardware
+$hostVendor = [string]$hardware.cpu.vendor
+$bundledTag = switch ($hostVendor) {
+    'AMD'      { "$hostArch-amd" }
+    'Qualcomm' { "$hostArch-qualcomm" }
+    default    { $hostArch }
+}
 
 if ($Runtime -eq "all") {
     $runtimeFailures = 0
     foreach ($targetRuntime in @("bundled", "winml")) {
-        $targetTag = if ($targetRuntime -eq "winml") { "$hostArch-winml" } else { $hostArch }
+        $targetTag = if ($targetRuntime -eq "winml") { "$hostArch-winml" } else { $bundledTag }
         $targetExe = Join-Path $root "build\$targetTag\$Configuration\NpuInferenceBench.exe"
         if (-not (Test-Path -LiteralPath $targetExe)) {
             Write-Host "Skipping unavailable runtime '$targetRuntime' ($targetExe)." -ForegroundColor DarkYellow
@@ -112,7 +119,7 @@ if ($Runtime -eq "all") {
 # Target the HOST architecture's build tree by default: x64 boxes get build\x64\,
 # ARM64 (Snapdragon) boxes get build\ARM64\. Use OSArchitecture so this is correct
 # whether PowerShell runs native or x64-emulated on ARM64.
-$platform = $hostArch
+$platform = $bundledTag
 
 # The OpenVINO EP lives in a SEPARATE build tree: -EnableOvep emits build\<plat>-ovep\
 # (carrying onnxruntime_providers_openvino.dll + the OpenVINO runtime), while a plain
@@ -178,8 +185,6 @@ if (-not (Test-Path $Manifest)) {
     exit 1
 }
 $workloads = @((Get-Content $Manifest -Raw -Encoding UTF8 | ConvertFrom-Json).workloads)
-$hardware = Get-BenchmarkHardware
-$hostVendor = [string]$hardware.cpu.vendor
 $environmentSnapshot = Get-BenchmarkEnvironmentSnapshot `
     -Root $root -Exe $exe -RuntimeTarget $Runtime -BuildTree $platform
 Write-Host "environment: $($environmentSnapshot.id) -> $($environmentSnapshot.path)" -ForegroundColor DarkCyan

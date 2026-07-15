@@ -8,8 +8,8 @@
 // multiple TUs).
 #pragma once
 
-#include "npu_inference_bench/whisper.hpp"
 #include "npu_inference_bench/precision_policy.hpp"
+#include "npu_inference_bench/runtime/runtime_options.hpp"
 
 #ifdef NPU_INFERENCE_BENCH_ORT
 
@@ -55,7 +55,7 @@ inline std::string lower(std::string s) {
     return s;
 }
 
-inline std::string openvino_device_type(const EngineOptions& options,
+inline std::string openvino_device_type(const runtime::RuntimeOptions& options,
                                         const std::string& provider) {
     const auto colon = provider.find(':');
     if (colon != std::string::npos) return provider.substr(colon + 1);
@@ -76,7 +76,7 @@ inline Device winml_token_device(const std::string& provider, Device fallback) {
 
 // Provider-neutral policy. CPU/GPU default to reproducible FP32; NPU defaults
 // to device-preferred because accelerator compilers generally fix precision.
-inline std::string inference_precision_policy(const EngineOptions& options,
+inline std::string inference_precision_policy(const runtime::RuntimeOptions& options,
                                               const std::string& provider) {
     const std::string p = lower(provider);
 #ifdef NPU_INFERENCE_BENCH_WINML
@@ -106,7 +106,7 @@ inline std::string inference_precision_policy(const EngineOptions& options,
     return precision_policy::resolve(options, actual_device);
 }
 
-inline void validate_inference_precision(const EngineOptions& options,
+inline void validate_inference_precision(const runtime::RuntimeOptions& options,
                                          const std::string& provider) {
     const std::string precision = inference_precision_policy(options, provider);
     const std::string p = lower(provider);
@@ -114,18 +114,20 @@ inline void validate_inference_precision(const EngineOptions& options,
     if (p.find("cpu") != std::string::npos || p.find("dml") != std::string::npos ||
         p.find("directml") != std::string::npos) {
         if (precision == "f32" || precision == "preferred") return;
-        throw std::runtime_error(
+        throw runtime::RuntimeError(
+            runtime::RuntimeErrorCode::InvalidArgument,
             provider + " cannot apply a provider-wide " + precision +
             " conversion; use a model exported in that precision");
     }
     if (precision != "preferred") {
-        throw std::runtime_error(
+        throw runtime::RuntimeError(
+            runtime::RuntimeErrorCode::InvalidArgument,
             provider + " cannot guarantee provider-wide " + precision +
             "; use precision=preferred or a compiler/model-specific configuration");
     }
 }
 
-inline std::string resolved_inference_precision(const EngineOptions& options,
+inline std::string resolved_inference_precision(const runtime::RuntimeOptions& options,
                                                 const std::string& provider) {
     validate_inference_precision(options, provider);
     return inference_precision_policy(options, provider);
@@ -135,15 +137,26 @@ inline bool is_qnn(const std::string& provider) {
     return lower(provider).find("qnn") != std::string::npos;
 }
 
+inline runtime::ResolvedDevice resolved_device_for_provider(const std::string& provider) {
+    const std::string p = lower(provider);
+    if (p.rfind("windowsml:", 0) == 0) return runtime::ResolvedDevice::Unknown;
+    if (p == "cpuexecutionprovider" || p == "openvino:cpu")
+        return runtime::ResolvedDevice::CPU;
+    if (p.find("dml") != std::string::npos || p.find("directml") != std::string::npos ||
+        p == "openvino:gpu")
+        return runtime::ResolvedDevice::GPU;
+    if (p.find("qnn") != std::string::npos || p.find("vitis") != std::string::npos ||
+        p == "openvino:npu")
+        return runtime::ResolvedDevice::NPU;
+    return runtime::ResolvedDevice::Unknown;
+}
+
 inline bool is_fallback_provider_for_device(Device requested_device,
                                             const std::string& resolved_provider) {
-    const std::string provider = lower(resolved_provider);
-    const bool cpu = provider == "cpuexecutionprovider";
-    if (requested_device == Device::NPU) {
-        return cpu || provider.find("dml") != std::string::npos ||
-               provider.find("directml") != std::string::npos;
-    }
-    return requested_device == Device::GPU && cpu;
+    const runtime::ResolvedDevice resolved =
+        resolved_device_for_provider(resolved_provider);
+    return resolved != runtime::ResolvedDevice::Unknown &&
+           resolved != runtime::requested_device_class(requested_device);
 }
 
 #ifdef NPU_INFERENCE_BENCH_WINML
@@ -207,15 +220,25 @@ inline std::string runtime_for(const std::string& provider) {
 // override is honored verbatim (single attempt). Otherwise NPU walks down to GPU
 // then CPU, and GPU walks down to CPU, so one binary always produces a result on
 // whatever hardware/drivers are actually present.
-inline std::vector<std::string> fallback_chain(const EngineOptions& options) {
+inline std::vector<std::string> fallback_chain(const runtime::RuntimeOptions& options) {
     if (!options.device_override.empty()) return {options.device_override};
+    if (!options.provider_order.empty()) return options.provider_order;
     std::vector<std::string> chain;
     const auto add = [&](Device d) {
         for (auto& p : providers_for(d)) chain.push_back(p);
     };
     switch (options.device) {
-        case Device::NPU: add(Device::NPU); add(Device::GPU); add(Device::CPU); break;
-        case Device::GPU: add(Device::GPU); add(Device::CPU); break;
+        case Device::NPU:
+            add(Device::NPU);
+            if (options.allow_fallback && !options.require_requested_device) {
+                add(Device::GPU);
+                add(Device::CPU);
+            }
+            break;
+        case Device::GPU:
+            add(Device::GPU);
+            if (options.allow_fallback && !options.require_requested_device) add(Device::CPU);
+            break;
         case Device::CPU:
         default:          add(Device::CPU); break;
     }
@@ -348,7 +371,8 @@ inline Ort::ConstEpDevice find_qnn_device(Ort::Env& env) {
 // Append the requested execution provider to `so`. `model_dir`/`cache_key` feed
 // VitisAI's config + blob cache; `options.cache_dir` also drives OpenVINO's blob
 // cache. Unknown provider strings throw.
-inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const EngineOptions& options,
+inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
+                            const runtime::RuntimeOptions& options,
                             const std::string& provider, const fs::path& model_dir,
                             const std::string& cache_key) {
     const std::string p = lower(provider);

@@ -18,6 +18,16 @@ reported as an executor problem instead of being celebrated as an NPU result.
 This is a benchmark and runtime-diagnostics project. The old Whisper HAL is now
 an internal workload adapter rather than the product architecture.
 
+## Reusable ONNX runtime
+
+The benchmark now consumes a workload-neutral `OnnxRuntimeHal` static library.
+It exposes logical CPU/GPU/NPU selection, explicit providers, strict
+requested-device enforcement, vendor caching, named tensor I/O, and provider
+offload diagnostics without depending on Whisper or benchmark ledgers.
+
+`NpuInferenceBench run-onnx` is a generic tensor-manifest reference consumer.
+See `docs/onnx-runtime-hal.md` for the C++ and CLI contracts.
+
 ## Run the portable suite
 
 ```powershell
@@ -131,10 +141,15 @@ benchmark/
 
 runner/
   cli/main.cpp               thin process entry point
+  cli/generic_onnx_cli.cpp   arbitrary ONNX tensor-manifest runner
   benchmark/                 timing, reporting, and workload dispatch
   core/                      workload factory
-  runtime/                   provider selection and offload diagnostics
+  runtime/                   reusable sessions, provider selection, diagnostics
   include/npu_inference_bench/
+
+projects/
+  OnnxRuntimeHal/            reusable static runtime library
+  OnnxRuntimeHal.Tests/      focused runtime contract tests
 
 workloads/
   whisper/backends/          Whisper engine adapters
