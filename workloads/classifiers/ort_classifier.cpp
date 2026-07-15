@@ -255,6 +255,7 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
 
     std::unique_ptr<Ort::Session> session;
     std::string active_provider, last_err;
+    ort_common::OperationAssignmentStats recorded_assignment;
     EngineOptions provider_options;
     provider_options.device = device;
     provider_options.device_override = provider_override;
@@ -281,6 +282,11 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         const auto make_options = [&](bool generate_qnn_ctx) {
             Ort::SessionOptions so;
             so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+#if ORT_API_VERSION >= 24
+            if (device == Device::NPU) {
+                so.AddConfigEntry("session.record_ep_graph_assignment_info", "1");
+            }
+#endif
             if (enable_profile) so.EnableProfiling(prof_prefix_w.c_str());
             const fs::path provider_model_dir =
                 vitis_config_file.empty() ? fx.onnx_path.parent_path()
@@ -327,6 +333,13 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
             res.cold_load_seconds =
                 std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             active_provider = chain[i];
+#if ORT_API_VERSION >= 24
+            if (device == Device::NPU &&
+                lower(active_provider).find("vitis") == std::string::npos) {
+                recorded_assignment =
+                    ort_common::query_ort_operation_assignment(*session);
+            }
+#endif
             res.diagnostics.attempts.push_back({chain[i], true, {}});
             break;
         } catch (const std::exception& e) {
@@ -470,6 +483,23 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
             res.diagnostics.operation_assignment_source = assignment.source;
         }
     }
+#if ORT_API_VERSION >= 24
+    else if (device == Device::NPU && !res.diagnostics.fallback_occurred) {
+        const auto assignment = recorded_assignment.measured
+                                    ? recorded_assignment
+                                    : ort_common::query_ort_operation_assignment(*session);
+        if (assignment.measured) {
+            res.operation_assignment_measured = true;
+            res.assigned_ops_cpu = assignment.cpu_operations;
+            res.assigned_ops_npu = assignment.npu_operations;
+            res.operation_assignment_source = assignment.source;
+            res.diagnostics.operation_assignment_measured = true;
+            res.diagnostics.assigned_ops_cpu = assignment.cpu_operations;
+            res.diagnostics.assigned_ops_npu = assignment.npu_operations;
+            res.diagnostics.operation_assignment_source = assignment.source;
+        }
+    }
+#endif
     return res;
 }
 

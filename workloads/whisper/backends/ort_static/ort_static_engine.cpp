@@ -95,6 +95,11 @@ std::unique_ptr<Ort::Session> build_session(Ort::Env& env, const EngineOptions& 
     auto make_so = [&](bool generate_ctx) {
         Ort::SessionOptions so;
         so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+#if ORT_API_VERSION >= 24
+        if (options.device == Device::NPU) {
+            so.AddConfigEntry("session.record_ep_graph_assignment_info", "1");
+        }
+#endif
         const fs::path profile_prefix =
             fs::temp_directory_path() / ("npu_bench_" + cache_key);
         const std::wstring profile_prefix_w = profile_prefix.wstring();
@@ -356,6 +361,29 @@ public:
                     diagnostics_.operation_assignment_source = assignment.source;
                 }
             }
+#if ORT_API_VERSION >= 24
+            else if (options_.device == Device::NPU && !diagnostics_.fallback_occurred) {
+                ep::OperationAssignmentStats assignment;
+                const auto accumulate = [&](const std::unique_ptr<Ort::Session>& session) {
+                    if (!session) return false;
+                    const auto part = ep::query_ort_operation_assignment(*session);
+                    if (!part.measured) return false;
+                    if (!assignment.measured) {
+                        assignment = part;
+                    } else {
+                        assignment.cpu_operations += part.cpu_operations;
+                        assignment.npu_operations += part.npu_operations;
+                    }
+                    return true;
+                };
+                if (accumulate(encoder_) && accumulate(decoder_)) {
+                    diagnostics_.operation_assignment_measured = true;
+                    diagnostics_.assigned_ops_cpu = assignment.cpu_operations;
+                    diagnostics_.assigned_ops_npu = assignment.npu_operations;
+                    diagnostics_.operation_assignment_source = assignment.source;
+                }
+            }
+#endif
         }
         return diagnostics_;
     }

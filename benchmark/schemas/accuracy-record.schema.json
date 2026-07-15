@@ -62,6 +62,7 @@
         "no_reference_decision_flips": { "type": "boolean" },
         "intended_provider_resolved": { "type": "boolean" },
         "accuracy_eligible": { "type": "boolean" },
+        "npu_operation_assignment_recorded": { "type": "boolean" },
         "valid": { "type": "boolean" }
       }
     }

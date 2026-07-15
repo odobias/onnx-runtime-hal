@@ -8,12 +8,28 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib\harness.ps1")
 Initialize-BenchmarkConsole
 $root = Split-Path $PSScriptRoot -Parent
-if (-not $Ledger) { $Ledger = Join-Path $root "results\ledgers\accuracy.jsonl" }
-if (-not (Test-Path -LiteralPath $Ledger)) { throw "Accuracy ledger does not exist: $Ledger" }
-
-$records = @(Get-Content -LiteralPath $Ledger -Encoding UTF8 |
-    Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
-if (-not $records.Count) { throw "Accuracy ledger is empty: $Ledger" }
+$isAggregateValidation = -not [bool]$Ledger
+$ledgerPaths = if ($Ledger) {
+    @($Ledger)
+} else {
+    $paths = @()
+    $legacyLedger = Join-Path $root "results\ledgers\accuracy.jsonl"
+    if (Test-Path -LiteralPath $legacyLedger) { $paths += $legacyLedger }
+    $runDirectory = Join-Path $root "results\accuracy-runs"
+    if (Test-Path -LiteralPath $runDirectory) {
+        $paths += @(Get-ChildItem -LiteralPath $runDirectory -Filter "*.jsonl" -File |
+            Sort-Object Name | Select-Object -ExpandProperty FullName)
+    }
+    $paths
+}
+foreach ($path in $ledgerPaths) {
+    if (-not (Test-Path -LiteralPath $path)) { throw "Accuracy ledger does not exist: $path" }
+}
+$records = @($ledgerPaths | ForEach-Object {
+    Get-Content -LiteralPath $_ -Encoding UTF8 |
+        Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json }
+})
+if (-not $records.Count) { throw "Accuracy evidence is empty." }
 
 $errors = [Collections.Generic.List[string]]::new()
 foreach ($record in $records) {
@@ -45,6 +61,21 @@ foreach ($record in $records) {
     if ($record.trust_gate.valid -and -not $intended) {
         $errors.Add("$($record.workload_id)/$($record.execution_profile): valid record used fallback provider")
     }
+    if ($record.trust_gate.PSObject.Properties.Name -contains "npu_operation_assignment_recorded") {
+        $assignmentRecorded =
+            Test-BenchmarkNpuOperationAssignment $record.metrics ([string]$record.requested_device)
+        if ([bool]$record.trust_gate.npu_operation_assignment_recorded -ne $assignmentRecorded) {
+            $errors.Add(
+                "$($record.workload_id)/$($record.execution_profile): recorded NPU operation-assignment " +
+                "gate does not match assignment evidence")
+        }
+        if ($record.requested_device -eq "npu" -and $record.trust_gate.valid -and
+            -not $assignmentRecorded) {
+            $errors.Add(
+                "$($record.workload_id)/$($record.execution_profile): valid NPU record lacks " +
+                "CPU/NPU operation assignment")
+        }
+    }
     if (-not $AllowInvalid -and -not $record.trust_gate.valid) {
         $errors.Add("$($record.workload_id)/$($record.execution_profile): trust gate invalid")
     }
@@ -67,7 +98,8 @@ if ($wholeNpu.Count) { $errors.Add("whole-graph FakeAudio NPU appeared in the ac
 
 $whisperCohorts = @($records | Where-Object { $_.workload_kind -eq "asr" } |
     Select-Object -ExpandProperty execution_profile -Unique)
-if ("static-onnx" -notin $whisperCohorts -or "dynamic-kv-onnx" -notin $whisperCohorts) {
+if ($isAggregateValidation -and
+    ("static-onnx" -notin $whisperCohorts -or "dynamic-kv-onnx" -notin $whisperCohorts)) {
     $errors.Add("static and dynamic Whisper cohorts were not both recorded")
 }
 
@@ -77,8 +109,14 @@ if ($errors.Count) {
 }
 
 $valid = @($records | Where-Object { $_.trust_gate.valid }).Count
+$npuAssignments = @($records | Where-Object {
+    $_.requested_device -eq "npu" -and
+    (Test-BenchmarkNpuOperationAssignment $_.metrics ([string]$_.requested_device))
+}).Count
 $runtimes = @($records | Select-Object -ExpandProperty runtime_target -Unique | Sort-Object)
-Write-Host "Accuracy ledger valid: $valid / $($records.Count) records" -ForegroundColor Green
+Write-Host "Accuracy evidence valid: $valid / $($records.Count) records" -ForegroundColor Green
+Write-Host "Accuracy sources     : $($ledgerPaths.Count)"
 Write-Host "Runtime targets      : $($runtimes -join ', ')"
 Write-Host "Whisper cohorts      : $($whisperCohorts -join ', ')"
 Write-Host "Whole FakeAudio NPU  : absent" -ForegroundColor Green
+Write-Host "NPU op assignments   : $npuAssignments records"
