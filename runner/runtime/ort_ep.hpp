@@ -348,6 +348,20 @@ inline Ort::ConstEpDevice find_qnn_device(Ort::Env& env) {
 // Append the requested execution provider to `so`. `model_dir`/`cache_key` feed
 // VitisAI's config + blob cache; `options.cache_dir` also drives OpenVINO's blob
 // cache. Unknown provider strings throw.
+inline std::unordered_map<std::string, std::string> vitis_provider_options(
+    const EngineOptions& options, const fs::path& model_dir,
+    const std::string& cache_key) {
+    std::unordered_map<std::string, std::string> vitis_opts;
+    const fs::path config = model_dir / "vitisai_config.json";
+    if (fs::exists(config)) vitis_opts["config_file"] = config.string();
+    if (!options.cache_dir.empty()) {
+        vitis_opts["cache_dir"] = options.cache_dir;
+        vitis_opts["cache_key"] = cache_key;
+        vitis_opts["enable_cache_file_io_in_mem"] = "0";
+    }
+    return vitis_opts;
+}
+
 inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const EngineOptions& options,
                             const std::string& provider, const fs::path& model_dir,
                             const std::string& cache_key) {
@@ -403,8 +417,12 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
                     });
                 compatible.resize(1);
             }
-            std::unordered_map<std::string, std::string> empty_options;
-            Ort::KeyValuePairs ep_options(empty_options);
+            std::unordered_map<std::string, std::string> provider_options;
+            if (lower(compatible.front().EpName()).find("vitis") != std::string::npos) {
+                provider_options = vitis_provider_options(
+                    options, model_dir, cache_key);
+            }
+            Ort::KeyValuePairs ep_options(provider_options);
             so.AppendExecutionProvider_V2(env, compatible, ep_options);
             return;
         }
@@ -439,8 +457,12 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
         if (selected.empty()) {
             throw std::runtime_error("Windows ML provider is not registered or compatible: " + provider);
         }
-        std::unordered_map<std::string, std::string> empty_options;
-        Ort::KeyValuePairs ep_options(empty_options);
+        std::unordered_map<std::string, std::string> provider_options;
+        if (lower(selected.front().EpName()).find("vitis") != std::string::npos) {
+            provider_options = vitis_provider_options(
+                options, model_dir, cache_key);
+        }
+        Ort::KeyValuePairs ep_options(provider_options);
         so.AppendExecutionProvider_V2(env, selected, ep_options);
         return;
     }
@@ -493,14 +515,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so, const Engine
 
     if (p == "vitisai" || p == "vitisaiexecutionprovider") {
         validate_inference_precision(options, provider);
-        std::unordered_map<std::string, std::string> vitis_opts;
-        const fs::path config = model_dir / "vitisai_config.json";
-        if (fs::exists(config)) vitis_opts["config_file"] = config.string();
-        if (!options.cache_dir.empty()) {
-            vitis_opts["cache_dir"] = options.cache_dir;
-            vitis_opts["cache_key"] = cache_key;
-            vitis_opts["enable_cache_file_io_in_mem"] = "0";
-        }
+        auto vitis_opts = vitis_provider_options(options, model_dir, cache_key);
         so.AppendExecutionProvider_VitisAI(vitis_opts);
         return;
     }
