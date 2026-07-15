@@ -65,6 +65,9 @@ Successful rows include:
 - `cpu_nodes`
 - `cpu_offload_pct`
 - `cpu_offload_ops`
+- `assigned_ops_cpu`
+- `assigned_ops_npu`
+- `operation_assignment_source`
 - `error`
 
 `provider_attempts` is JSON stored inside the CSV field. It preserves each
@@ -76,6 +79,14 @@ may represent hundreds of fused ONNX operations while cheap shape/control
 operations remain individual CPU nodes. The same profiler parser is used for
 OpenVINO, VitisAI, QNN, and DirectML, so the audit is vendor-neutral. Only the
 hot session that performs inference is profiled.
+
+`assigned_ops_cpu` and `assigned_ops_npu` are a separate, optional measurement
+family populated only from provider/compiler assignment artifacts. They are
+left empty when the provider does not expose a trustworthy operation mapping;
+ORT profiler node counts are never promoted into these fields. For VitisAI,
+`operation_assignment_source=vitisai-cache-context-gops` means the total graph
+operation rows came from `gops.csv` and NPU partition membership came from
+`context.json`.
 
 Classifier startup is measured twice against a dedicated cache:
 

@@ -64,6 +64,10 @@ struct Result {
     int ep_nodes = -1;
     int cpu_nodes = -1;
     std::string cpu_offload_ops;  // fallback op histogram, e.g. "Gather x3, Cast x2"
+    bool operation_assignment_measured = false;
+    int assigned_ops_cpu = -1;
+    int assigned_ops_npu = -1;
+    std::string operation_assignment_source;
     ExecutionDiagnostics diagnostics;
     std::vector<SampleResult> samples;
 };

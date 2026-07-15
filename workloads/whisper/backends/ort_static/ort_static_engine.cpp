@@ -342,6 +342,20 @@ public:
             };
             audit(encoder_);
             audit(decoder_);
+            if (ep::lower(diagnostics_.resolved_provider).find("vitis") !=
+                std::string::npos) {
+                const std::string cache_base =
+                    cache_safe(fs::path(options_.model_dir).filename().string());
+                const auto assignment = ep::parse_vitis_operation_assignment(
+                    fs::path(options_.cache_dir),
+                    {cache_base + "_encoder", cache_base + "_decoder"});
+                if (assignment.measured) {
+                    diagnostics_.operation_assignment_measured = true;
+                    diagnostics_.assigned_ops_cpu = assignment.cpu_operations;
+                    diagnostics_.assigned_ops_npu = assignment.npu_operations;
+                    diagnostics_.operation_assignment_source = assignment.source;
+                }
+            }
         }
         return diagnostics_;
     }

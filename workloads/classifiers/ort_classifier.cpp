@@ -456,6 +456,20 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     } catch (const std::exception&) {
         // profiling unavailable / parse failed -> leave offload unmeasured (-1)
     }
+    if (lower(res.execution_provider).find("vitis") != std::string::npos) {
+        const auto assignment = ort_common::parse_vitis_operation_assignment(
+            fs::path(cache_dir), {"classifier"});
+        if (assignment.measured) {
+            res.operation_assignment_measured = true;
+            res.assigned_ops_cpu = assignment.cpu_operations;
+            res.assigned_ops_npu = assignment.npu_operations;
+            res.operation_assignment_source = assignment.source;
+            res.diagnostics.operation_assignment_measured = true;
+            res.diagnostics.assigned_ops_cpu = assignment.cpu_operations;
+            res.diagnostics.assigned_ops_npu = assignment.npu_operations;
+            res.diagnostics.operation_assignment_source = assignment.source;
+        }
+    }
     return res;
 }
 

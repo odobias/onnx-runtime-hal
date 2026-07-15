@@ -18,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace npu_inference_bench {
 namespace ort_common {
@@ -51,6 +52,13 @@ struct OffloadStats {
     }
 };
 
+struct OperationAssignmentStats {
+    bool measured = false;
+    int cpu_operations = -1;
+    int npu_operations = -1;
+    std::string source;
+};
+
 namespace detail {
 
 // Extract the string value of  "key" : "<value>"  starting at/after `from`, bounded
@@ -80,7 +88,89 @@ inline bool ends_with(const std::string& s, const std::string& suffix) {
            s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
+inline int csv_data_rows(const std::filesystem::path& path) {
+    std::ifstream f(path);
+    if (!f) return -1;
+    std::string line;
+    int rows = -1;  // exclude the header
+    while (std::getline(f, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (!line.empty()) ++rows;
+    }
+    return rows < 0 ? 0 : rows;
+}
+
+// Count string entries in every JSON array named `key`. VitisAI context.json
+// stores each compiler-assigned operation as one string in metaDef[].nodes.
+inline int json_string_array_entries(const std::filesystem::path& path,
+                                     const std::string& key) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return -1;
+    std::stringstream buf;
+    buf << f.rdbuf();
+    const std::string s = buf.str();
+    const std::string token = "\"" + key + "\"";
+    int count = 0;
+    bool found = false;
+    size_t pos = 0;
+    while ((pos = s.find(token, pos)) != std::string::npos) {
+        pos += token.size();
+        pos = s.find('[', pos);
+        if (pos == std::string::npos) break;
+        found = true;
+        ++pos;
+        while (pos < s.size()) {
+            while (pos < s.size() &&
+                   (std::isspace(static_cast<unsigned char>(s[pos])) || s[pos] == ',')) {
+                ++pos;
+            }
+            if (pos >= s.size() || s[pos] == ']') break;
+            if (s[pos] != '"') return -1;
+            ++count;
+            ++pos;
+            bool escaped = false;
+            while (pos < s.size()) {
+                const char c = s[pos++];
+                if (escaped) {
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    break;
+                }
+            }
+        }
+    }
+    return found ? count : -1;
+}
+
 }  // namespace detail
+
+// VitisAI writes gops.csv for the provider input graph and context.json for the
+// operations captured by its NPU partitions. Their difference is the compiler's
+// CPU assignment. These are provider-reported operation counts, unlike the
+// post-fusion ORT profiler node counts above.
+inline OperationAssignmentStats parse_vitis_operation_assignment(
+    const std::filesystem::path& cache_dir,
+    const std::vector<std::string>& cache_keys) {
+    OperationAssignmentStats result;
+    int total_operations = 0;
+    int npu_operations = 0;
+    for (const auto& key : cache_keys) {
+        const std::filesystem::path dir = cache_dir / key;
+        const int total = detail::csv_data_rows(dir / "gops.csv");
+        const int npu = detail::json_string_array_entries(dir / "context.json", "nodes");
+        if (total <= 0 || npu < 0 || npu > total) return result;
+        total_operations += total;
+        npu_operations += npu;
+    }
+    if (total_operations <= 0) return result;
+    result.measured = true;
+    result.cpu_operations = total_operations - npu_operations;
+    result.npu_operations = npu_operations;
+    result.source = "vitisai-cache-context-gops";
+    return result;
+}
 
 // Parse `profile_json`. Nodes are deduplicated by name, so a profile spanning many
 // inference iterations still yields the true per-provider node count.

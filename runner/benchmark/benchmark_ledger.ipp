@@ -12,6 +12,7 @@ constexpr const char* kBenchmarkCsvHeader =
     "host_arch,host_os,runtime_version,inference_precision,"
     "requested_provider,resolved_provider,fallback_occurred,provider_attempts,"
     "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,"
+    "assigned_ops_cpu,assigned_ops_npu,operation_assignment_source,"
     "measurement_purpose,execution_profile,graph_role,environment_snapshot_id,"
     "model_compilation_provenance_ids,error";
 
@@ -22,7 +23,9 @@ constexpr const char* kClassifierCsvHeader =
     "inference_precision,host_arch,host_os,backend_name,runs,cache_dir,load_seconds,cold_load_seconds,hot_load_seconds,"
     "mean_infer_ms,median_infer_ms,p90_infer_ms,"
     "model_size_mb,eval_samples,correct,accuracy,max_abs_p_diff,"
-    "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,power_source,eval_detail,"
+    "ep_nodes,cpu_nodes,cpu_offload_pct,cpu_offload_ops,"
+    "assigned_ops_cpu,assigned_ops_npu,operation_assignment_source,"
+    "power_source,eval_detail,"
     "status,requested_provider,resolved_provider,fallback_occurred,provider_attempts,"
     "measurement_purpose,execution_profile,graph_role,environment_snapshot_id,"
     "model_compilation_provenance_ids,error";
@@ -273,6 +276,11 @@ void append_result_csv(const std::string& path,
         << (diagnostics.offload_measured ? std::to_string(diagnostics.cpu_nodes) : std::string()) << ','
         << opt_num(cpu_offload_pct, diagnostics.offload_measured, 4) << ','
         << csv_escape(diagnostics.cpu_offload_ops) << ','
+        << (diagnostics.operation_assignment_measured
+                ? std::to_string(diagnostics.assigned_ops_cpu) : std::string()) << ','
+        << (diagnostics.operation_assignment_measured
+                ? std::to_string(diagnostics.assigned_ops_npu) : std::string()) << ','
+        << csv_escape(diagnostics.operation_assignment_source) << ','
         << csv_escape(environment_value("NPU_INFERENCE_BENCH_MEASUREMENT_PURPOSE")) << ','
         << csv_escape(environment_value("NPU_INFERENCE_BENCH_EXECUTION_PROFILE")) << ','
         << csv_escape(environment_value("NPU_INFERENCE_BENCH_GRAPH_ROLE")) << ','
@@ -338,6 +346,11 @@ void append_classifier_csv(const std::string& path, const npu_inference_bench::c
         << (r.offload_measured ? std::to_string(r.cpu_nodes) : std::string()) << ','
         << opt_num(offload_pct, r.offload_measured, 4) << ','
         << csv_escape(r.cpu_offload_ops) << ','
+        << (r.operation_assignment_measured
+                ? std::to_string(r.assigned_ops_cpu) : std::string()) << ','
+        << (r.operation_assignment_measured
+                ? std::to_string(r.assigned_ops_npu) : std::string()) << ','
+        << csv_escape(r.operation_assignment_source) << ','
         << csv_escape(power_source()) << ','
         << csv_escape(detail.str()) << ','
         << "ok" << ','
