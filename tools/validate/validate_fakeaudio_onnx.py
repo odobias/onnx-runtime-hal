@@ -55,6 +55,7 @@ import onnxruntime as ort
 import soundfile as sf
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(ROOT, "tools", "research"))
 MODEL_PATH = os.path.join(ROOT, "models", "deepfake", "fakeaudio", "model.onnx")
 SAMPLES_DIR = os.path.join(ROOT, "models", "deepfake", "audio-samples")
 WINDOW_SAMPLES = 308700  # 7.0s @ 44.1kHz, per the model's static input shape

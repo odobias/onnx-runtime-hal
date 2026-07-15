@@ -66,6 +66,11 @@
     <ClCompile Include="$(NpuInferenceBenchRoot)workloads\classifiers\ort_classifier.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OnnxRuntimeHal\OnnxRuntimeHal.vcxproj">
+      <Project>{6E8B1C2A-0003-4A00-9000-00000000C0DE}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\whisper.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\execution_diagnostics.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\classifier.hpp" />
@@ -75,6 +80,7 @@
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\backend_registry.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_ep.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_offload.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_session_access.hpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

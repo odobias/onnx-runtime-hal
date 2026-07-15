@@ -8,6 +8,7 @@
     <!-- Intel native path: the vendored ORT+OpenVINO EP package wins over the AMD
          Ryzen AI default when EnableOvep=true (explicit /p:OrtDir still overrides). -->
     <OrtDir Condition="'$(OrtDir)'=='' and '$(EnableOvep)'=='true'">$(NpuInferenceBenchRoot)third_party\onnxruntime-openvino</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(EnableAmd)'=='true'">$(RyzenAiDir)\onnxruntime</OrtDir>
     <OrtDir Condition="'$(OrtDir)'=='' and '$(ORT_DIR)'!=''">$(ORT_DIR)</OrtDir>
     <OrtDir Condition="'$(OrtDir)'=='' and Exists('$(NpuInferenceBenchRoot)third_party\onnxruntime-directml\include')">$(NpuInferenceBenchRoot)third_party\onnxruntime-directml</OrtDir>
     <OrtDir Condition="'$(OrtDir)'=='' and Exists('$(NpuInferenceBenchRoot)third_party\onnxruntime\include')">$(NpuInferenceBenchRoot)third_party\onnxruntime</OrtDir>

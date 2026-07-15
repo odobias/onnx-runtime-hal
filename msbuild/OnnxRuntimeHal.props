@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Public build contract for consumers of the Windows-first static runtime HAL.
+     Import the matching backend.*.props before this file so the consumer links
+     the same ONNX Runtime flavor used to build OnnxRuntimeHal.lib. -->
+<Project>
+  <PropertyGroup>
+    <OnnxRuntimeHalRoot Condition="'$(OnnxRuntimeHalRoot)'==''">$(NpuInferenceBenchRoot)</OnnxRuntimeHalRoot>
+    <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'==''">$(OnnxRuntimeHalRoot)build\$(PlatformOutTag)\$(Configuration)\</OnnxRuntimeHalLibDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OnnxRuntimeHalRoot)runner\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OnnxRuntimeHalLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>OnnxRuntimeHal.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

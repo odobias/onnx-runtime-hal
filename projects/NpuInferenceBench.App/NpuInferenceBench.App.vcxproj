@@ -62,19 +62,25 @@
 
   <ItemGroup>
     <ClCompile Include="$(NpuInferenceBenchRoot)runner\cli\main.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)runner\cli\generic_onnx_cli.cpp" />
     <ClCompile Include="$(NpuInferenceBenchRoot)runner\benchmark\benchmark_runner.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\benchmark_runner.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\generic_onnx_cli.hpp" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\NpuInferenceBench.Core\NpuInferenceBench.Core.vcxproj">
       <Project>{6E8B1C2A-0001-4A00-9000-00000000C0DE}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\OnnxRuntimeHal\OnnxRuntimeHal.vcxproj">
+      <Project>{6E8B1C2A-0003-4A00-9000-00000000C0DE}</Project>
+    </ProjectReference>
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(NpuInferenceBenchRoot)msbuild\runtime-pack.targets" />
 
   <!-- Copy OpenVINO + GenAI + TBB runtime DLLs and plugins.xml next to the exe so
        it runs without a configured PATH. -->
@@ -86,45 +92,6 @@
     </ItemGroup>
     <Copy SourceFiles="@(IntelRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Message Importance="high" Text="Copied Intel OpenVINO runtime to $(OutDir)" />
-  </Target>
-
-  <!-- One unified runtime-staging step for the ONNX Runtime backend and every
-       execution provider bundled into this build. All entries are Exists()-gated,
-       so a given build (e.g. ARM64 CPU+QNN) copies exactly the DLLs it has and
-       silently skips EPs it wasn't built with. This is what makes the output
-       folder a self-contained, one-binary-carries-everything package. -->
-  <Target Name="CopyUnifiedRuntime" AfterTargets="Build"
-          Condition="'$(EnableOrt)'=='true' or '$(EnableQualcomm)'=='true' or '$(EnableAmd)'=='true'">
-    <ItemGroup>
-      <!-- Core ONNX Runtime + DirectML (GPU) -->
-      <UnifiedRuntime Include="$(OrtBinDir)\onnxruntime*.dll" Condition="'$(OrtBinDir)'!=''" />
-      <UnifiedRuntime Include="$(OrtBinDir)\DirectML.dll" Condition="Exists('$(OrtBinDir)\DirectML.dll')" />
-      <UnifiedRuntime Include="$(OrtBinDir)\Microsoft.Windows.AI.MachineLearning.dll" Condition="'$(EnableWinML)'=='true' and Exists('$(OrtBinDir)\Microsoft.Windows.AI.MachineLearning.dll')" />
-      <!-- Intel OpenVINO EP (NPU/GPU/CPU). The provider DLL loads openvino.dll +
-           its plugins by colocation, so every openvino_*/tbb DLL and the plugin
-           catalog must land next to the exe. Gated on EnableOvep. -->
-      <UnifiedRuntime Include="$(OrtBinDir)\openvino*.dll" Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
-      <UnifiedRuntime Include="$(OrtBinDir)\tbb*.dll" Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
-      <UnifiedRuntime Include="$(OrtBinDir)\*.xml" Condition="'$(EnableOvep)'=='true' and '$(OrtBinDir)'!=''" />
-      <!-- Qualcomm QNN plugin EP (Hexagon NPU). Wildcards capture the provider,
-           every Qnn* backend/stub, the Hexagon DSP skeletons and their catalogs. -->
-      <UnifiedRuntime Include="$(QnnEpDir)\onnxruntime_providers_qnn.dll" Condition="Exists('$(QnnEpDir)\onnxruntime_providers_qnn.dll')" />
-      <UnifiedRuntime Include="$(QnnEpDir)\Qnn*.dll" Condition="Exists('$(QnnEpDir)')" />
-      <UnifiedRuntime Include="$(QnnEpDir)\Genie.dll" Condition="Exists('$(QnnEpDir)\Genie.dll')" />
-      <UnifiedRuntime Include="$(QnnEpDir)\*Skel.so" Condition="Exists('$(QnnEpDir)')" />
-      <UnifiedRuntime Include="$(QnnEpDir)\*.cat" Condition="Exists('$(QnnEpDir)')" />
-      <!-- AMD Ryzen AI VitisAI EP (XDNA NPU) -->
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\onnxruntime*.dll" Condition="'$(EnableAmd)'=='true' and '$(OrtAmdBinDir)'!=''" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\dyn_dispatch_core.dll" Condition="Exists('$(OrtAmdBinDir)\dyn_dispatch_core.dll')" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\dyn_bins.dll" Condition="Exists('$(OrtAmdBinDir)\dyn_bins.dll')" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\vaiml.dll" Condition="Exists('$(OrtAmdBinDir)\vaiml.dll')" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\aiecompiler_client.dll" Condition="Exists('$(OrtAmdBinDir)\aiecompiler_client.dll')" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\DirectML.dll" Condition="Exists('$(OrtAmdBinDir)\DirectML.dll')" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\z.dll" Condition="Exists('$(OrtAmdBinDir)\z.dll')" />
-      <UnifiedRuntime Include="$(OrtAmdBinDir)\zstd.dll" Condition="Exists('$(OrtAmdBinDir)\zstd.dll')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(UnifiedRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(UnifiedRuntime)' != ''" />
-    <Message Importance="high" Text="Staged unified ONNX Runtime + EP runtime (%(UnifiedRuntime.Filename)%(UnifiedRuntime.Extension)) to $(OutDir)" Condition="'@(UnifiedRuntime)' != ''" />
   </Target>
 
   <!-- Bundle the one portable static ONNX model into models/ next to the exe so

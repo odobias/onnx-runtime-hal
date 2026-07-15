@@ -21,8 +21,10 @@
 #include <vector>
 
 #include "npu_inference_bench/whisper_frontend.hpp"
+#include "npu_inference_bench/runtime/runtime_context.hpp"
 #include "ort_ep.hpp"
 #include "ort_offload.hpp"
+#include "ort_session_access.hpp"
 
 #ifdef NPU_INFERENCE_BENCH_ORT
 #include <onnxruntime_cxx_api.h>
@@ -67,76 +69,11 @@ Ort::Value tensor_int64(std::vector<int64_t>& data, const std::vector<int64_t>& 
     return Ort::Value::CreateTensor<int64_t>(mem, data.data(), data.size(), shape.data(), shape.size());
 }
 
-std::string cache_safe(std::string s) {
-    if (s.empty()) s = "static_onnx";
-    for (char& c : s) {
-        const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                        (c >= '0' && c <= '9') || c == '_' || c == '-';
-        if (!ok) c = '_';
-    }
-    return s;
-}
-
-// Build one ORT session for `provider`, adding QNN context-binary caching when a
-// cache_dir is set. The HTP compile is QNN's ~15s cold cost; ORT's EPContext
-// mechanism dumps that compiled graph to "<key>_qnn_ctx.onnx" and reloads it on the
-// next process, turning the cold compile into a ~1s blob load. OpenVINO/VitisAI keep
-// their own cache_dir handling in append_provider, so this fast path is scoped to QNN
-// and stays inert on x64 builds (the QNN token never enters the chain there).
-std::unique_ptr<Ort::Session> build_session(Ort::Env& env, const EngineOptions& options,
-                                            const std::string& provider,
-                                            const fs::path& model_path, const fs::path& model_dir,
-                                            const std::string& cache_key) {
-    fs::path ctx_path;
-    if (ep::is_qnn(provider) && !options.cache_dir.empty()) {
-        ctx_path = fs::path(options.cache_dir) / (cache_key + "_qnn_ctx.onnx");
-    }
-
-    auto make_so = [&](bool generate_ctx) {
-        Ort::SessionOptions so;
-        so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-        const fs::path profile_prefix =
-            fs::temp_directory_path() / ("npu_bench_" + cache_key);
-        const std::wstring profile_prefix_w = profile_prefix.wstring();
-        if (options.profile_execution) so.EnableProfiling(profile_prefix_w.c_str());
-        ep::append_provider(env, so, options, provider, model_dir, cache_key);
-        if (generate_ctx) {
-            const std::string p = ctx_path.string();
-            so.AddConfigEntry("ep.context_enable", "1");
-            so.AddConfigEntry("ep.context_file_path", p.c_str());
-            so.AddConfigEntry("ep.context_embed_mode", "1");  // embed the HTP binary in the .onnx
-        }
-        return so;
-    };
-
-    // Fast path: a compiled QNN context already exists -> load it and skip the HTP compile.
-    if (!ctx_path.empty() && fs::exists(ctx_path)) {
-        try {
-            auto so = make_so(false);
-            return std::make_unique<Ort::Session>(env, ctx_path.c_str(), so);
-        } catch (const std::exception& e) {
-            // The context is EP/arch/QNN-version specific; a stale blob can't load. Recompile.
-            std::cerr << "[npu-inference-bench] QNN context cache '" << ctx_path.string()
-                      << "' unusable (" << e.what() << "); recompiling\n";
-            std::error_code ec;
-            fs::remove(ctx_path, ec);
-        }
-    }
-
-    // Compile path. For QNN with a cache_dir this session-create also dumps the context binary.
-    if (!ctx_path.empty()) {
-        std::error_code ec;
-        fs::create_directories(ctx_path.parent_path(), ec);
-    }
-    auto so = make_so(!ctx_path.empty());
-    return std::make_unique<Ort::Session>(env, model_path.c_str(), so);
-}
-
 class OrtStaticEngine final : public IWhisperEngine {
 public:
     explicit OrtStaticEngine(const EngineOptions& options)
-        : env_(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_ort_static"),
-          options_(options),
+        : options_(options),
+          context_(options),
           max_tokens_(env_max_tokens()) {
         const fs::path dir(options.model_dir);
         const fs::path enc_path = dir / "encoder_model.onnx";
@@ -157,49 +94,16 @@ public:
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
-#ifdef NPU_INFERENCE_BENCH_WINML
-        ep::register_windows_ml_catalog(env_, options_.device);
-#endif
-        const std::string cache_base = cache_safe(dir.filename().string());
-        const std::vector<std::string> chain = ep::fallback_chain(options_);
-        diagnostics_.requested_provider =
-            options_.device_override.empty() ? std::string("auto") : options_.device_override;
-
-        // Try each EP in the fallback chain until both sessions build. This is
-        // what lets one binary self-select CPU/GPU/NPU at runtime on whatever
-        // hardware and drivers are actually present.
-        std::string last_err;
-        for (size_t i = 0; i < chain.size(); ++i) {
-            const std::string& provider = chain[i];
-            try {
-                const auto t0 = std::chrono::steady_clock::now();
-                encoder_ = build_session(env_, options_, provider, enc_path, dir, cache_base + "_encoder");
-                decoder_ = build_session(env_, options_, provider, dec_path, dir, cache_base + "_decoder");
-                load_seconds_ =
-                    std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-                active_provider_ = provider;
-                diagnostics_.attempts.push_back({provider, true, {}});
-                diagnostics_.resolved_provider = provider;
-                diagnostics_.inference_precision =
-                    ep::resolved_inference_precision(options_, provider);
-                diagnostics_.fallback_occurred = provider != chain.front();
-                break;
-            } catch (const std::exception& e) {
-                last_err = e.what();
-                diagnostics_.attempts.push_back({provider, false, last_err});
-                encoder_.reset();
-                decoder_.reset();
-                if (i + 1 < chain.size()) {
-                    std::cerr << "[npu-inference-bench] EP '" << provider << "' unavailable (" << e.what()
-                              << "); falling back to '" << chain[i + 1] << "'\n";
-                }
-            }
-        }
-
-        if (!encoder_ || !decoder_) {
-            throw std::runtime_error("no ONNX Runtime execution provider could build a session (last error: " +
-                                     last_err + ")");
-        }
+        const std::string cache_base = dir.filename().string();
+        models_ = context_.load({
+            {enc_path, dir, cache_base + "_encoder"},
+            {dec_path, dir, cache_base + "_decoder"},
+        });
+        load_seconds_ = models_.load_seconds;
+        diagnostics_ = models_.diagnostics;
+        active_provider_ = diagnostics_.resolved_provider;
+        encoder_ = &runtime::detail::OrtSessionAccess::get(models_.sessions[0]);
+        decoder_ = &runtime::detail::OrtSessionAccess::get(models_.sessions[1]);
     }
 
     TranscribeResult transcribe(const AudioSamples& audio) override {
@@ -304,57 +208,13 @@ public:
     ExecutionDiagnostics execution_diagnostics() const override {
         if (!diagnostics_finalized_) {
             diagnostics_finalized_ = true;
-            auto audit = [&](const std::unique_ptr<Ort::Session>& session) {
-                if (!session) return;
-                try {
-                    Ort::AllocatorWithDefaultOptions alloc;
-                    const std::string profile_path =
-                        session->EndProfilingAllocated(alloc).get();
-                    const auto stats = ep::parse_ort_profile(profile_path);
-                    if (stats.measured) {
-#ifdef NPU_INFERENCE_BENCH_WINML
-                        if (!stats.providers.empty()) {
-                            const auto comma = stats.providers.find(',');
-                            diagnostics_.resolved_provider = stats.providers.substr(0, comma);
-                            active_provider_ = diagnostics_.resolved_provider;
-                            diagnostics_.fallback_occurred =
-                                diagnostics_.fallback_occurred ||
-                                ep::is_fallback_provider_for_device(
-                                    options_.device, diagnostics_.resolved_provider);
-                        }
-#endif
-                        diagnostics_.offload_measured = true;
-                        diagnostics_.ep_nodes =
-                            std::max(0, diagnostics_.ep_nodes) + stats.ep_nodes;
-                        diagnostics_.cpu_nodes =
-                            std::max(0, diagnostics_.cpu_nodes) + stats.cpu_nodes;
-                        if (!stats.cpu_ops.empty()) {
-                            if (!diagnostics_.cpu_offload_ops.empty())
-                                diagnostics_.cpu_offload_ops += "; ";
-                            diagnostics_.cpu_offload_ops += stats.cpu_ops;
-                        }
-                    }
-                    std::error_code ec;
-                    fs::remove(profile_path, ec);
-                } catch (const std::exception&) {
-                    // Profiling is diagnostic only; inference results remain valid.
-                }
-            };
-            audit(encoder_);
-            audit(decoder_);
-            if (ep::lower(diagnostics_.resolved_provider).find("vitis") !=
-                std::string::npos) {
-                const std::string cache_base =
-                    cache_safe(fs::path(options_.model_dir).filename().string());
-                const auto assignment = ep::parse_vitis_operation_assignment(
-                    fs::path(options_.cache_dir),
-                    {cache_base + "_encoder", cache_base + "_decoder"});
-                if (assignment.measured) {
-                    diagnostics_.operation_assignment_measured = true;
-                    diagnostics_.assigned_ops_cpu = assignment.cpu_operations;
-                    diagnostics_.assigned_ops_npu = assignment.npu_operations;
-                    diagnostics_.operation_assignment_source = assignment.source;
-                }
+            try {
+                models_.finalize_profiling();
+                diagnostics_ = models_.diagnostics;
+                active_provider_ = diagnostics_.resolved_provider;
+            } catch (const std::exception&) {
+                // Profiling is diagnostic unless strict device enforcement is enabled.
+                if (options_.require_requested_device) throw;
             }
         }
         return diagnostics_;
@@ -362,8 +222,9 @@ public:
     double load_seconds() const override { return load_seconds_; }
 
 private:
-    Ort::Env env_;
     EngineOptions options_;
+    runtime::RuntimeContext context_;
+    mutable runtime::LoadedModelSet models_;
     mutable std::string active_provider_;  // EP that actually built/executed the sessions
     mutable ExecutionDiagnostics diagnostics_;
     mutable bool diagnostics_finalized_ = false;
@@ -377,8 +238,8 @@ private:
     std::vector<float> mel_filters_;
     std::unordered_map<int64_t, std::string> vocab_;
     double load_seconds_ = 0.0;
-    std::unique_ptr<Ort::Session> encoder_;
-    std::unique_ptr<Ort::Session> decoder_;
+    Ort::Session* encoder_ = nullptr;
+    Ort::Session* decoder_ = nullptr;
 };
 
 }  // namespace

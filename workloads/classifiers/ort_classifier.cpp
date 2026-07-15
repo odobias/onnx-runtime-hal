@@ -4,6 +4,7 @@
 // agreement vs the CPU reference. See runner/include/npu_inference_bench/classifier.hpp.
 #include "npu_inference_bench/classifier.hpp"
 #include "npu_inference_bench/model_hash.hpp"
+#include "npu_inference_bench/runtime/runtime_context.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -26,6 +27,7 @@
 #include <onnxruntime_cxx_api.h>
 #include "ort_ep.hpp"
 #include "ort_offload.hpp"
+#include "ort_session_access.hpp"
 #endif
 
 namespace npu_inference_bench {
@@ -239,11 +241,6 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     res.model_sha256 = model_artifacts_sha256(fx.onnx_path);
     res.cache_dir = cache_dir;
 
-    Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "npu_inference_bench_classifier");
-#ifdef NPU_INFERENCE_BENCH_WINML
-    ort_common::register_windows_ml_catalog(env, device);
-#endif
-
     // Optional VitisAI compile config: prefer one next to the fixture, else next to
     // the model. Lets us pass VAIML accuracy knobs without any CLI change.
     std::string vitis_config_file;
@@ -253,115 +250,41 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         if (fs::exists(cand, ec)) { vitis_config_file = cand.string(); break; }
     }
 
-    std::unique_ptr<Ort::Session> session;
-    std::string active_provider, last_err;
-    EngineOptions provider_options;
+    runtime::RuntimeOptions provider_options;
     provider_options.device = device;
     provider_options.device_override = provider_override;
     provider_options.cpu_threads = cpu_threads;
     provider_options.cache_dir = cache_dir;
-    const auto chain = ort_common::fallback_chain(provider_options);
-    res.diagnostics.requested_provider =
-        provider_override.empty() ? std::string("auto") : provider_override;
-    // Only the hot session is profiled: it is the one that executes inference and
-    // therefore owns the provider-assignment events used by the CPU-offload audit.
-    const fs::path prof_prefix = fs::temp_directory_path() / ("whal_ofl_" + res.model);
-    const std::wstring prof_prefix_w = prof_prefix.wstring();
-
-    // QNN needs ORT's EPContext mechanism in addition to the generic EP options:
-    // cold session creation compiles the HTP graph and writes an embedded context
-    // model; hot session creation loads that context model and skips recompilation.
-    // OpenVINO and VitisAI consume cache_dir directly in append_provider().
-    const auto build_session = [&](const std::string& provider, bool enable_profile) {
-        fs::path qnn_ctx;
-        if (lower(provider).find("qnn") != std::string::npos && !cache_dir.empty()) {
-            qnn_ctx = fs::path(cache_dir) / (res.model + "_qnn_ctx.onnx");
-        }
-
-        const auto make_options = [&](bool generate_qnn_ctx) {
-            Ort::SessionOptions so;
-            so.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-            if (enable_profile) so.EnableProfiling(prof_prefix_w.c_str());
-            const fs::path provider_model_dir =
-                vitis_config_file.empty() ? fx.onnx_path.parent_path()
-                                          : fs::path(vitis_config_file).parent_path();
-            ort_common::append_provider(
-                env, so, provider_options, provider, provider_model_dir, "classifier");
-            if (generate_qnn_ctx) {
-                const std::string p = qnn_ctx.string();
-                so.AddConfigEntry("ep.context_enable", "1");
-                so.AddConfigEntry("ep.context_file_path", p.c_str());
-                so.AddConfigEntry("ep.context_embed_mode", "1");
-            }
-            return so;
-        };
-
-        if (!qnn_ctx.empty() && fs::exists(qnn_ctx)) {
-            try {
-                auto so = make_options(false);
-                const std::wstring wctx = qnn_ctx.wstring();
-                return std::make_unique<Ort::Session>(env, wctx.c_str(), so);
-            } catch (const std::exception& e) {
-                std::cerr << "[classifier] QNN context cache '" << qnn_ctx.string()
-                          << "' unusable (" << e.what() << "); recompiling\n";
-                std::error_code ec;
-                fs::remove(qnn_ctx, ec);
-            }
-        }
-
-        if (!qnn_ctx.empty()) {
-            std::error_code ec;
-            fs::create_directories(qnn_ctx.parent_path(), ec);
-        }
-        auto so = make_options(!qnn_ctx.empty());
-        const std::wstring wpath = fx.onnx_path.wstring();
-        return std::make_unique<Ort::Session>(env, wpath.c_str(), so);
+    const fs::path provider_model_dir =
+        vitis_config_file.empty() ? fx.onnx_path.parent_path()
+                                  : fs::path(vitis_config_file).parent_path();
+    const runtime::ModelSpec model_spec{
+        fx.onnx_path, provider_model_dir, res.model,
     };
 
-    // Cold creation selects the first EP that can build the model. benchmark-onnx
-    // removes cache_dir before calling us, making this a genuine compile.
-    for (size_t i = 0; i < chain.size(); ++i) {
-        try {
-            const auto t0 = std::chrono::steady_clock::now();
-            session = build_session(chain[i], false);
-            res.cold_load_seconds =
-                std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-            active_provider = chain[i];
-            res.diagnostics.attempts.push_back({chain[i], true, {}});
-            break;
-        } catch (const std::exception& e) {
-            last_err = e.what();
-            res.diagnostics.attempts.push_back({chain[i], false, last_err});
-            session.reset();
-            if (i + 1 < chain.size()) {
-                std::cerr << "[classifier] EP '" << chain[i] << "' unavailable (" << e.what()
-                          << "); falling back to '" << chain[i + 1] << "'\n";
-            }
-        }
-    }
-    if (!session) {
-        throw std::runtime_error("no ONNX Runtime EP could build a classifier session (last error: " +
-                                 last_err + ")");
+    provider_options.profile_execution = false;
+    std::string active_provider;
+    {
+        runtime::RuntimeContext cold_context(provider_options);
+        runtime::ModelSession cold_session = cold_context.load_one(model_spec);
+        res.cold_load_seconds = cold_session.load_seconds();
+        res.diagnostics = cold_session.diagnostics();
+        active_provider = res.diagnostics.resolved_provider;
     }
 
-    // Destroy the cold session, then recreate the same selected EP from its newly
-    // populated cache. Do not run the fallback chain again: changing EPs would make
-    // the cold/hot pair incomparable.
-    session.reset();
-    {
-        const auto t0 = std::chrono::steady_clock::now();
-        session = build_session(active_provider, true);
-        res.hot_load_seconds =
-            std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    }
+    // Recreate only the selected provider for a comparable hot load.
+    provider_options.device_override = active_provider;
+    provider_options.allow_fallback = false;
+    provider_options.profile_execution = true;
+    runtime::RuntimeContext hot_context(provider_options);
+    runtime::ModelSession hot_session = hot_context.load_one(model_spec);
+    res.hot_load_seconds = hot_session.load_seconds();
+    Ort::Session* session = &runtime::detail::OrtSessionAccess::get(hot_session);
 
     res.execution_provider = active_provider;
     res.runtime = ort_common::runtime_for(active_provider);
     res.inference_precision =
         ort_common::resolved_inference_precision(provider_options, active_provider);
-    res.diagnostics.resolved_provider = active_provider;
-    res.diagnostics.fallback_occurred =
-        !chain.empty() && active_provider != chain.front();
 
     Ort::AllocatorWithDefaultOptions alloc;
     std::string out_name = session->GetOutputNameAllocated(0, alloc).get();
@@ -428,47 +351,38 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
     // CPU-offload audit: flush the profile trace and tally the per-node provider
     // assignments (deduped across all runs). Best-effort -- never fail the benchmark.
     try {
-        const std::string prof_path = session->EndProfilingAllocated(alloc).get();
-        const auto st = ort_common::parse_ort_profile(prof_path);
-        if (st.measured) {
-#ifdef NPU_INFERENCE_BENCH_WINML
-            if (!st.providers.empty()) {
-                const auto comma = st.providers.find(',');
-                const std::string resolved = st.providers.substr(0, comma);
-                res.execution_provider = resolved;
-                res.diagnostics.resolved_provider = resolved;
-                res.diagnostics.fallback_occurred =
-                    res.diagnostics.fallback_occurred ||
-                    ort_common::is_fallback_provider_for_device(device, resolved);
-            }
-#endif
+        hot_session.finalize_profiling();
+        const ExecutionDiagnostics& hot_diagnostics = hot_session.diagnostics();
+        res.execution_provider = hot_diagnostics.resolved_provider;
+        res.runtime = hot_session.runtime_name();
+        res.diagnostics.resolved_provider = hot_diagnostics.resolved_provider;
+        res.diagnostics.resolved_device = hot_diagnostics.resolved_device;
+        res.diagnostics.fallback_occurred =
+            res.diagnostics.fallback_occurred || hot_diagnostics.fallback_occurred;
+        if (hot_diagnostics.offload_measured) {
             res.offload_measured = true;
-            res.ep_nodes = st.ep_nodes;
-            res.cpu_nodes = st.cpu_nodes;
-            res.cpu_offload_ops = st.cpu_ops;
+            res.ep_nodes = hot_diagnostics.ep_nodes;
+            res.cpu_nodes = hot_diagnostics.cpu_nodes;
+            res.cpu_offload_ops = hot_diagnostics.cpu_offload_ops;
             res.diagnostics.offload_measured = true;
-            res.diagnostics.ep_nodes = st.ep_nodes;
-            res.diagnostics.cpu_nodes = st.cpu_nodes;
-            res.diagnostics.cpu_offload_ops = st.cpu_ops;
+            res.diagnostics.ep_nodes = hot_diagnostics.ep_nodes;
+            res.diagnostics.cpu_nodes = hot_diagnostics.cpu_nodes;
+            res.diagnostics.cpu_offload_ops = hot_diagnostics.cpu_offload_ops;
         }
-        std::error_code ec;
-        fs::remove(prof_path, ec);
+        if (hot_diagnostics.operation_assignment_measured) {
+            res.operation_assignment_measured = true;
+            res.assigned_ops_cpu = hot_diagnostics.assigned_ops_cpu;
+            res.assigned_ops_npu = hot_diagnostics.assigned_ops_npu;
+            res.operation_assignment_source =
+                hot_diagnostics.operation_assignment_source;
+            res.diagnostics.operation_assignment_measured = true;
+            res.diagnostics.assigned_ops_cpu = hot_diagnostics.assigned_ops_cpu;
+            res.diagnostics.assigned_ops_npu = hot_diagnostics.assigned_ops_npu;
+            res.diagnostics.operation_assignment_source =
+                hot_diagnostics.operation_assignment_source;
+        }
     } catch (const std::exception&) {
         // profiling unavailable / parse failed -> leave offload unmeasured (-1)
-    }
-    if (lower(res.execution_provider).find("vitis") != std::string::npos) {
-        const auto assignment = ort_common::parse_vitis_operation_assignment(
-            fs::path(cache_dir), {"classifier"});
-        if (assignment.measured) {
-            res.operation_assignment_measured = true;
-            res.assigned_ops_cpu = assignment.cpu_operations;
-            res.assigned_ops_npu = assignment.npu_operations;
-            res.operation_assignment_source = assignment.source;
-            res.diagnostics.operation_assignment_measured = true;
-            res.diagnostics.assigned_ops_cpu = assignment.cpu_operations;
-            res.diagnostics.assigned_ops_npu = assignment.npu_operations;
-            res.diagnostics.operation_assignment_source = assignment.source;
-        }
     }
     return res;
 }

@@ -19,15 +19,6 @@ const char* to_string(Backend backend) {
     return "Unknown";
 }
 
-const char* to_string(Device device) {
-    switch (device) {
-        case Device::NPU: return "NPU";
-        case Device::GPU: return "GPU";
-        case Device::CPU: return "CPU";
-    }
-    return "Unknown";
-}
-
 bool backend_available(Backend backend) {
     switch (backend) {
         case Backend::IntelOpenVINO: return intel::available();
