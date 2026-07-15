@@ -7,6 +7,8 @@
          its own "<platform>-ovep" tree (exe + colocated runtime + obj). -->
     <PlatformOutTag Condition="'$(EnableOvep)'=='true'">$(Platform)-ovep</PlatformOutTag>
     <PlatformOutTag Condition="'$(EnableWinML)'=='true'">$(Platform)-winml</PlatformOutTag>
+    <PlatformOutTag Condition="'$(EnableAmd)'=='true'">$(Platform)-amd</PlatformOutTag>
+    <PlatformOutTag Condition="'$(EnableQualcomm)'=='true'">$(Platform)-qualcomm</PlatformOutTag>
     <PlatformOutTag Condition="'$(PlatformOutTag)'==''">$(Platform)</PlatformOutTag>
     <OutDir>$(NpuInferenceBenchRoot)build\$(PlatformOutTag)\$(Configuration)\</OutDir>
     <IntDir>$(NpuInferenceBenchRoot)build\obj\$(MSBuildProjectName)\$(PlatformOutTag)\$(Configuration)\</IntDir>

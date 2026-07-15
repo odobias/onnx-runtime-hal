@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "npu_inference_bench/execution_diagnostics.hpp"
+#include "npu_inference_bench/runtime/runtime_options.hpp"
 
 namespace npu_inference_bench {
 
@@ -26,25 +27,11 @@ enum class Backend {
     QualcommQNN,   // Qualcomm Hexagon NPU via ONNX Runtime + QNN EP  (prepared)
 };
 
-// Logical accelerator target. Mapped to a backend-specific device string.
-enum class Device {
-    NPU,
-    GPU,
-    CPU,
-};
-
-struct EngineOptions {
+struct EngineOptions : runtime::RuntimeOptions {
     // Path to the exported model directory for the chosen backend.
     // Intel: OpenVINO IR dir (e.g. whisper-tiny-en-hybrid-ov).
     // AMD/Qualcomm: ONNX / QNN context-binary dir (backend-defined).
     std::string model_dir;
-
-    Device device = Device::NPU;
-
-    // Optional raw device string that overrides `device` for the backend
-    // (e.g. OpenVINO "NPU", "GPU.1"; ORT EP-specific selectors). Empty = derive
-    // from `device`.
-    std::string device_override;
 
     // True when the caller asked for automatic device selection (CLI device "auto")
     // rather than naming NPU/GPU/CPU. Only then may Backend::Auto self-pick the
@@ -53,24 +40,6 @@ struct EngineOptions {
     // requesting GPU/CPU would silently run (and be mislabeled) on the NPU.
     bool auto_device = false;
 
-    // Directory for the compiled-model cache. When set, the backend persists its
-    // device-compiled blob here so subsequent loads skip the (slow) NPU compile
-    // step. Empty = no on-disk caching. This is the key to a fast-loading runner.
-    std::string cache_dir;
-
-    // CPU-only tuning: number of inference threads (maps to OpenVINO's
-    // ov::inference_num_threads on the Intel backend). 0 = backend/runtime default.
-    // Ignored by NPU/GPU devices, where the accelerator's own scheduler applies.
-    int cpu_threads = 0;
-
-    // Provider-neutral inference precision policy: "f32" (default on CPU/GPU),
-    // "f16", "bf16", or "preferred" (let the executor choose). Providers must
-    // reject policies they cannot guarantee instead of silently mislabeling runs.
-    std::string precision_policy;
-
-    // Benchmark harnesses disable profiling on the throw-away cold session and
-    // enable it only on the hot session that performs measured inference.
-    bool profile_execution = true;
 };
 
 // Backend-neutral result + metrics. Every backend fills `text`/`infer_seconds`;
@@ -147,7 +116,6 @@ bool backend_available(Backend backend);
 std::vector<Backend> available_backends();
 
 const char* to_string(Backend backend);
-const char* to_string(Device device);
 
 // --- Factory -----------------------------------------------------------------
 

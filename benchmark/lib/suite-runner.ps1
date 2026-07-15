@@ -141,7 +141,7 @@ function Invoke-NativeBenchmark {
             $args += @("--eval-clip", $clipSpec.id, $clipSpec.audio, $clipSpec.ref)
         }
         $native = Invoke-BenchmarkNativeJson -Exe $exe -Arguments $args `
-            -JsonOutputPath $jsonOutput -EchoOutput
+            -JsonOutputPath $jsonOutput -IsolationRoot $runnerIsolationRoot -EchoOutput
         if (-not $native.succeeded -or -not $native.payload.clips) {
             $message = if ($native.payload.error) {
                 [string]$native.payload.error
@@ -202,7 +202,8 @@ function Invoke-NativeBenchmark {
         $args += @("--results", $ledger)
         if ($Workload.kind -eq "asr") { $args += @("--label", [string]$Workload.id) }
     }
-    $native = Invoke-BenchmarkNativeJson -Exe $exe -Arguments $args -EchoOutput
+    $native = Invoke-BenchmarkNativeJson -Exe $exe -Arguments $args `
+        -IsolationRoot $runnerIsolationRoot -EchoOutput
     $result = $native.payload
     if (-not $native.succeeded) {
         $message = if ($result.error) { [string]$result.error } else { "executor exited with code $($native.exit_code)" }

@@ -19,6 +19,16 @@ operation split—is therefore invalid instead of being celebrated as an NPU res
 This is a benchmark and runtime-diagnostics project. The old Whisper HAL is now
 an internal workload adapter rather than the product architecture.
 
+## Reusable ONNX runtime
+
+The benchmark now consumes a workload-neutral `OnnxRuntimeHal` static library.
+It exposes logical CPU/GPU/NPU selection, explicit providers, strict
+requested-device enforcement, vendor caching, named tensor I/O, and provider
+offload diagnostics without depending on Whisper or benchmark ledgers.
+
+`NpuInferenceBench run-onnx` is a generic tensor-manifest reference consumer.
+See `docs/onnx-runtime-hal.md` for the C++ and CLI contracts.
+
 ## Run the portable suite
 
 ```powershell
@@ -148,10 +158,15 @@ benchmark/
 
 runner/
   cli/main.cpp               thin process entry point
+  cli/generic_onnx_cli.cpp   arbitrary ONNX tensor-manifest runner
   benchmark/                 timing, reporting, and workload dispatch
   core/                      workload factory
-  runtime/                   provider selection and offload diagnostics
+  runtime/                   reusable sessions, provider selection, diagnostics
   include/npu_inference_bench/
+
+projects/
+  OnnxRuntimeHal/            reusable static runtime library
+  OnnxRuntimeHal.Tests/      focused runtime contract tests
 
 workloads/
   whisper/backends/          Whisper engine adapters
@@ -223,6 +238,30 @@ Build output:
 ```text
 build/<platform>[/variant]/<configuration>/NpuInferenceBench.exe
 ```
+
+## Publish isolated runners
+
+One distribution is produced per CPU architecture. Runtime DLL families stay in
+separate runner directories while benchmark scripts, workloads, and models are
+copied once:
+
+```powershell
+.\tools\build\build-runner-package.ps1 -Architecture ARM64 -Clean
+.\tools\build\build-runner-package.ps1 -Architecture x64 -Clean
+```
+
+Unavailable vendor SDKs are recorded in `runner-package.json` as skipped.
+Matching runner artifacts from CI or another SDK host can be merged with
+`-AdditionalRunnerRoot`. The packaged entry point preserves the suite options:
+
+```powershell
+.\run-benchmark.ps1 --list-runners
+.\run-benchmark.ps1 --explain -Runtime bundled -Provider auto
+.\run-benchmark.ps1 -Device npu,gpu,cpu -Provider auto
+```
+
+See [Isolated runner distributions](docs/distribution.md) for the package
+layout, selection rules, external-artifact contract, and publishing workflow.
 
 ## Single-workload CLI
 
