@@ -385,6 +385,27 @@ inline std::unordered_map<std::string, std::string> vitis_provider_options(
     return vitis_opts;
 }
 
+#ifdef NPU_INFERENCE_BENCH_WINML
+inline std::unordered_map<std::string, std::string> winml_catalog_provider_options(
+    const runtime::RuntimeOptions& options, const std::string& ep_name,
+    Device selected_device, const fs::path& model_dir,
+    const std::string& cache_key) {
+    const std::string selected_ep = lower(ep_name);
+    if (selected_ep.find("vitis") != std::string::npos) {
+        return vitis_provider_options(options, model_dir, cache_key);
+    }
+    std::unordered_map<std::string, std::string> provider_options;
+    if (selected_device == Device::NPU &&
+        selected_ep.find("qnn") != std::string::npos) {
+        // Match the direct QNN pack's session policy. Without this, WinML
+        // leaves HTP clocks at a platform default that can vary substantially
+        // between AC/DC power overlays.
+        provider_options.emplace("htp_performance_mode", "burst");
+    }
+    return provider_options;
+}
+#endif
+
 inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
                             const runtime::RuntimeOptions& options,
                             const std::string& provider, const fs::path& model_dir,
@@ -441,11 +462,9 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
                     });
                 compatible.resize(1);
             }
-            std::unordered_map<std::string, std::string> provider_options;
-            if (lower(compatible.front().EpName()).find("vitis") != std::string::npos) {
-                provider_options = vitis_provider_options(
-                    options, model_dir, cache_key);
-            }
+            auto provider_options = winml_catalog_provider_options(
+                options, compatible.front().EpName(), selected_device,
+                model_dir, cache_key);
             Ort::KeyValuePairs ep_options(provider_options);
             so.AppendExecutionProvider_V2(env, compatible, ep_options);
             return;
@@ -481,11 +500,9 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
         if (selected.empty()) {
             throw std::runtime_error("Windows ML provider is not registered or compatible: " + provider);
         }
-        std::unordered_map<std::string, std::string> provider_options;
-        if (lower(selected.front().EpName()).find("vitis") != std::string::npos) {
-            provider_options = vitis_provider_options(
-                options, model_dir, cache_key);
-        }
+        auto provider_options = winml_catalog_provider_options(
+            options, selected.front().EpName(), options.device,
+            model_dir, cache_key);
         Ort::KeyValuePairs ep_options(provider_options);
         so.AppendExecutionProvider_V2(env, selected, ep_options);
         return;
