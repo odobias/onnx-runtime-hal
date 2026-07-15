@@ -43,6 +43,23 @@ function Test-BenchmarkIntendedProvider {
     return $true
 }
 
+function Test-BenchmarkNpuOperationAssignment {
+    param([object]$Result, [string]$RequestedDevice)
+    if ($RequestedDevice -ne "npu") { return $true }
+    if (-not $Result) { return $false }
+    $effective = if ($Result.first_row) { $Result.first_row } else { $Result }
+    foreach ($field in @("assigned_ops_cpu", "assigned_ops_npu", "operation_assignment_source")) {
+        if (-not ($effective.PSObject.Properties.Name -contains $field)) { return $false }
+    }
+    try {
+        return [int]$effective.assigned_ops_cpu -ge 0 -and
+            [int]$effective.assigned_ops_npu -gt 0 -and
+            -not [string]::IsNullOrWhiteSpace([string]$effective.operation_assignment_source)
+    } catch {
+        return $false
+    }
+}
+
 function Measure-BenchmarkClassifierAgreement {
     param([Parameter(Mandatory)][object]$Result)
     $finite = $true
@@ -90,6 +107,8 @@ function New-BenchmarkAccuracyRecord {
         [Parameter(Mandatory)][bool]$IntendedProviderResolved
     )
     $first = if ($Result.first_row) { $Result.first_row } else { $Result }
+    $npuOperationAssignmentRecorded =
+        Test-BenchmarkNpuOperationAssignment $Result $RequestedDevice
     return [ordered]@{
         schema_version = 1
         timestamp_utc = [DateTime]::UtcNow.ToString("o")
@@ -116,6 +135,7 @@ function New-BenchmarkAccuracyRecord {
             no_reference_decision_flips = ([int]$ReferenceAgreement.decision_flips -eq 0)
             intended_provider_resolved = $IntendedProviderResolved
             accuracy_eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or [bool]$ExecutionProfile.accuracyEligible
+            npu_operation_assignment_recorded = $npuOperationAssignmentRecorded
             valid = $Valid
         }
         metrics = $Result

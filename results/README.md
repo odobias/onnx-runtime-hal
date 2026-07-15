@@ -5,9 +5,14 @@ reports.
 
 ## Authoritative ledgers
 
-`ledgers/accuracy.jsonl` contains accuracy-first evidence. The default suite mode
-is `accuracy-quick`; it runs every valid execution profile once and never appends
-to either performance CSV.
+`accuracy-runs/<environment-snapshot-id>.jsonl` contains immutable,
+invocation-scoped accuracy evidence. The default suite mode is
+`accuracy-quick`; it runs every valid execution profile once and writes a new
+campaign file instead of appending to a shared tracked ledger.
+
+`ledgers/accuracy.jsonl` is the frozen pre-migration history. New campaigns must
+not append to it. `benchmark/validate-accuracy.ps1` reads that history together
+with every run-scoped accuracy file by default.
 
 `ledgers/asr.csv` and `ledgers/classifiers.csv` contain latency measurements
 created only by explicit `-Mode latency` runs.
@@ -34,13 +39,32 @@ successful accuracy rows instead of relying on an uncommitted developer
 workspace. Validate either a published or rolling attempt ledger with
 `benchmark/validate-attempts.ps1 -Ledger <path>`.
 
+## Benchmarking approach
+
+The portable suite separates three contracts:
+
+1. `accuracy-quick` is the default benchmark-of-record. It evaluates the full
+   reference fixture once, applies provider and numerical trust gates, and
+   publishes immutable accuracy and attempt files for that invocation.
+2. `latency` is explicit. It may use repeated timed runs and writes only the
+   performance CSVs; an accuracy-quick mean is orientation data, not a latency
+   leaderboard.
+3. Direct CLI invocations are smoke or executor diagnostics. They do not become
+   comparable benchmark evidence merely because inference succeeded.
+
+Comparisons require matching workload/profile, model and fixture hashes,
+reference contract, runtime target, requested device, and measurement purpose.
+Host architecture, runtime version, power source, thermal conditions, and
+provider assignment remain visible caveats rather than silently normalized.
+
 Each accuracy record carries the execution profile, graph role, model and
 fixture hashes, runtime environment snapshot ID, compilation-provenance IDs,
 requested/resolved provider, fallback status, workload metrics, and a
 `trust_gate`. A record is valid only when outputs are finite, CPU-reference
 decisions do not flip, the intended provider resolves, and the profile is
-accuracy-eligible. Invalid and diagnostic payloads remain in the ledgers but
-must not enter valid summaries.
+accuracy-eligible. New NPU records must additionally contain a trustworthy
+CPU/NPU operation assignment. Invalid and diagnostic payloads remain published
+but must not enter valid summaries.
 
 Use selectors to narrow the default matrix:
 
@@ -81,12 +105,18 @@ OpenVINO, VitisAI, QNN, and DirectML, so the audit is vendor-neutral. Only the
 hot session that performs inference is profiled.
 
 `assigned_ops_cpu` and `assigned_ops_npu` are a separate, optional measurement
-family populated only from provider/compiler assignment artifacts. They are
-left empty when the provider does not expose a trustworthy operation mapping;
-ORT profiler node counts are never promoted into these fields. For VitisAI,
+family populated only from provider/compiler assignment artifacts or ORT's
+retained EP graph-assignment API. They are left empty when neither source
+exposes a trustworthy operation mapping; ORT profiler node counts are never
+promoted into these fields. For VitisAI,
 `operation_assignment_source=vitisai-cache-context-gops` means the total graph
 operation rows came from `gops.csv` and NPU partition membership came from
-`context.json`.
+`context.json`. On ORT API v24 or newer,
+`operation_assignment_source=ort-ep-graph-assignment` counts the original,
+unfused graph nodes retained for each EP subgraph. Non-CPU assignments are
+recorded as NPU operations only for a valid, non-fallback NPU request. The suite
+marks a new NPU accuracy row invalid when these fields are absent, malformed, or
+report no NPU operations.
 
 Classifier startup is measured twice against a dedicated cache:
 

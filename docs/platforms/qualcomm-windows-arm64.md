@@ -167,9 +167,10 @@ Run every declared combination with:
 .\benchmark\run-suite.ps1 -Device npu,gpu,cpu -Provider auto
 ```
 
-The default `accuracy-quick` run writes `results/ledgers/accuracy.jsonl`,
-immutable host/SDK sidecars, and `results/ledgers/attempts.jsonl`; it does not
-touch latency CSVs. Use `-Mode latency` explicitly to append performance rows.
+The default `accuracy-quick` run writes an immutable
+`results/accuracy-runs/<environment-snapshot-id>.jsonl`, host/SDK sidecars, and
+`results/run-attempts/<environment-snapshot-id>.jsonl`; it does not touch
+latency CSVs. Use `-Mode latency` explicitly to append performance rows.
 
 For comparable performance measurements:
 

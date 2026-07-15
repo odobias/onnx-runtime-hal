@@ -369,12 +369,8 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
             res.diagnostics.cpu_nodes = hot_diagnostics.cpu_nodes;
             res.diagnostics.cpu_offload_ops = hot_diagnostics.cpu_offload_ops;
         }
-        if (hot_diagnostics.operation_assignment_measured) {
-            res.operation_assignment_measured = true;
-            res.assigned_ops_cpu = hot_diagnostics.assigned_ops_cpu;
-            res.assigned_ops_npu = hot_diagnostics.assigned_ops_npu;
-            res.operation_assignment_source =
-                hot_diagnostics.operation_assignment_source;
+        if (hot_diagnostics.operation_assignment_measured &&
+            !res.diagnostics.operation_assignment_measured) {
             res.diagnostics.operation_assignment_measured = true;
             res.diagnostics.assigned_ops_cpu = hot_diagnostics.assigned_ops_cpu;
             res.diagnostics.assigned_ops_npu = hot_diagnostics.assigned_ops_npu;
@@ -383,6 +379,13 @@ Result run(const std::string& fixture_dir, Device device, const std::string& pro
         }
     } catch (const std::exception&) {
         // profiling unavailable / parse failed -> leave offload unmeasured (-1)
+    }
+    if (res.diagnostics.operation_assignment_measured) {
+        res.operation_assignment_measured = true;
+        res.assigned_ops_cpu = res.diagnostics.assigned_ops_cpu;
+        res.assigned_ops_npu = res.diagnostics.assigned_ops_npu;
+        res.operation_assignment_source =
+            res.diagnostics.operation_assignment_source;
     }
     return res;
 }

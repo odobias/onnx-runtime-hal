@@ -3,9 +3,10 @@
 Windows ML is an isolated runtime option for the existing native C++ benchmark.
 It uses the ONNX Runtime and Execution Provider Catalog from
 `Microsoft.WindowsAppSDK.ML`, while preserving the same models, fixtures,
-metrics, cold/hot-load procedure, and result ledgers as the bundled runtimes.
-The default suite mode is accuracy-first and writes `accuracy.jsonl`; latency
-CSV output requires `-Mode latency`.
+metrics, cold/hot-load procedure, and result contracts as the bundled runtimes.
+The default suite mode is accuracy-first and writes a new
+`results/accuracy-runs/<environment-snapshot-id>.jsonl`; latency CSV output
+requires `-Mode latency`.
 
 ## Requirements
 

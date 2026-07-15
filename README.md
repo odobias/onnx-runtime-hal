@@ -11,9 +11,10 @@ It benchmarks three production-shaped workloads:
 - **FakeAudio / GAD**, a generated-audio detector.
 
 Latency and accuracy are only half the result. The runner also records execution
-provider selection, failed provider attempts, fallback, runtime versions, and
-CPU offload. An NPU request that silently executes on the CPU is therefore
-reported as an executor problem instead of being celebrated as an NPU result.
+provider selection, failed provider attempts, fallback, runtime versions,
+profiler placement, and original graph operations assigned to NPU versus CPU.
+An NPU request that silently executes on the CPU—or cannot report a trustworthy
+operation split—is therefore invalid instead of being celebrated as an NPU result.
 
 This is a benchmark and runtime-diagnostics project. The old Whisper HAL is now
 an internal workload adapter rather than the product architecture.
@@ -55,15 +56,25 @@ comparison.
 
 ## What gets recorded
 
-Successful ASR and classifier measurements are appended to:
+The default `accuracy-quick` mode writes one immutable campaign file:
 
-- `results/ledgers/asr.csv`
-- `results/ledgers/classifiers.csv`
+- `results/accuracy-runs/<environment-snapshot-id>.jsonl`
 
-Every requested workload/device/provider combination, including failures, is
-appended to:
+Each record links the exact model and fixture hashes, host/runtime snapshot,
+provider-input provenance, reference agreement, resolved provider, fallback
+state, and workload metrics. A fresh file per invocation keeps concurrent vendor
+campaigns independent and avoids append conflicts in a shared Git ledger.
 
-- `results/ledgers/attempts.jsonl`
+Explicit `-Mode latency` runs append performance rows to
+`results/ledgers/asr.csv` and `results/ledgers/classifiers.csv`; accuracy-quick
+never writes those latency ledgers.
+
+Every invocation also publishes all requested combinations—including failures
+and unsupported profiles—to:
+
+- `results/run-attempts/<environment-snapshot-id>.jsonl`
+
+`results/ledgers/attempts.jsonl` remains ignored rolling local state.
 
 The attempt ledger includes:
 
@@ -73,7 +84,13 @@ The attempt ledger includes:
 - every failed and successful provider attempt;
 - whether fallback occurred;
 - CPU-offload evidence when ORT profiling is available;
+- provider/compiler CPU-versus-NPU operation assignments for valid NPU rows;
 - the workload-specific JSON result.
+
+Profiler node counts and operation assignments are deliberately separate. One
+accelerator profiler node may contain hundreds of fused operations. New NPU
+accuracy rows are valid only when `assigned_ops_cpu`, `assigned_ops_npu`, and
+`operation_assignment_source` contain trustworthy partition evidence.
 
 Machine-readable column contracts live in `benchmark/schemas/`.
 

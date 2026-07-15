@@ -150,6 +150,20 @@ std::string first_accelerator_provider(const std::string& providers) {
     return first == "CPUExecutionProvider" ? std::string{} : first;
 }
 
+ResolvedDevice resolved_device_for_selection(const RuntimeOptions& options,
+                                             const std::string& provider) {
+    const ResolvedDevice resolved =
+        ort_common::resolved_device_for_provider(provider);
+    if (resolved != ResolvedDevice::Unknown) return resolved;
+    const std::string selected = ort_common::lower(provider);
+    if (selected == "openvino" ||
+        selected.rfind("openvino:", 0) == 0 ||
+        selected.rfind("windowsml:", 0) == 0) {
+        return requested_device_class(options.device);
+    }
+    return ResolvedDevice::Unknown;
+}
+
 void enforce_requested_device(const RuntimeOptions& options,
                               const ExecutionDiagnostics& diagnostics) {
     if (!options.require_requested_device) return;
@@ -315,9 +329,20 @@ void ModelSession::finalize_profiling() {
             impl_->diagnostics.cpu_offload_ops = stats.cpu_ops;
             const std::string actual_provider = first_accelerator_provider(stats.providers);
             if (!actual_provider.empty()) {
+                const std::string selected_provider =
+                    ort_common::lower(impl_->diagnostics.resolved_provider);
                 impl_->diagnostics.resolved_provider = actual_provider;
-                impl_->diagnostics.resolved_device =
-                    ort_common::resolved_device_for_provider(actual_provider);
+                const bool selection_owns_device =
+                    selected_provider == "openvino" ||
+                    selected_provider.rfind("openvino:", 0) == 0 ||
+                    selected_provider.rfind("windowsml:", 0) == 0;
+                if (!selection_owns_device) {
+                    const ResolvedDevice profiled_device =
+                        ort_common::resolved_device_for_provider(actual_provider);
+                    if (profiled_device != ResolvedDevice::Unknown) {
+                        impl_->diagnostics.resolved_device = profiled_device;
+                    }
+                }
                 impl_->runtime_name = ort_common::runtime_for(actual_provider);
             } else if (stats.providers == "CPUExecutionProvider") {
                 impl_->diagnostics.resolved_provider = "CPUExecutionProvider";
@@ -476,7 +501,8 @@ LoadedModelSet RuntimeContext::load(const std::vector<ModelSpec>& models) {
         candidate.reserve(models.size());
         const auto started = std::chrono::steady_clock::now();
         try {
-            const ResolvedDevice resolved = ort_common::resolved_device_for_provider(provider);
+            const ResolvedDevice resolved =
+                resolved_device_for_selection(impl_->options, provider);
             if (impl_->options.require_requested_device &&
                 resolved != ResolvedDevice::Unknown &&
                 resolved != requested_device_class(impl_->options.device)) {
@@ -519,6 +545,12 @@ LoadedModelSet RuntimeContext::load(const std::vector<ModelSpec>& models) {
                     Ort::SessionOptions session_options;
                     session_options.SetGraphOptimizationLevel(
                         GraphOptimizationLevel::ORT_ENABLE_ALL);
+#if ORT_API_VERSION >= 24
+                    if (impl_->options.device == Device::NPU) {
+                        session_options.AddConfigEntry(
+                            "session.record_ep_graph_assignment_info", "1");
+                    }
+#endif
                     if (impl_->options.profile_execution) {
                         const fs::path prefix =
                             fs::temp_directory_path() /
@@ -568,6 +600,23 @@ LoadedModelSet RuntimeContext::load(const std::vector<ModelSpec>& models) {
                 }
                 state->load_seconds = std::chrono::duration<double>(
                     std::chrono::steady_clock::now() - session_started).count();
+#if ORT_API_VERSION >= 24
+                if (impl_->options.device == Device::NPU &&
+                    !state->diagnostics.fallback_occurred &&
+                    ort_common::lower(provider).find("vitis") == std::string::npos) {
+                    const auto assignment =
+                        ort_common::query_ort_operation_assignment(*state->session);
+                    if (assignment.measured) {
+                        state->diagnostics.operation_assignment_measured = true;
+                        state->diagnostics.assigned_ops_cpu =
+                            assignment.cpu_operations;
+                        state->diagnostics.assigned_ops_npu =
+                            assignment.npu_operations;
+                        state->diagnostics.operation_assignment_source =
+                            assignment.source;
+                    }
+                }
+#endif
                 state->input_descriptors = describe_inputs(*state->session);
                 state->output_descriptors = describe_outputs(*state->session);
                 candidate.push_back(ModelSession(std::move(state)));

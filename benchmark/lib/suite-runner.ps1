@@ -167,7 +167,12 @@ function Invoke-NativeBenchmark {
         }
         $eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or
             [bool]$ExecutionProfile.accuracyEligible
-        $valid = $finite -and $intended -and $eligible
+        $assignmentRecorded =
+            Test-BenchmarkNpuOperationAssignment $aggregate $RequestedDevice
+        if ($RequestedDevice -eq "npu" -and -not $assignmentRecorded) {
+            Write-Warning "$($Workload.id)/$($ExecutionProfile.id): NPU operation assignment was not recorded"
+        }
+        $valid = $finite -and $intended -and $eligible -and $assignmentRecorded
         $record = New-BenchmarkAccuracyRecord -Workload $Workload `
             -ExecutionProfile $ExecutionProfile -RuntimeTarget $Runtime `
             -RequestedDevice $RequestedDevice `
@@ -211,8 +216,13 @@ function Invoke-NativeBenchmark {
         $intended = Test-BenchmarkIntendedProvider $result $RequestedDevice
         $eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or
             [bool]$ExecutionProfile.accuracyEligible
+        $assignmentRecorded =
+            Test-BenchmarkNpuOperationAssignment $result $RequestedDevice
+        if ($RequestedDevice -eq "npu" -and -not $assignmentRecorded) {
+            Write-Warning "$($Workload.id)/$($ExecutionProfile.id): NPU operation assignment was not recorded"
+        }
         $valid = $agreement.outputs_finite -and $agreement.decision_flips -eq 0 -and
-            $intended -and $eligible
+            $intended -and $eligible -and $assignmentRecorded
         $record = New-BenchmarkAccuracyRecord -Workload $Workload `
             -ExecutionProfile $ExecutionProfile -RuntimeTarget $Runtime `
             -RequestedDevice $RequestedDevice `

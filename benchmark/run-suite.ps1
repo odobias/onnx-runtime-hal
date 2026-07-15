@@ -253,7 +253,7 @@ if ($Only -contains "all") { $Only = @("whisper", "tsc", "fakeaudio") }
 if (-not $Results) { $Results = Join-Path $root "results\ledgers\asr.csv" }
 if (-not $ClassifierResults) { $ClassifierResults = Join-Path $root "results\ledgers\classifiers.csv" }
 if (-not $AttemptLedger) { $AttemptLedger = Join-Path $root "results\ledgers\attempts.jsonl" }
-if (-not $AccuracyLedger) { $AccuracyLedger = Join-Path $root "results\ledgers\accuracy.jsonl" }
+$accuracyLedgerExplicit = [bool]$AccuracyLedger
 if (-not $Manifest) { $Manifest = Join-Path $root "benchmark\manifests\portable.json" }
 $audioExplicit = [bool]$Audio
 if (-not $Audio) { $Audio = Join-Path $root "workloads\eval\ls_000.wav" }
@@ -267,6 +267,14 @@ $environmentSnapshot = Get-BenchmarkEnvironmentSnapshot `
     -Root $root -Exe $exe -RuntimeTarget $Runtime -BuildTree $platform `
     -RunnerId $selectedRunnerId
 Write-Host "environment: $($environmentSnapshot.id) -> $($environmentSnapshot.path)" -ForegroundColor DarkCyan
+if ($Mode -eq "accuracy-quick" -and -not $accuracyLedgerExplicit) {
+    $accuracyRunDir = Join-Path $root "results\accuracy-runs"
+    New-Item -ItemType Directory -Force -Path $accuracyRunDir | Out-Null
+    $AccuracyLedger = Join-Path $accuracyRunDir "$($environmentSnapshot.id).jsonl"
+    if (Test-Path -LiteralPath $AccuracyLedger) {
+        throw "Immutable accuracy run already exists: $AccuracyLedger"
+    }
+}
 # Classifier fixtures + their ONNX models are colocated under models/deepfake/ (the
 # model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx, so fixtures must
 # live beside the models). tools/fixtures/generate.py writes here too. (The workloads/
@@ -334,7 +342,7 @@ if ($Mode -eq "latency" -and -not $NoResults) {
     Write-Host "classifier ledger : $ClassifierResults" -ForegroundColor DarkGray
 }
 if ($Mode -eq "accuracy-quick") {
-    Write-Host "accuracy ledger   : $AccuracyLedger" -ForegroundColor DarkGray
+    Write-Host "accuracy run      : $AccuracyLedger" -ForegroundColor DarkGray
 }
 Write-Host "attempt ledger    : $AttemptLedger" -ForegroundColor DarkGray
 Write-Host "published attempts: $($publishedAttempts.path) ($($publishedAttempts.count) records)" -ForegroundColor DarkGray

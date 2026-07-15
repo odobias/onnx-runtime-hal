@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cctype>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -169,6 +170,42 @@ inline OperationAssignmentStats parse_vitis_operation_assignment(
     result.cpu_operations = total_operations - npu_operations;
     result.npu_operations = npu_operations;
     result.source = "vitisai-cache-context-gops";
+    return result;
+}
+
+// ORT API v24 can retain the original graph nodes assigned to every execution
+// provider. Unlike profiler events, compiling EP subgraphs report their unfused
+// source nodes here, so these are operation counts rather than fused runtime-node
+// counts. The caller enables session.record_ep_graph_assignment_info before
+// creating the session and only interprets non-CPU assignments as NPU operations
+// when the requested device was NPU.
+//
+// Kept as a template so this pure-std header remains usable with older ORT headers;
+// call sites instantiate it only when ORT_API_VERSION >= 24.
+template <typename Session>
+OperationAssignmentStats query_ort_operation_assignment(const Session& session) {
+    OperationAssignmentStats result;
+    try {
+        int cpu_operations = 0;
+        int accelerator_operations = 0;
+        for (const auto& subgraph : session.GetEpGraphAssignmentInfo()) {
+            const std::string provider = subgraph.GetEpName();
+            const int operations = static_cast<int>(subgraph.GetNodes().size());
+            if (provider.empty() || operations <= 0) continue;
+            if (provider == "CPUExecutionProvider") {
+                cpu_operations += operations;
+            } else {
+                accelerator_operations += operations;
+            }
+        }
+        if (cpu_operations + accelerator_operations <= 0) return result;
+        result.measured = true;
+        result.cpu_operations = cpu_operations;
+        result.npu_operations = accelerator_operations;
+        result.source = "ort-ep-graph-assignment";
+    } catch (const std::exception&) {
+        // Assignment recording is diagnostic only; inference remains valid.
+    }
     return result;
 }
 
