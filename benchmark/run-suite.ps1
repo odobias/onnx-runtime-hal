@@ -80,13 +80,51 @@ if ($Precision -ne "default") {
 $root = Split-Path $PSScriptRoot -Parent
 $hostArch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "ARM64" } else { "x64" }
 
+function Get-RequestedBenchmarkTags {
+    param([Parameter(Mandatory)][string]$RuntimeName)
+
+    $manifestPath = if ($Manifest) { $Manifest } else { Join-Path $root "benchmark\manifests\portable.json" }
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        return @("$RuntimeName/<manifest-unavailable>")
+    }
+    $requested = if ($Only -contains "all") { @("whisper", "tsc", "fakeaudio") } else { @($Only) }
+    $hostVendor = [string](Get-BenchmarkHardware).cpu.vendor
+    $manifestWorkloads = @((Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 |
+        ConvertFrom-Json).workloads)
+    $tags = [Collections.Generic.List[string]]::new()
+    foreach ($dev in $Device) {
+        foreach ($workload in $manifestWorkloads) {
+            $selector = if ($workload.kind -eq "asr") { "whisper" } else { [string]$workload.id }
+            if ($requested -notcontains $selector) { continue }
+            $profiles = @(Get-BenchmarkExecutionProfiles -Workload $workload -Device $dev `
+                -Selectors $Profile -HostVendor $hostVendor)
+            foreach ($executionProfile in $profiles) {
+                $tags.Add("$RuntimeName/$($workload.id)/$($executionProfile.id)/$dev")
+            }
+        }
+    }
+    return @($tags)
+}
+
+function Write-MissingRuntimeRuns {
+    param(
+        [Parameter(Mandatory)][string]$RuntimeName,
+        [Parameter(Mandatory)][string]$Executable
+    )
+    Write-Host "NOT PERFORMED: runtime '$RuntimeName' is unavailable." -ForegroundColor Yellow
+    Write-Host "  missing prerequisite: $Executable" -ForegroundColor Yellow
+    foreach ($tag in @(Get-RequestedBenchmarkTags -RuntimeName $RuntimeName)) {
+        Write-Host "  - $tag" -ForegroundColor DarkYellow
+    }
+}
+
 if ($Runtime -eq "all") {
     $runtimeFailures = 0
     foreach ($targetRuntime in @("bundled", "winml")) {
         $targetTag = if ($targetRuntime -eq "winml") { "$hostArch-winml" } else { $hostArch }
         $targetExe = Join-Path $root "build\$targetTag\$Configuration\NpuInferenceBench.exe"
         if (-not (Test-Path -LiteralPath $targetExe)) {
-            Write-Host "Skipping unavailable runtime '$targetRuntime' ($targetExe)." -ForegroundColor DarkYellow
+            Write-MissingRuntimeRuns -RuntimeName $targetRuntime -Executable $targetExe
             continue
         }
         $childArgs = @{
@@ -152,6 +190,7 @@ elseif ($Provider -match "(?i)dml|directml") {
 }
 $exe = Join-Path $root "build\$platform\$Configuration\NpuInferenceBench.exe"
 if (-not (Test-Path $exe)) {
+    Write-MissingRuntimeRuns -RuntimeName $Runtime -Executable $exe
     if ($Runtime -eq "winml") {
         Write-Host "Not built: $exe  (run .\tools\setup\setup-winml.ps1; .\tools\build\build.ps1 -EnableWinML -DisableIntel)" -ForegroundColor Red
     }
@@ -191,6 +230,7 @@ $providerTag = if ($Provider) { $Provider } else { "auto" }
 
 $ran = @()
 $skipped = @()
+$script:prerequisiteSkips = @()
 
 $wantClassifiers = @($Only | Where-Object { $_ -in @("tsc", "fakeaudio") })
 if ($wantClassifiers.Count -gt 0) {
@@ -235,6 +275,12 @@ $publishedAttempts = Write-BenchmarkRunAttemptSnapshot -Root $root `
 Write-Host "`n==================== summary ====================" -ForegroundColor Magenta
 Write-Host "ran    : $(if ($ran.Count) { $ran -join ', ' } else { '(nothing)' })" -ForegroundColor Green
 if ($skipped.Count) { Write-Host "skipped: $($skipped -join ', ')" -ForegroundColor Yellow }
+if ($script:prerequisiteSkips.Count) {
+    Write-Host "NOT PERFORMED (missing prerequisites):" -ForegroundColor Yellow
+    foreach ($skip in $script:prerequisiteSkips) {
+        Write-Host "  - $($skip.tag) [$($skip.status)]: $($skip.reason)" -ForegroundColor DarkYellow
+    }
+}
 if ($Mode -eq "latency" -and -not $NoResults) {
     Write-Host "ASR ledger        : $Results" -ForegroundColor DarkGray
     Write-Host "classifier ledger : $ClassifierResults" -ForegroundColor DarkGray
