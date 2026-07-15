@@ -188,6 +188,8 @@ function Write-BenchmarkCompilationProvenance {
     $record = [ordered]@{
         schema_version = 1
         created_utc = [DateTime]::UtcNow.ToString("o")
+        provenance_scope = "pre-execution-input-artifact-and-compiler-context"
+        artifact_stage = "provider-input"
         execution_profile = $ProfileId
         graph_role = $GraphRole
         target_vendor = $HostVendor
@@ -202,6 +204,10 @@ function Write-BenchmarkCompilationProvenance {
         }
         compile_or_export_options = $(if ($step) { $step } else { [ordered]@{ status = "unknown"; reason = "no generated fixture-step metadata" } })
         transformation_recipe = $(if ($step -and $step.transform) { "$($step.transform)" } else { "none-recorded" })
+        compiled_cache_artifact = [ordered]@{
+            status = "not-captured"
+            reason = "provider compilation occurs during session creation after this input-artifact record is generated"
+        }
         compilation_host_snapshot_id = $EnvironmentSnapshot.id
     }
     $id = Get-BenchmarkObjectId $record

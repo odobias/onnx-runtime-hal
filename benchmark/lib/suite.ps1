@@ -95,3 +95,48 @@ function Write-BenchmarkAttemptRecord {
     New-Item -ItemType Directory -Force -Path (Split-Path $Path -Parent) | Out-Null
     Add-Content -LiteralPath $Path -Value ($record | ConvertTo-Json -Depth 20 -Compress) -Encoding UTF8
 }
+
+function Write-BenchmarkRunAttemptSnapshot {
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [Parameter(Mandatory)][string]$RollingLedger,
+        [Parameter(Mandatory)][string]$EnvironmentSnapshotId
+    )
+    if (-not (Test-Path -LiteralPath $RollingLedger)) {
+        throw "Rolling attempt ledger does not exist: $RollingLedger"
+    }
+
+    $matches = [Collections.Generic.List[string]]::new()
+    $lineNumber = 0
+    foreach ($rawLine in [IO.File]::ReadLines($RollingLedger)) {
+        ++$lineNumber
+        $line = $rawLine.TrimStart([char]0xFEFF)
+        if (-not $line.Trim()) { continue }
+        try {
+            $record = $line | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            throw "Rolling attempt ledger contains invalid JSON at line ${lineNumber}: $($_.Exception.Message)"
+        }
+        if ([string]$record.environment_snapshot_id -eq $EnvironmentSnapshotId) {
+            $matches.Add($line)
+        }
+    }
+    if (-not $matches.Count) {
+        throw "No attempt records found for environment snapshot '$EnvironmentSnapshotId'."
+    }
+
+    $dir = Join-Path $Root "results\run-attempts"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $path = Join-Path $dir "$EnvironmentSnapshotId.jsonl"
+    $content = ($matches -join "`n") + "`n"
+    $encoding = [Text.UTF8Encoding]::new($false)
+    if (Test-Path -LiteralPath $path) {
+        $existing = [IO.File]::ReadAllText($path, $encoding).Replace("`r`n", "`n")
+        if ($existing -ne $content) {
+            throw "Published attempt snapshot already exists with different content: $path"
+        }
+    } else {
+        [IO.File]::WriteAllText($path, $content, $encoding)
+    }
+    return [pscustomobject]@{ path = $path; count = $matches.Count }
+}
