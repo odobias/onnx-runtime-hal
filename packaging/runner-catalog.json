@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "runners": [
+    {
+      "id": "ort",
+      "runtime_target": "bundled",
+      "architectures": ["x64", "ARM64"],
+      "vendors": ["Any"],
+      "provider_patterns": ["^$", "^auto$", "^cpu", "^CPUExecutionProvider$", "dml", "directml"],
+      "priority": 10,
+      "required_files": ["NpuInferenceBench.exe", "onnxruntime.dll"],
+      "build_switch": "EnableOrt",
+      "platform_suffix": ""
+    },
+    {
+      "id": "dml",
+      "runtime_target": "bundled",
+      "architectures": ["x64", "ARM64"],
+      "vendors": ["Any"],
+      "provider_patterns": ["dml", "directml"],
+      "priority": 40,
+      "required_files": ["NpuInferenceBench.exe", "onnxruntime.dll", "DirectML.dll"],
+      "build_switch": "EnableDirectML",
+      "platform_suffix": "-dml"
+    },
+    {
+      "id": "winml",
+      "runtime_target": "winml",
+      "architectures": ["x64", "ARM64"],
+      "vendors": ["Any"],
+      "provider_patterns": [".*"],
+      "priority": 50,
+      "minimum_os_build": 26100,
+      "required_files": [
+        "NpuInferenceBench.exe",
+        "onnxruntime.dll",
+        "Microsoft.Windows.AI.MachineLearning.dll"
+      ],
+      "build_switch": "EnableWinML",
+      "platform_suffix": "-winml"
+    },
+    {
+      "id": "ovep",
+      "runtime_target": "bundled",
+      "architectures": ["x64"],
+      "vendors": ["Intel"],
+      "provider_patterns": ["^$", "^auto$", "openvino"],
+      "priority": 80,
+      "required_files": [
+        "NpuInferenceBench.exe",
+        "onnxruntime.dll",
+        "onnxruntime_providers_openvino.dll"
+      ],
+      "build_switch": "EnableOvep",
+      "platform_suffix": "-ovep"
+    },
+    {
+      "id": "amd",
+      "runtime_target": "bundled",
+      "architectures": ["x64"],
+      "vendors": ["AMD"],
+      "provider_patterns": ["^$", "^auto$", "vitis"],
+      "priority": 100,
+      "required_files": [
+        "NpuInferenceBench.exe",
+        "onnxruntime.dll",
+        "onnxruntime_providers_vitisai.dll"
+      ],
+      "build_switch": "EnableAmd",
+      "platform_suffix": "-amd"
+    },
+    {
+      "id": "qualcomm",
+      "runtime_target": "bundled",
+      "architectures": ["ARM64"],
+      "vendors": ["Qualcomm"],
+      "provider_patterns": ["^$", "^auto$", "qnn"],
+      "priority": 100,
+      "required_files": [
+        "NpuInferenceBench.exe",
+        "onnxruntime.dll",
+        "onnxruntime_providers_qnn.dll",
+        "QnnHtp.dll"
+      ],
+      "build_switch": "EnableQualcomm",
+      "platform_suffix": "-qualcomm"
+    }
+  ]
+}

@@ -5,18 +5,53 @@ function Invoke-BenchmarkNativeJson {
         [Parameter(Mandatory)][string]$Exe,
         [Parameter(Mandatory)][string[]]$Arguments,
         [string]$JsonOutputPath = "",
+        [string]$IsolationRoot = "",
         [switch]$EchoOutput
     )
     $oldEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     $raw = [System.Collections.Generic.List[object]]::new()
+    $oldPath = $env:PATH
+    $isolatedVariables = @(
+        "ORT_DIR", "RYZEN_AI_INSTALLATION_PATH", "QNN_EP_DIR",
+        "WHISPER_QNN_EP_DLL", "WHISPER_QNN_HTP_DLL",
+        "WHISPER_QNN_GPU_DLL", "WHISPER_QNN_CPU_DLL", "OPENVINO_DIR",
+        "NPU_INFERENCE_BENCH_RUNNER_PACK"
+    )
+    $oldValues = @{}
     try {
+        if ($IsolationRoot) {
+            $resolvedIsolation = (Resolve-Path -LiteralPath $IsolationRoot -ErrorAction Stop).Path
+            $resolvedExe = (Resolve-Path -LiteralPath $Exe -ErrorAction Stop).Path
+            if (-not $resolvedExe.StartsWith($resolvedIsolation + "\", [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Packaged executable is outside its isolation root: $resolvedExe"
+            }
+            foreach ($name in $isolatedVariables) {
+                $oldValues[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+                [Environment]::SetEnvironmentVariable($name, $null, "Process")
+            }
+            [Environment]::SetEnvironmentVariable(
+                "NPU_INFERENCE_BENCH_RUNNER_PACK", $resolvedIsolation, "Process")
+            $systemPaths = @(
+                $resolvedIsolation,
+                (Join-Path $env:SystemRoot "System32"),
+                $env:SystemRoot,
+                $PSHOME
+            ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+            $env:PATH = $systemPaths -join ";"
+        }
         & $Exe @Arguments 2>&1 | ForEach-Object {
             $raw.Add($_)
             if ($EchoOutput) { Write-Host ([string]$_) }
         }
         $exitCode = $LASTEXITCODE
     } finally {
+        if ($IsolationRoot) {
+            $env:PATH = $oldPath
+            foreach ($name in $isolatedVariables) {
+                [Environment]::SetEnvironmentVariable($name, $oldValues[$name], "Process")
+            }
+        }
         $ErrorActionPreference = $oldEap
     }
     $payload = $null

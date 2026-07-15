@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/odobias/whisper-npu-hal/schemas/runner-package.schema.json",
+  "type": "object",
+  "required": ["schema_version", "package_id", "architecture", "configuration", "runners", "skipped"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "package_id": { "type": "string", "minLength": 1 },
+    "architecture": { "enum": ["x64", "ARM64"] },
+    "configuration": { "enum": ["Debug", "Release"] },
+    "generated_at_utc": { "type": "string" },
+    "runners": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "runtime_target", "architecture", "platform_tag", "path",
+          "executable", "vendors", "provider_patterns", "priority",
+          "required_files", "files"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "runtime_target": { "enum": ["bundled", "winml"] },
+          "architecture": { "enum": ["x64", "ARM64"] },
+          "platform_tag": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "pattern": "^runners/" },
+          "executable": { "const": "NpuInferenceBench.exe" },
+          "vendors": { "type": "array", "items": { "type": "string" } },
+          "provider_patterns": { "type": "array", "items": { "type": "string" } },
+          "priority": { "type": "integer" },
+          "minimum_os_build": { "type": ["integer", "null"] },
+          "required_files": { "type": "array", "items": { "type": "string" } },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "sha256", "size_bytes"],
+              "properties": {
+                "path": { "type": "string" },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "size_bytes": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "reason"],
+        "properties": {
+          "id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}
