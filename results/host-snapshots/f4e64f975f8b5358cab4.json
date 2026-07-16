@@ -1,0 +1,188 @@
+﻿{
+    "schema_version":  1,
+    "collected_utc":  "2026-07-16T13:33:26.7818305Z",
+    "runtime_target":  "bundled",
+    "build_tree":  "x64-dml",
+    "runner_id":  "",
+    "executable":  {
+                       "path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\build\\x64-dml\\Release\\NpuInferenceBench.exe",
+                       "sha256":  "1d55bc59c25bb34f0a87291378faa723f4f45fd80bb55d208f2b99d336a9e57c"
+                   },
+    "host":  {
+                 "hostname":  "MSI",
+                 "architecture":  "X64",
+                 "os_caption":  "Microsoft Windows 11 Pro",
+                 "os_version":  "10.0.26200",
+                 "windows_build":  "26200",
+                 "ubr":  8875,
+                 "memory_bytes":  68169183232,
+                 "system_product":  "Prestige 13 AI+ Evo A3VMG",
+                 "system_vendor":  "Micro-Star International Co., Ltd.",
+                 "bios_vendor":  "American Megatrends International, LLC.",
+                 "bios_version":  "E13Q4IMS.005",
+                 "bios_release_date":  "2025-07-02T02:00:00.0000000+02:00"
+             },
+    "hardware":  {
+                     "collected_utc":  "2026-07-16T13:33:26Z",
+                     "hostname":  "MSI",
+                     "os":  "Microsoft Windows 11 Pro",
+                     "memory_gb":  63.5,
+                     "cpu":  {
+                                 "name":  "Genuine Intel(R) 0000",
+                                 "vendor":  "Intel",
+                                 "cores":  16,
+                                 "threads":  16,
+                                 "max_clock_mhz":  2000,
+                                 "description":  "Intel64 Family 6 Model 204 Stepping 0"
+                             },
+                     "gpus":  [
+                                  {
+                                      "name":  "Intel(R) Graphics",
+                                      "video_processor":  "Intel(R) Graphics Family",
+                                      "driver_version":  "32.0.101.6960",
+                                      "driver_date":  "2025-06-04T02:00:00.0000000+02:00",
+                                      "pnp_id":  "PCI\\VEN_8086\u0026DEV_B0B0\u0026SUBSYS_14DE1462\u0026REV_00\\3\u002611583659\u00260\u002610",
+                                      "vram_mb_approx":  2048,
+                                      "resolution":  "2880x1800"
+                                  }
+                              ],
+                     "npu":  {
+                                 "name":  "Intel(R) NPU",
+                                 "architecture":  "",
+                                 "present":  true,
+                                 "manufacturer":  "Intel Corporation",
+                                 "pci_id":  "8086:B03E",
+                                 "driver_version":  "32.0.100.4778",
+                                 "driver_date":  "2026-04-28T02:00:00.0000000+02:00",
+                                 "instance_id":  "PCI\\VEN_8086\u0026DEV_B03E\u0026SUBSYS_14DE1462\u0026REV_00\\3\u002611583659\u00260\u002658"
+                             }
+                 },
+    "power":  {
+                  "source":  "battery",
+                  "active_plan":  "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+                  "energy_saver_enabled":  null,
+                  "overlay_scheme":  {
+                                         "ac":  "",
+                                         "dc":  ""
+                                     },
+                  "battery":  {
+                                  "device_id":  "MSIBIF0_9",
+                                  "status":  "OK",
+                                  "battery_status":  1,
+                                  "estimated_charge_remaining_pct":  55,
+                                  "estimated_runtime_minutes":  113,
+                                  "design_voltage_mv":  15152,
+                                  "chemistry":  6
+                              },
+                  "thermal_zones":  [
+
+                                    ]
+              },
+    "runtime_binaries":  [
+                             {
+                                 "name":  "concrt140.dll",
+                                 "sha256":  "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "DirectML.dll",
+                                 "sha256":  "9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1",
+                                 "file_version":  "1.15.4+241025-1615.1.dml-1.15.fac7597",
+                                 "product_version":  "1.15.4+241025-1615.1.dml-1.15.fac7597"
+                             },
+                             {
+                                 "name":  "msvcp140.dll",
+                                 "sha256":  "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_1.dll",
+                                 "sha256":  "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_2.dll",
+                                 "sha256":  "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_atomic_wait.dll",
+                                 "sha256":  "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_codecvt_ids.dll",
+                                 "sha256":  "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "NpuInferenceBench.exe",
+                                 "sha256":  "1d55bc59c25bb34f0a87291378faa723f4f45fd80bb55d208f2b99d336a9e57c",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "onnxruntime.dll",
+                                 "sha256":  "e7eedec6a6f26dc39dc948276a75ef6d2bee3fff944d874ceed0bbd3b97bff40",
+                                 "file_version":  "1.24.20260316.9.2d92497",
+                                 "product_version":  "1.24.20260316.9.2d92497"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_shared.dll",
+                                 "sha256":  "265c8daf29637cb259cac8be9f08f2cd45f3883f0f0e4949cbfddd5b4cbec3b6",
+                                 "file_version":  "1.24.20260316.9.2d92497",
+                                 "product_version":  "1.24.20260316.9.2d92497"
+                             },
+                             {
+                                 "name":  "OnnxRuntimeHal.Tests.exe",
+                                 "sha256":  "97c01fea4a761fd9705f1d271dc986464299c5ac8fbebb7e59f922a6be136b9f",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "vccorlib140.dll",
+                                 "sha256":  "19839407c3fdbc824e5bce189bf68ddf8097f12ec28b757797ffa0415c144ddd",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140.dll",
+                                 "sha256":  "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_1.dll",
+                                 "sha256":  "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_threads.dll",
+                                 "sha256":  "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             }
+                         ],
+    "vendor_sdk_manifests":  [
+                                 {
+                                     "path":  "third_party/windows-ml/VERSION.json",
+                                     "sha256":  "1e9bf17b04dc7a1d10cee79f9b89db7ec422108ebeb61c6c751aa3479d7a6228",
+                                     "metadata":  {
+                                                      "schema_version":  1,
+                                                      "vendor":  "Microsoft",
+                                                      "package":  "Microsoft.WindowsAppSDK.ML",
+                                                      "version":  "2.1.70",
+                                                      "rid":  "win-x64",
+                                                      "source":  "NuGet package metadata"
+                                                  }
+                                 }
+                             ],
+    "id":  "f4e64f975f8b5358cab4"
+}
