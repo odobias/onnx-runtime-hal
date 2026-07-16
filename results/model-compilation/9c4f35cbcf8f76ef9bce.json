@@ -1,0 +1,29 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-16T09:51:49.9768245Z",
+    "provenance_scope":  "pre-execution-input-artifact-and-compiler-context",
+    "artifact_stage":  "provider-input",
+    "execution_profile":  "dynamic-kv-onnx",
+    "graph_role":  "whole",
+    "target_vendor":  "Intel",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\workloads\\whisper\\models\\dynamic-onnx",
+    "artifact_sha256":  "cb0a9671f51faecc9af026e7273087151320b21cac9b451c07db062c9e64951e",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "Intel execution-provider compiler",
+                     "version":  "unknown",
+                     "version_source":  "unknown: no authoritative SDK manifest or provider binary version was found"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compiled_cache_artifact":  {
+                                    "status":  "not-captured",
+                                    "reason":  "provider compilation occurs during session creation after this input-artifact record is generated"
+                                },
+    "compilation_host_snapshot_id":  "c05bc5bc0b7392994191",
+    "id":  "9c4f35cbcf8f76ef9bce"
+}
