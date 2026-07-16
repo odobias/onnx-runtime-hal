@@ -306,14 +306,23 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
                 static_cast<double>(clip_wav.sample_rate ? clip_wav.sample_rate : 16000);
 
             TranscribeResult clip_result;
+            std::vector<double> clip_latencies;
+            clip_latencies.reserve(static_cast<std::size_t>(runs));
             try {
                 if (index == 0) engine->transcribe(clip_wav.samples);
-                clip_result = engine->transcribe(clip_wav.samples);
+                for (int run = 0; run < runs; ++run) {
+                    clip_result = engine->transcribe(clip_wav.samples);
+                    clip_latencies.push_back(clip_result.infer_seconds);
+                }
             } catch (const std::exception& e) {
                 return fail(4, std::string("Transcription failed for '") + spec.id + "': " + e.what());
             }
             const std::string clip_text = trim(clip_result.text);
-            const double clip_mean = clip_result.infer_seconds;
+            double clip_mean = 0.0;
+            for (double latency : clip_latencies) clip_mean += latency;
+            clip_mean /= static_cast<double>(clip_latencies.size());
+            const double clip_median = percentile(clip_latencies, 50.0);
+            const double clip_p90 = percentile(clip_latencies, 90.0);
             const double clip_rtf = clip_mean / clip_audio_len;
             const ErrorRate clip_error = compute_error_rate(spec.reference, clip_text);
             const auto clip_meta =
@@ -350,7 +359,7 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
             output << ",\"model_size_mb\":" << size_mb;
             output << ",\"audio\":\"" << json_escape(spec.audio) << "\"";
             output << ",\"audio_len_s\":" << clip_audio_len;
-            output << ",\"runs\":1";
+            output << ",\"runs\":" << runs;
             output << ",\"warmup\":" << (index == 0 ? 1 : 0);
             output << ",\"hot_only\":false";
             output << ",\"load_cold_s\":" << (index == 0 ? cold_load : -1.0);
@@ -359,8 +368,8 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
             output << ",\"hot_load_seconds\":" << (index == 0 ? warm_load : -1.0);
             output << ",\"warm_load_seconds\":" << (index == 0 ? warm_load : -1.0);
             output << ",\"mean_ms\":" << clip_mean * 1000.0;
-            output << ",\"median_ms\":" << clip_mean * 1000.0;
-            output << ",\"p90_ms\":" << clip_mean * 1000.0;
+            output << ",\"median_ms\":" << clip_median * 1000.0;
+            output << ",\"p90_ms\":" << clip_p90 * 1000.0;
             output << ",\"rtf\":" << clip_rtf;
             output << ",\"xrt\":" << (clip_rtf > 0 ? 1.0 / clip_rtf : 0.0);
             output << ",\"avg_logprob\":" << clip_result.avg_logprob;

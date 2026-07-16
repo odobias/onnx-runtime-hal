@@ -130,7 +130,7 @@ function Invoke-NativeBenchmark {
         }
         $args = @(
             "run", "whisper", $path, $clipSpecs[0].audio,
-            [string]$Workload.backend, $RequestedDevice, "1",
+            [string]$Workload.backend, $RequestedDevice, "$Runs",
             "--cache", $cache, "--json"
         )
         $jsonOutput = Join-Path $cache "batch-result.json"

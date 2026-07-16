@@ -44,13 +44,19 @@ workspace. Validate either a published or rolling attempt ledger with
 The portable suite separates three contracts:
 
 1. `accuracy-quick` is the default benchmark-of-record. It evaluates the full
-   reference fixture once, applies provider and numerical trust gates, and
-   publishes immutable accuracy and attempt files for that invocation.
-2. `latency` is explicit. It may use repeated timed runs and writes only the
-   performance CSVs; an accuracy-quick mean is orientation data, not a latency
-   leaderboard.
+   reference fixture with one measured inference per clip or fixture, applies
+   provider and numerical trust gates, and publishes immutable accuracy and
+   attempt files for that invocation.
+2. `latency` is explicit. Its defaults are 10 measured Whisper transcriptions
+   per clip and 20 measured classifier inferences per fixture. It writes only
+   the performance CSVs; an accuracy-quick mean is orientation data, not a
+   latency leaderboard.
 3. Direct CLI invocations are smoke or executor diagnostics. They do not become
    comparable benchmark evidence merely because inference succeeded.
+
+Both contracts keep untimed warm-up separate from measured repetitions.
+`-Runs <N>` overrides Whisper repetitions and `-ClassifierRuns <N>` overrides
+the repetitions performed for each classifier fixture in either mode.
 
 Comparisons require matching workload/profile, model and fixture hashes,
 reference contract, runtime target, requested device, and measurement purpose.
