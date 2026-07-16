@@ -69,6 +69,12 @@ Explicit `-Mode latency` runs append performance rows to
 `results/ledgers/asr.csv` and `results/ledgers/classifiers.csv`; accuracy-quick
 never writes those latency ledgers.
 
+Repetitions are mode-aware. `accuracy-quick` defaults to one measured inference
+per Whisper clip or classifier fixture. `latency` defaults to 10 measured
+Whisper transcriptions per clip and 20 measured classifier inferences per
+fixture. Both modes perform untimed warm-up separately. Override these defaults
+with `-Runs <N>` and `-ClassifierRuns <N>`.
+
 Every invocation also publishes all requested combinations—including failures
 and unsupported profiles—to:
 

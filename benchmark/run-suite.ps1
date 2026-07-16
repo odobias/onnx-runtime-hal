@@ -37,6 +37,11 @@
 # Startup policy: every model/device gets a dedicated cache that is deleted before
 # the run. The C++ harness then creates the session twice against that cache:
 # cold = compile from an empty cache; hot = reload the artifact cold just produced.
+#
+# Repetition policy: accuracy-quick defaults to one measured inference per clip
+# or fixture. Latency defaults to 10 measured Whisper transcriptions per clip and
+# 20 classifier inferences per fixture. -Runs and -ClassifierRuns override either
+# mode explicitly.
 
 [CmdletBinding()]
 param(
@@ -44,7 +49,9 @@ param(
     [ValidateSet("whisper", "tsc", "fakeaudio", "all")][string[]]$Only = @("all"),
     [ValidateSet("accuracy-quick", "latency")][string]$Mode = "accuracy-quick",
     [string[]]$Profile = @("all"),
+    [ValidateRange(1, 1000)]
     [int]$Runs = 1,
+    [ValidateRange(1, 1000)]
     [int]$ClassifierRuns = 1,
     [string]$Configuration = "Release",
     [string]$Provider = "auto",
@@ -66,6 +73,13 @@ param(
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "lib\harness.ps1")
 Initialize-BenchmarkConsole
+
+$runsExplicit = $PSBoundParameters.ContainsKey("Runs")
+$classifierRunsExplicit = $PSBoundParameters.ContainsKey("ClassifierRuns")
+if ($Mode -eq "latency") {
+    if (-not $runsExplicit) { $Runs = 10 }
+    if (-not $classifierRunsExplicit) { $ClassifierRuns = 20 }
+}
 
 # "auto" is the escape hatch back to the app's portable per-device EP fallback chain
 # (leave --provider off so ort_ep.hpp walks VitisAI/QNN/DirectML/OpenVINO/CPU).
@@ -283,6 +297,7 @@ $fixRoot = Join-Path $root "models\deepfake\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
 $providerTag = if ($Provider) { $Provider } else { "auto" }
+Write-Host "repetitions: Whisper=$Runs per clip; classifiers=$ClassifierRuns per fixture" -ForegroundColor DarkCyan
 
 $ran = @()
 $skipped = @()
