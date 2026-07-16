@@ -4,7 +4,7 @@
 <Project>
   <PropertyGroup>
     <RyzenAiDir Condition="'$(RyzenAiDir)'=='' and '$(RYZEN_AI_INSTALLATION_PATH)'!=''">$(RYZEN_AI_INSTALLATION_PATH)</RyzenAiDir>
-    <RyzenAiDir Condition="'$(RyzenAiDir)'==''">C:\Program Files\RyzenAI\1.8.0-beta</RyzenAiDir>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'==''">C:\Program Files\RyzenAI\1.7.1</RyzenAiDir>
     <!-- Intel native path: the vendored ORT+OpenVINO EP package wins over the AMD
          Ryzen AI default when EnableOvep=true (explicit /p:OrtDir still overrides). -->
     <OrtDir Condition="'$(OrtDir)'=='' and '$(EnableOvep)'=='true'">$(NpuInferenceBenchRoot)third_party\onnxruntime-openvino</OrtDir>

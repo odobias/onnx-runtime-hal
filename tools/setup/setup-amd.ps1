@@ -4,20 +4,25 @@
 #
 #   .\setup-amd.ps1
 #   .\setup-amd.ps1 -SkipDriver               # SDK only (driver already current)
-#   .\setup-amd.ps1 -InstallDir "D:\RyzenAI\1.8.0-beta"
+#   .\setup-amd.ps1 -InstallDir "D:\RyzenAI\1.7.1"
+#
+# Default is the last GA release (1.7.1). Do not use 1.8.0-beta for validation or
+# redistributable packages; AMD published that beta for MLPerf and recommends GA.
 #
 # NOTE: AMD ships no silent installer for the Ryzen AI SDK or the NPU driver, and
-# both need elevation. This script downloads them, launches the vendor installers
-# elevated (you approve the UAC + wizard prompts), and then polls for completion.
+# both need elevation. GA installers are behind account.amd.com EULA forms (not
+# direct bits URLs). Download those artifacts in a browser, then re-run, or pass
+# local -SdkUrl/-DriverUrl file paths / direct URLs when you have them.
 # Re-running after a successful install is a fast no-op.
 [CmdletBinding()]
 param(
-    [string]$Version = "1.8.0-beta",
+    [string]$Version = "1.7.1",
     [string]$InstallDir = "",
     [string]$CondaEnv = "",
-    [string]$SdkUrl = "https://download.amd.com/opendownload/RyzenAI/1.8.0b0/ryzen-ai-lt-1.8.0-beta.exe",
-    [string]$DriverUrl = "https://download.amd.com/opendownload/RyzenAI/1.8.0b0/NPU_RAI_376_WHQL.zip",
-    [version]$MinDriverVersion = "32.0.20101.3760",
+    # Browser EULA pages from https://ryzenai.docs.amd.com/en/latest/inst.html
+    [string]$SdkUrl = "https://account.amd.com/en/forms/downloads/xef.html?filename=ryzen-ai-lt-1.7.1.exe",
+    [string]$DriverUrl = "https://account.amd.com/en/forms/downloads/ryzenai-eula-public-xef.html?filename=NPU_RAI1.5_280_WHQL.zip",
+    [version]$MinDriverVersion = "32.0.203.280",
     [string]$DownloadDir = "",
     [switch]$SkipDriver,
     [int]$TimeoutMinutes = 45
@@ -99,6 +104,17 @@ function Write-SdkMetadata {
 
 function Download-File {
     param([string]$Uri, [string]$OutFile, [long]$ExpectedBytes = 0)
+    if ($Uri -match 'account\.amd\.com/.*/forms/downloads/') {
+        throw @"
+Ryzen AI GA artifacts require accepting AMD's EULA in a browser; they are not
+direct download URLs. Open:
+  $Uri
+Save the file, then either place it at:
+  $OutFile
+or re-run with -SdkUrl/-DriverUrl pointing at the local file / a direct URL.
+Docs: https://ryzenai.docs.amd.com/en/latest/inst.html
+"@
+    }
     if (Test-Path $OutFile) {
         $len = (Get-Item $OutFile).Length
         if ($ExpectedBytes -eq 0 -or $len -eq $ExpectedBytes) {

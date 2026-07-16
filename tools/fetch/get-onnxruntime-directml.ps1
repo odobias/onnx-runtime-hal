@@ -103,6 +103,7 @@ Copy-Item $directmlDll.FullName (Join-Path $staging "bin\DirectML.dll") -Force
     $utf8
 )
 
+New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
 Remove-Item $destination -Recurse -Force -ErrorAction SilentlyContinue
 Move-Item $staging $destination
 
