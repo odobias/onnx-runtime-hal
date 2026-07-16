@@ -1,0 +1,237 @@
+﻿{
+    "schema_version":  1,
+    "collected_utc":  "2026-07-16T00:28:15.6860610Z",
+    "runtime_target":  "bundled",
+    "build_tree":  "ARM64-qualcomm",
+    "runner_id":  "qualcomm",
+    "executable":  {
+                       "path":  "C:\\Projects\\whisper-npu-hal\\dist\\npu-inference-bench-ARM64\\runners\\qualcomm\\NpuInferenceBench.exe",
+                       "sha256":  "326f682abe4f3d81578798e7e1049d8d9fe91f8175b97a3623fddbd6acb76b53"
+                   },
+    "host":  {
+                 "hostname":  "DRAGONREAPER",
+                 "architecture":  "Arm64",
+                 "os_caption":  "Microsoft Windows 11 Home",
+                 "os_version":  "10.0.26200",
+                 "windows_build":  "26200",
+                 "ubr":  8737,
+                 "memory_bytes":  16757260288,
+                 "system_product":  "Microsoft Surface Laptop, 7th Edition",
+                 "system_vendor":  "Microsoft Corporation",
+                 "bios_vendor":  "Microsoft Corporation",
+                 "bios_version":  "175.235.235",
+                 "bios_release_date":  "2026-04-02T02:00:00.0000000+02:00"
+             },
+    "hardware":  {
+                     "collected_utc":  "2026-07-16T00:28:15Z",
+                     "hostname":  "DRAGONREAPER",
+                     "os":  "Microsoft Windows 11 Home",
+                     "memory_gb":  15.6,
+                     "cpu":  {
+                                 "name":  "Snapdragon(R) X 12-core X1E80100 @ 3.40 GHz",
+                                 "vendor":  "Qualcomm",
+                                 "cores":  12,
+                                 "threads":  12,
+                                 "max_clock_mhz":  3417,
+                                 "description":  "ARMv8 (64-bit) Family 8 Model 1 Revision 201"
+                             },
+                     "gpus":  [
+                                  {
+                                      "name":  "Qualcomm(R) Adreno(TM) X1-85 GPU",
+                                      "video_processor":  "Qualcomm(R) Adreno(TM) Graphics",
+                                      "driver_version":  "31.0.133.1",
+                                      "driver_date":  "2025-11-09T01:00:00.0000000+01:00",
+                                      "pnp_id":  "ACPI\\VEN_QCOM\u0026DEV_0C36\u0026SUBSYS_IDP08380\u0026REV_0088\\0",
+                                      "vram_mb_approx":  null,
+                                      "resolution":  "2304x1536"
+                                  }
+                              ],
+                     "npu":  {
+                                 "name":  "Snapdragon(R) X Elite - X1E80100 - Qualcomm(R) Hexagon(TM) NPU",
+                                 "architecture":  "",
+                                 "present":  true,
+                                 "manufacturer":  "Qualcomm Technologies, Inc.",
+                                 "pci_id":  "",
+                                 "driver_version":  "30.0.220.3000",
+                                 "driver_date":  "2026-01-08T01:00:00.0000000+01:00",
+                                 "instance_id":  "ACPI\\QCOM0D0A\\2\u0026DABA3FF\u00260"
+                             }
+                 },
+    "power":  {
+                  "source":  "AC",
+                  "active_plan":  "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+                  "energy_saver_enabled":  null,
+                  "overlay_scheme":  {
+                                         "ac":  "",
+                                         "dc":  ""
+                                     },
+                  "battery":  {
+                                  "device_id":  "SurfaceBattery1",
+                                  "status":  "OK",
+                                  "battery_status":  2,
+                                  "estimated_charge_remaining_pct":  98,
+                                  "estimated_runtime_minutes":  71582788,
+                                  "design_voltage_mv":  13190,
+                                  "chemistry":  6
+                              },
+                  "thermal_zones":  [
+
+                                    ]
+              },
+    "runtime_binaries":  [
+                             {
+                                 "name":  "concrt140.dll",
+                                 "sha256":  "599bc7eaec13274536cc3ec2d18e810e79bc9eb915237b4ee6d25081b6926214",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "DirectML.dll",
+                                 "sha256":  "77b0db83ff903f2323f5caf538499d75af6038bbea23b7959f7d232d9a4ab9d4",
+                                 "file_version":  "1.15.4+241025-1615.1.dml-1.15.fac7597",
+                                 "product_version":  "1.15.4+241025-1615.1.dml-1.15.fac7597"
+                             },
+                             {
+                                 "name":  "Genie.dll",
+                                 "sha256":  "1668b9c48ef476ab31c8f39a7caccf546a33eae75ed69bc31ad84cc033669724",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "msvcp140.dll",
+                                 "sha256":  "045faeab0b5710816ae160ea20dae8495ffc11bb51feca15d22aaf7ff3752cb3",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_1.dll",
+                                 "sha256":  "af9dd287c5e5d47186fec391099e140bf9e758245d39c78e94f8cb4ffaada1e5",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_2.dll",
+                                 "sha256":  "17dd07ea186d419e1803a4b25785644b59d4346dd1a00df709fb6eb403baa11e",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_atomic_wait.dll",
+                                 "sha256":  "4384e35592b7be1f0b80718eba2f779060d73c3e232eb1bfadf8a4cb9b14601f",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_codecvt_ids.dll",
+                                 "sha256":  "6e075254adab66a80e1624b656fbe81043c23149e5045871b2eccc4c7ff589ce",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "NpuInferenceBench.exe",
+                                 "sha256":  "326f682abe4f3d81578798e7e1049d8d9fe91f8175b97a3623fddbd6acb76b53",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "onnxruntime.dll",
+                                 "sha256":  "939fa0be435d253eadd9e394ee94ad6b6ac1878c83b64118bb4bda669eb0e28c",
+                                 "file_version":  "1.24.20260316.9.2d92497",
+                                 "product_version":  "1.24.20260316.9.2d92497"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_qnn.dll",
+                                 "sha256":  "136b445a1b974a2ee82d5097256c3e4dbe1b5ead9d03de96a1216c3e5c310ecb",
+                                 "file_version":  "2.3.0",
+                                 "product_version":  "2.3.0"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_shared.dll",
+                                 "sha256":  "3923290b6fc5dcd754b4d533463a9b8b46da0889d3991ef4f9b9afa17929e3e2",
+                                 "file_version":  "1.24.20260316.9.2d92497",
+                                 "product_version":  "1.24.20260316.9.2d92497"
+                             },
+                             {
+                                 "name":  "OnnxRuntimeHal.Tests.exe",
+                                 "sha256":  "f23dc2c18b69afebd8dc9dc7b56cae6ce6cf0ee247dd3e1fbb5ff1155a5af4d5",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "QnnCpu.dll",
+                                 "sha256":  "2431d2f6a06ab95445c3b7f8f44fb24e648487b934d676be2719467a626f0a74",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnGpu.dll",
+                                 "sha256":  "6a1d0adb00ec4bc3c8b03e62ef1a48eaa99cbf00819f3ba06e81cecbce190243",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnHtp.dll",
+                                 "sha256":  "f83036e8bafce2d6fb1da8a1bd4fe822aef42f954dcd591401e7fe26b4ae8412",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnHtpNetRunExtensions.dll",
+                                 "sha256":  "d32eae956077c7d359122f66e06e8ca20e5d38657e9f75a035631fb198406d38",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnHtpPrepare.dll",
+                                 "sha256":  "cd7123f907b1a425856e0b84caa4cade219861a15a5c8f45f17ef8d1f3a3d735",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnHtpV73Stub.dll",
+                                 "sha256":  "7ec9b3fa286e6bb79cdb69fb5990302c1d72fe463a74cf51c1bebc709c62e755",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnHtpV81Stub.dll",
+                                 "sha256":  "6e30e5ec9d844da9e71499678d24cbafaf8d4507316a01f6df601ab889df50e5",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "QnnSystem.dll",
+                                 "sha256":  "b4b5fc291b421826dda5b9da5e9e9d45555710497903a4ffc2eaab4130e7b7a4",
+                                 "file_version":  "2.47.0.0",
+                                 "product_version":  "2.47.0.260601114230"
+                             },
+                             {
+                                 "name":  "vccorlib140.dll",
+                                 "sha256":  "1b6511898e2d52815e059ecdf9635dd6bc86b487057cf3eb1bf4798d87855fb7",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140.dll",
+                                 "sha256":  "d8a8513921544569837e400d37cc71302819967ae6defa932266a7ecb41dbaf9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_1.dll",
+                                 "sha256":  "42b5f76f1f0ae03c93fc4c107adf83c5f14e86032474860032cfe672d0836546",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_threads.dll",
+                                 "sha256":  "165c779ae40e8c1a914537873629c17546d6866ecb3c24cc2022805053e6c77d",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             }
+                         ],
+    "vendor_sdk_manifests":  [
+
+                             ],
+    "id":  "b19656d2123b11f89289"
+}
