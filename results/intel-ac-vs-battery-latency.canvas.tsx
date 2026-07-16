@@ -1,4 +1,4 @@
-import {
+﻿import {
   BarChart,
   Callout,
   Card,
@@ -26,28 +26,28 @@ type RowCmp = {
 };
 
 const ROWS: RowCmp[] = [
-  { runtime: "bundled", workload: "fakeaudio", device: "CPU", ac_ms: 165.4, battery_ms: 126.1, delta_ms: -39.3, ratio: 0.76 },
-  { runtime: "bundled", workload: "fakeaudio", device: "GPU", ac_ms: 56.3, battery_ms: 76.5, delta_ms: 20.2, ratio: 1.36 },
-  { runtime: "bundled", workload: "fakeaudio", device: "NPU", ac_ms: 28.1, battery_ms: 23.2, delta_ms: -4.9, ratio: 0.82 },
-  { runtime: "bundled", workload: "tsc", device: "CPU", ac_ms: 387.8, battery_ms: 243.9, delta_ms: -143.9, ratio: 0.63 },
-  { runtime: "bundled", workload: "tsc", device: "GPU", ac_ms: 58.5, battery_ms: 40.2, delta_ms: -18.4, ratio: 0.69 },
-  { runtime: "bundled", workload: "tsc", device: "NPU", ac_ms: 29.7, battery_ms: 8.2, delta_ms: -21.5, ratio: 0.27 },
-  { runtime: "bundled", workload: "whisper-dynamic", device: "CPU", ac_ms: 1878.9, battery_ms: 1671.8, delta_ms: -207.1, ratio: 0.89 },
-  { runtime: "bundled", workload: "whisper-dynamic", device: "GPU", ac_ms: 598.0, battery_ms: 612.3, delta_ms: 14.3, ratio: 1.02 },
-  { runtime: "bundled", workload: "whisper-static", device: "CPU", ac_ms: 3243.1, battery_ms: 2337.5, delta_ms: -905.6, ratio: 0.72 },
-  { runtime: "bundled", workload: "whisper-static", device: "GPU", ac_ms: 1313.3, battery_ms: 676.2, delta_ms: -637.1, ratio: 0.51 },
-  { runtime: "bundled", workload: "whisper-static", device: "NPU", ac_ms: 3063.8, battery_ms: 544.4, delta_ms: -2519.4, ratio: 0.18 },
-  { runtime: "winml", workload: "fakeaudio", device: "CPU", ac_ms: 148.0, battery_ms: 115.2, delta_ms: -32.8, ratio: 0.78 },
-  { runtime: "winml", workload: "fakeaudio", device: "GPU", ac_ms: 61.4, battery_ms: 72.4, delta_ms: 11.0, ratio: 1.18 },
-  { runtime: "winml", workload: "fakeaudio", device: "NPU", ac_ms: 33.4, battery_ms: 23.1, delta_ms: -10.4, ratio: 0.69 },
-  { runtime: "winml", workload: "tsc", device: "CPU", ac_ms: 304.5, battery_ms: 197.5, delta_ms: -107.0, ratio: 0.65 },
-  { runtime: "winml", workload: "tsc", device: "GPU", ac_ms: 70.7, battery_ms: 39.0, delta_ms: -31.8, ratio: 0.55 },
-  { runtime: "winml", workload: "tsc", device: "NPU", ac_ms: 19.3, battery_ms: 8.8, delta_ms: -10.5, ratio: 0.46 },
-  { runtime: "winml", workload: "whisper-dynamic", device: "CPU", ac_ms: 329.6, battery_ms: 218.3, delta_ms: -111.3, ratio: 0.66 },
-  { runtime: "winml", workload: "whisper-dynamic", device: "GPU", ac_ms: 537.4, battery_ms: 583.2, delta_ms: 45.8, ratio: 1.09 },
-  { runtime: "winml", workload: "whisper-static", device: "CPU", ac_ms: 2151.4, battery_ms: 932.2, delta_ms: -1219.1, ratio: 0.43 },
-  { runtime: "winml", workload: "whisper-static", device: "GPU", ac_ms: 848.7, battery_ms: 658.3, delta_ms: -190.3, ratio: 0.78 },
-  { runtime: "winml", workload: "whisper-static", device: "NPU", ac_ms: 372.1, battery_ms: 292.5, delta_ms: -79.6, ratio: 0.79 },
+  { runtime: "bundled", workload: "whisper-static", device: "NPU", ac_ms: 718.9, battery_ms: 544.4, delta_ms: -174.5, ratio: 0.76 },
+  { runtime: "bundled", workload: "whisper-static", device: "GPU", ac_ms: 728.6, battery_ms: 676.2, delta_ms: -52.4, ratio: 0.93 },
+  { runtime: "bundled", workload: "whisper-static", device: "CPU", ac_ms: 2514.2, battery_ms: 2337.5, delta_ms: -176.7, ratio: 0.93 },
+  { runtime: "bundled", workload: "whisper-dynamic", device: "GPU", ac_ms: 357.5, battery_ms: 612.3, delta_ms: 254.8, ratio: 1.71 },
+  { runtime: "bundled", workload: "whisper-dynamic", device: "CPU", ac_ms: 1566.0, battery_ms: 1671.8, delta_ms: 105.8, ratio: 1.07 },
+  { runtime: "bundled", workload: "tsc", device: "NPU", ac_ms: 8.3, battery_ms: 8.2, delta_ms: -0.2, ratio: 0.98 },
+  { runtime: "bundled", workload: "tsc", device: "GPU", ac_ms: 40.9, battery_ms: 40.2, delta_ms: -0.7, ratio: 0.98 },
+  { runtime: "bundled", workload: "tsc", device: "CPU", ac_ms: 266.0, battery_ms: 243.9, delta_ms: -22.1, ratio: 0.92 },
+  { runtime: "bundled", workload: "fakeaudio", device: "NPU", ac_ms: 23.4, battery_ms: 23.2, delta_ms: -0.3, ratio: 0.99 },
+  { runtime: "bundled", workload: "fakeaudio", device: "GPU", ac_ms: 50.2, battery_ms: 76.5, delta_ms: 26.3, ratio: 1.52 },
+  { runtime: "bundled", workload: "fakeaudio", device: "CPU", ac_ms: 122.7, battery_ms: 126.1, delta_ms: 3.4, ratio: 1.03 },
+  { runtime: "winml", workload: "whisper-static", device: "NPU", ac_ms: 200.0, battery_ms: 292.5, delta_ms: 92.5, ratio: 1.46 },
+  { runtime: "winml", workload: "whisper-static", device: "GPU", ac_ms: 562.5, battery_ms: 658.3, delta_ms: 95.9, ratio: 1.17 },
+  { runtime: "winml", workload: "whisper-static", device: "CPU", ac_ms: 1497.5, battery_ms: 932.2, delta_ms: -565.3, ratio: 0.62 },
+  { runtime: "winml", workload: "whisper-dynamic", device: "GPU", ac_ms: 334.2, battery_ms: 583.2, delta_ms: 249.1, ratio: 1.75 },
+  { runtime: "winml", workload: "whisper-dynamic", device: "CPU", ac_ms: 202.7, battery_ms: 218.3, delta_ms: 15.6, ratio: 1.08 },
+  { runtime: "winml", workload: "tsc", device: "NPU", ac_ms: 8.8, battery_ms: 8.8, delta_ms: 0.0, ratio: 1.00 },
+  { runtime: "winml", workload: "tsc", device: "GPU", ac_ms: 38.6, battery_ms: 39.0, delta_ms: 0.3, ratio: 1.01 },
+  { runtime: "winml", workload: "tsc", device: "CPU", ac_ms: 204.5, battery_ms: 197.5, delta_ms: -7.1, ratio: 0.97 },
+  { runtime: "winml", workload: "fakeaudio", device: "NPU", ac_ms: 23.5, battery_ms: 23.1, delta_ms: -0.4, ratio: 0.98 },
+  { runtime: "winml", workload: "fakeaudio", device: "GPU", ac_ms: 47.1, battery_ms: 72.4, delta_ms: 25.3, ratio: 1.54 },
+  { runtime: "winml", workload: "fakeaudio", device: "CPU", ac_ms: 107.3, battery_ms: 115.2, delta_ms: 7.8, ratio: 1.07 },
 ];
 
 function median(values: number[]) {
@@ -237,11 +237,11 @@ export default function IntelAcVsBatteryLatency() {
       </Grid>
 
       <Callout tone="warning" title="This is not evidence that battery makes Intel faster">
-        Battery measured lower mean latency in 18 of 22 pairs, including a
-        suspicious 0.18× result for bundled Whisper NPU. Each power condition
-        is one sequential campaign, not an interleaved or counterbalanced
-        experiment. Treat the gap as campaign-order, thermal, driver-cache, or
-        background-load sensitivity until repeated A/B/A/B runs reproduce it.
+        After replacing the contaminated AC campaigns, battery is still lower in
+        10 of 22 pairs (bundled Whisper NPU now 0.76×, not 0.18×). Each power
+        condition remains one sequential campaign, not interleaved. Treat
+        remaining gaps as campaign-order / thermal / cache sensitivity until
+        A/B/A/B repeats reproduce them.
       </Callout>
 
       <Card>

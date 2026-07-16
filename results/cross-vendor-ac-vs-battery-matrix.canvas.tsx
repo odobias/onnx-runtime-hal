@@ -1,4 +1,4 @@
-import {
+﻿import {
   BarChart,
   Callout,
   Card,
@@ -28,28 +28,28 @@ type Cell = {
 
 /** Latest mode-latency rows (10 Whisper / 20 classifier) from results/ledgers. */
 const CELLS: Cell[] = [
-  { power: "ac", runtime: "bundled", workload: "whisper-static", device: "NPU", intel: 3063.8, amd: 642.4, qualcomm: 359.8 },
-  { power: "ac", runtime: "bundled", workload: "whisper-static", device: "GPU", intel: 1313.3, amd: 570.1, qualcomm: 778.0 },
-  { power: "ac", runtime: "bundled", workload: "whisper-static", device: "CPU", intel: 3243.1, amd: 1033.7, qualcomm: 1202.2 },
-  { power: "ac", runtime: "bundled", workload: "whisper-dynamic", device: "GPU", intel: 598.0, amd: 379.2, qualcomm: 688.0 },
-  { power: "ac", runtime: "bundled", workload: "whisper-dynamic", device: "CPU", intel: 1878.9, amd: 264.3, qualcomm: 331.5 },
-  { power: "ac", runtime: "bundled", workload: "tsc", device: "NPU", intel: 29.7, amd: 33.3, qualcomm: 18.5 },
-  { power: "ac", runtime: "bundled", workload: "tsc", device: "GPU", intel: 58.5, amd: 63.6, qualcomm: 84.0 },
-  { power: "ac", runtime: "bundled", workload: "tsc", device: "CPU", intel: 387.8, amd: 159.0, qualcomm: 231.9 },
-  { power: "ac", runtime: "bundled", workload: "fakeaudio", device: "NPU", intel: 28.1, amd: 41.7, qualcomm: 128.1 },
-  { power: "ac", runtime: "bundled", workload: "fakeaudio", device: "GPU", intel: 56.3, amd: 38.0, qualcomm: 46.2 },
-  { power: "ac", runtime: "bundled", workload: "fakeaudio", device: "CPU", intel: 165.4, amd: 79.6, qualcomm: 158.2 },
-  { power: "ac", runtime: "winml", workload: "whisper-static", device: "NPU", intel: 372.1, amd: 609.0, qualcomm: 376.7 },
-  { power: "ac", runtime: "winml", workload: "whisper-static", device: "GPU", intel: 848.7, amd: 577.6, qualcomm: 774.2 },
-  { power: "ac", runtime: "winml", workload: "whisper-static", device: "CPU", intel: 2151.4, amd: 1327.5, qualcomm: 871.5 },
-  { power: "ac", runtime: "winml", workload: "whisper-dynamic", device: "GPU", intel: 537.4, amd: 391.9, qualcomm: 680.2 },
-  { power: "ac", runtime: "winml", workload: "whisper-dynamic", device: "CPU", intel: 329.6, amd: 220.8, qualcomm: 200.1 },
-  { power: "ac", runtime: "winml", workload: "tsc", device: "NPU", intel: 19.3, amd: 33.6, qualcomm: 18.4 },
-  { power: "ac", runtime: "winml", workload: "tsc", device: "GPU", intel: 70.7, amd: 74.9, qualcomm: 84.2 },
-  { power: "ac", runtime: "winml", workload: "tsc", device: "CPU", intel: 304.5, amd: 151.9, qualcomm: 179.4 },
-  { power: "ac", runtime: "winml", workload: "fakeaudio", device: "NPU", intel: 33.4, amd: 48.7, qualcomm: 128.1 },
-  { power: "ac", runtime: "winml", workload: "fakeaudio", device: "GPU", intel: 61.4, amd: 85.7, qualcomm: 45.8 },
-  { power: "ac", runtime: "winml", workload: "fakeaudio", device: "CPU", intel: 148.0, amd: 91.7, qualcomm: 94.2 },
+  { power: "ac", runtime: "bundled", workload: "whisper-static", device: "NPU", intel: 718.9, amd: 642.4, qualcomm: 359.8 },
+  { power: "ac", runtime: "bundled", workload: "whisper-static", device: "GPU", intel: 728.6, amd: 570.1, qualcomm: 778.0 },
+  { power: "ac", runtime: "bundled", workload: "whisper-static", device: "CPU", intel: 2514.2, amd: 1033.7, qualcomm: 1202.2 },
+  { power: "ac", runtime: "bundled", workload: "whisper-dynamic", device: "GPU", intel: 357.5, amd: 379.2, qualcomm: 688.0 },
+  { power: "ac", runtime: "bundled", workload: "whisper-dynamic", device: "CPU", intel: 1566.0, amd: 264.3, qualcomm: 331.5 },
+  { power: "ac", runtime: "bundled", workload: "tsc", device: "NPU", intel: 8.3, amd: 33.3, qualcomm: 18.5 },
+  { power: "ac", runtime: "bundled", workload: "tsc", device: "GPU", intel: 40.9, amd: 63.6, qualcomm: 84.0 },
+  { power: "ac", runtime: "bundled", workload: "tsc", device: "CPU", intel: 266.0, amd: 159.0, qualcomm: 231.9 },
+  { power: "ac", runtime: "bundled", workload: "fakeaudio", device: "NPU", intel: 23.4, amd: 41.7, qualcomm: 128.1 },
+  { power: "ac", runtime: "bundled", workload: "fakeaudio", device: "GPU", intel: 50.2, amd: 38.0, qualcomm: 46.2 },
+  { power: "ac", runtime: "bundled", workload: "fakeaudio", device: "CPU", intel: 122.7, amd: 79.6, qualcomm: 158.2 },
+  { power: "ac", runtime: "winml", workload: "whisper-static", device: "NPU", intel: 200.0, amd: 609.0, qualcomm: 376.7 },
+  { power: "ac", runtime: "winml", workload: "whisper-static", device: "GPU", intel: 562.5, amd: 577.6, qualcomm: 774.2 },
+  { power: "ac", runtime: "winml", workload: "whisper-static", device: "CPU", intel: 1497.5, amd: 1327.5, qualcomm: 871.5 },
+  { power: "ac", runtime: "winml", workload: "whisper-dynamic", device: "GPU", intel: 334.2, amd: 391.9, qualcomm: 680.2 },
+  { power: "ac", runtime: "winml", workload: "whisper-dynamic", device: "CPU", intel: 202.7, amd: 220.8, qualcomm: 200.1 },
+  { power: "ac", runtime: "winml", workload: "tsc", device: "NPU", intel: 8.8, amd: 33.6, qualcomm: 18.4 },
+  { power: "ac", runtime: "winml", workload: "tsc", device: "GPU", intel: 38.6, amd: 74.9, qualcomm: 84.2 },
+  { power: "ac", runtime: "winml", workload: "tsc", device: "CPU", intel: 204.5, amd: 151.9, qualcomm: 179.4 },
+  { power: "ac", runtime: "winml", workload: "fakeaudio", device: "NPU", intel: 23.5, amd: 48.7, qualcomm: 128.1 },
+  { power: "ac", runtime: "winml", workload: "fakeaudio", device: "GPU", intel: 47.1, amd: 85.7, qualcomm: 45.8 },
+  { power: "ac", runtime: "winml", workload: "fakeaudio", device: "CPU", intel: 107.3, amd: 91.7, qualcomm: 94.2 },
   { power: "battery", runtime: "bundled", workload: "whisper-static", device: "NPU", intel: 544.4, amd: 753.3, qualcomm: 360.0 },
   { power: "battery", runtime: "bundled", workload: "whisper-static", device: "GPU", intel: 676.2, amd: 818.3, qualcomm: 1283.4 },
   { power: "battery", runtime: "bundled", workload: "whisper-static", device: "CPU", intel: 2337.5, amd: 862.1, qualcomm: 12605.0 },
@@ -265,7 +265,7 @@ function Overview() {
         battery (bundled + Windows ML, NPU/GPU/CPU, excluding unsupported
         dynamic-KV NPU). Rankings still move with power: Qualcomm collapses on
         battery CPU, Intel&apos;s bundled Whisper NPU AC row looks campaign-
-        contaminated (3064 ms vs 544 ms on battery), and AMD pays a clearer
+        Intel AC was remeasured (bundled Whisper NPU ~719 ms); AMD still pays a clearer
         battery tax on accelerators.
       </Callout>
 
@@ -463,12 +463,11 @@ function PowerMatrix({ power }: { power: "ac" | "battery" }) {
       </Grid>
 
       {power === "ac" ? (
-        <Callout tone="danger" title="Intel bundled Whisper NPU AC is not trustworthy alone">
-          Intel AC bundled Whisper NPU mean is 3063.8 ms versus 544.4 ms on the
-          battery campaign with the same binary and model hash. Treat that AC
-          cell as contaminated by campaign order / compile cache / thermal
-          state until interleaved repeats exist. Prefer the Windows ML Whisper
-          NPU AC row (372.1 ms) for Intel Whisper comparisons on AC.
+        <Callout tone="info" title="Intel AC latency was remeasured">
+          Contaminated PR #80 AC campaigns were dropped from the ledgers. The
+          replacement bundled Whisper NPU AC mean is 718.9 ms (median 680.5),
+          versus 544.4 ms on battery. Windows ML Whisper NPU AC is 200.0 ms.
+          Prefer interleaved AC/battery repeats before claiming power causality.
         </Callout>
       ) : (
         <Callout tone="danger" title="Qualcomm battery CPU falls off a cliff">
@@ -566,9 +565,9 @@ function Caveats() {
         headers={["Issue", "Where it shows up", "How to read it"]}
         rows={[
           [
-            "Intel AC Whisper NPU outlier",
-            "bundled AC NPU 3063.8 ms vs battery 544.4 ms",
-            "Prefer WinML AC Whisper NPU or wait for interleaved repeats",
+            "Intel AC remeasured",
+            "bundled Whisper NPU AC 718.9 ms (was 3063.8) vs battery 544.4",
+            "Old AC campaigns removed from ledgers; WinML AC NPU is 200.0 ms",
           ],
           [
             "Qualcomm battery CPU collapse",
