@@ -264,9 +264,8 @@ function Overview() {
         Every vendor now has a complete 22-cell latency matrix on AC and on
         battery (bundled + Windows ML, NPU/GPU/CPU, excluding unsupported
         dynamic-KV NPU). Rankings still move with power: Qualcomm collapses on
-        battery CPU, Intel&apos;s bundled Whisper NPU AC row looks campaign-
-        Intel AC was remeasured (bundled Whisper NPU ~719 ms); AMD still pays a clearer
-        battery tax on accelerators.
+        battery CPU, Intel AC was remeasured (bundled Whisper NPU ~719 ms), and
+        AMD pays a clearer battery tax on accelerators.
       </Callout>
 
       <Grid columns={2} gap={16}>

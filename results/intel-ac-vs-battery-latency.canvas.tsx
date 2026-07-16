@@ -67,28 +67,28 @@ function pick(runtime: string, workload: string, device: string) {
   )!;
 }
 
-function seriesPair(
-  keys: Array<{
-    runtime: string;
-    workload: string;
-    device: string;
-    label: string;
-  }>
+function sharedYMax(values: number[]): number {
+  const max = Math.max(0, ...values);
+  return max <= 0 ? 1 : Math.ceil(max * 1.05);
+}
+
+function runtimePowerSeries(
+  runtime: "bundled" | "winml",
+  workload: string,
+  devices: string[]
 ) {
   return {
-    categories: keys.map((key) => key.label),
+    categories: devices,
     series: [
       {
         name: "AC",
-        data: keys.map(
-          (key) => pick(key.runtime, key.workload, key.device).ac_ms
-        ),
+        data: devices.map((device) => pick(runtime, workload, device).ac_ms),
         tone: "info" as const,
       },
       {
         name: "Battery",
-        data: keys.map(
-          (key) => pick(key.runtime, key.workload, key.device).battery_ms
+        data: devices.map(
+          (device) => pick(runtime, workload, device).battery_ms
         ),
         tone: "warning" as const,
       },
@@ -96,39 +96,67 @@ function seriesPair(
   };
 }
 
-const whisperStatic = seriesPair([
-  { runtime: "bundled", workload: "whisper-static", device: "NPU", label: "bundled NPU" },
-  { runtime: "bundled", workload: "whisper-static", device: "GPU", label: "bundled GPU" },
-  { runtime: "bundled", workload: "whisper-static", device: "CPU", label: "bundled CPU" },
-  { runtime: "winml", workload: "whisper-static", device: "NPU", label: "winml NPU" },
-  { runtime: "winml", workload: "whisper-static", device: "GPU", label: "winml GPU" },
-  { runtime: "winml", workload: "whisper-static", device: "CPU", label: "winml CPU" },
-]);
-
-const whisperDynamic = seriesPair([
-  { runtime: "bundled", workload: "whisper-dynamic", device: "GPU", label: "bundled GPU" },
-  { runtime: "bundled", workload: "whisper-dynamic", device: "CPU", label: "bundled CPU" },
-  { runtime: "winml", workload: "whisper-dynamic", device: "GPU", label: "winml GPU" },
-  { runtime: "winml", workload: "whisper-dynamic", device: "CPU", label: "winml CPU" },
-]);
-
-const tsc = seriesPair([
-  { runtime: "bundled", workload: "tsc", device: "NPU", label: "bundled NPU" },
-  { runtime: "bundled", workload: "tsc", device: "GPU", label: "bundled GPU" },
-  { runtime: "bundled", workload: "tsc", device: "CPU", label: "bundled CPU" },
-  { runtime: "winml", workload: "tsc", device: "NPU", label: "winml NPU" },
-  { runtime: "winml", workload: "tsc", device: "GPU", label: "winml GPU" },
-  { runtime: "winml", workload: "tsc", device: "CPU", label: "winml CPU" },
-]);
-
-const fakeaudio = seriesPair([
-  { runtime: "bundled", workload: "fakeaudio", device: "NPU", label: "bundled NPU" },
-  { runtime: "bundled", workload: "fakeaudio", device: "GPU", label: "bundled GPU" },
-  { runtime: "bundled", workload: "fakeaudio", device: "CPU", label: "bundled CPU" },
-  { runtime: "winml", workload: "fakeaudio", device: "NPU", label: "winml NPU" },
-  { runtime: "winml", workload: "fakeaudio", device: "GPU", label: "winml GPU" },
-  { runtime: "winml", workload: "fakeaudio", device: "CPU", label: "winml CPU" },
-]);
+function WorkloadRuntimePair({
+  workload,
+  devices,
+  title,
+  note,
+}: {
+  workload: string;
+  devices: string[];
+  title: string;
+  note: string;
+}) {
+  const bundled = runtimePowerSeries("bundled", workload, devices);
+  const winml = runtimePowerSeries("winml", workload, devices);
+  const yMax = sharedYMax([
+    ...bundled.series.flatMap((s) => s.data),
+    ...winml.series.flatMap((s) => s.data),
+  ]);
+  return (
+    <Stack gap={10}>
+      <H2>{title}</H2>
+      <Text tone="secondary">{note}</Text>
+      <Grid columns={2} gap={16}>
+        <Card>
+          <CardHeader trailing={<Pill size="sm">bundled</Pill>}>
+            {title} · bundled · AC vs battery
+          </CardHeader>
+          <CardBody>
+            <BarChart
+              {...bundled}
+              height={280}
+              valueSuffix=" ms"
+              beginAtZero
+              yMax={yMax}
+            />
+            <Text tone="tertiary">
+              X-axis: device · Y-axis: mean latency (ms) · shared scale ·
+              bundled
+            </Text>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader trailing={<Pill size="sm">Windows ML</Pill>}>
+            {title} · Windows ML · AC vs battery
+          </CardHeader>
+          <CardBody>
+            <BarChart
+              {...winml}
+              height={280}
+              valueSuffix=" ms"
+              beginAtZero
+              yMax={yMax}
+            />
+            <Text tone="tertiary">
+              X-axis: device · Y-axis: mean latency (ms) · shared scale · WinML
+            </Text>
+          </CardBody>
+        </Card>
+      </Grid>
+    </Stack>
+  );
+}
 
 const DEVICES = ["NPU", "GPU", "CPU"] as const;
 const byDevice = Object.fromEntries(
@@ -208,8 +236,8 @@ export default function IntelAcVsBatteryLatency() {
           inference latency.
         </Text>
         <Text tone="tertiary">
-          AC campaigns: 23b25628, 1993f5ab, 6e3949bc, 941ab7e6 · Battery:
-          da4ce213, a889fd8d, c05bc5bc, a9a43206 (48%→41%) · 16 July 2026
+          AC (remeasured): 3b7bbe70, 85d7c162, 2ea51705, 943e0bbd · Battery:
+          da4ce213, a889fd8d, c05bc5bc, a9a43206 · 16 July 2026
         </Text>
       </Stack>
 
@@ -266,78 +294,37 @@ export default function IntelAcVsBatteryLatency() {
       </Card>
 
       <Stack gap={8}>
-        <H2>Absolute latency by workload</H2>
+        <H2>Absolute latency by model</H2>
         <Text tone="secondary">
-          Same runtime, execution profile, device, model hash, and repetition
-          policy on AC and battery.
+          Remeasured Intel AC vs battery. Bundled and Windows ML sit side by
+          side on a shared Y scale; bars are AC vs battery per device.
         </Text>
       </Stack>
 
-      <Grid columns={2} gap={16}>
-        <Card>
-          <CardHeader>Whisper static — mean inference latency</CardHeader>
-          <CardBody>
-            <BarChart
-              categories={whisperStatic.categories}
-              series={whisperStatic.series}
-              height={280}
-              valueSuffix=" ms"
-              beginAtZero
-            />
-            <Text tone="tertiary">
-              X-axis: runtime/device · Y-axis: mean latency (ms) · 10 runs
-            </Text>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>Whisper dynamic — mean inference latency</CardHeader>
-          <CardBody>
-            <BarChart
-              categories={whisperDynamic.categories}
-              series={whisperDynamic.series}
-              height={280}
-              valueSuffix=" ms"
-              beginAtZero
-            />
-            <Text tone="tertiary">
-              X-axis: runtime/device · Y-axis: mean latency (ms) · 10 runs ·
-              NPU unsupported and omitted
-            </Text>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>TSC — mean inference latency</CardHeader>
-          <CardBody>
-            <BarChart
-              categories={tsc.categories}
-              series={tsc.series}
-              height={280}
-              valueSuffix=" ms"
-              beginAtZero
-            />
-            <Text tone="tertiary">
-              X-axis: runtime/device · Y-axis: mean latency (ms) · 20 runs per
-              fixture sample
-            </Text>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader>FakeAudio — mean inference latency</CardHeader>
-          <CardBody>
-            <BarChart
-              categories={fakeaudio.categories}
-              series={fakeaudio.series}
-              height={280}
-              valueSuffix=" ms"
-              beginAtZero
-            />
-            <Text tone="tertiary">
-              X-axis: runtime/device · Y-axis: mean latency (ms) · NPU uses the
-              Intel split-backbone fixture; GPU/CPU use whole graph
-            </Text>
-          </CardBody>
-        </Card>
-      </Grid>
+      <WorkloadRuntimePair
+        workload="whisper-static"
+        devices={["NPU", "GPU", "CPU"]}
+        title="Whisper static"
+        note="10 runs · bundled Whisper NPU AC 718.9 ms · WinML NPU AC 200.0 ms"
+      />
+      <WorkloadRuntimePair
+        workload="whisper-dynamic"
+        devices={["GPU", "CPU"]}
+        title="Whisper dynamic"
+        note="10 runs · NPU unsupported for dynamic-KV and omitted"
+      />
+      <WorkloadRuntimePair
+        workload="tsc"
+        devices={["NPU", "GPU", "CPU"]}
+        title="TSC"
+        note="20 runs · bundled NPU ~8.3 ms AC / 8.2 ms battery"
+      />
+      <WorkloadRuntimePair
+        workload="fakeaudio"
+        devices={["NPU", "GPU", "CPU"]}
+        title="FakeAudio"
+        note="NPU uses the Intel split-backbone fixture; GPU/CPU use whole graph"
+      />
 
       <Divider />
 
@@ -345,7 +332,8 @@ export default function IntelAcVsBatteryLatency() {
         <H2>Battery ÷ AC within each device</H2>
         <Text tone="secondary">
           Ratios below 1.0 are faster on battery; ratios above 1.0 are slower.
-          The surprising sub-parity values are the reason replication matters.
+          After the AC remeasure, the worst remaining sub-parity is WinML Whisper
+          static CPU (0.62×)—still not causal without interleaved repeats.
         </Text>
       </Stack>
 
