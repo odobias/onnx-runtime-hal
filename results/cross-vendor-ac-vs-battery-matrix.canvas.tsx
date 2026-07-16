@@ -62,15 +62,15 @@ const CELLS: Cell[] = [
   { power: "battery", runtime: "bundled", workload: "fakeaudio", device: "GPU", intel: 72.7, amd: 73.5, qualcomm: 75.0 },
   { power: "battery", runtime: "bundled", workload: "fakeaudio", device: "CPU", intel: 120.5, amd: 70.8, qualcomm: 1080.9 },
   { power: "battery", runtime: "winml", workload: "whisper-static", device: "NPU", intel: 284.9, amd: 1088.7, qualcomm: 449.9 },
-  { power: "battery", runtime: "winml", workload: "whisper-static", device: "GPU", intel: 1298.1, amd: 772.8, qualcomm: 1252.8 },
+  { power: "battery", runtime: "winml", workload: "whisper-static", device: "GPU", intel: 675.9, amd: 772.8, qualcomm: 1252.8 },
   { power: "battery", runtime: "winml", workload: "whisper-static", device: "CPU", intel: 858.7, amd: 1187.5, qualcomm: 2552.2 },
-  { power: "battery", runtime: "winml", workload: "whisper-dynamic", device: "GPU", intel: 811.1, amd: 688.4, qualcomm: 1424.0 },
+  { power: "battery", runtime: "winml", workload: "whisper-dynamic", device: "GPU", intel: 506.4, amd: 688.4, qualcomm: 1424.0 },
   { power: "battery", runtime: "winml", workload: "whisper-dynamic", device: "CPU", intel: 196.6, amd: 254.1, qualcomm: 526.8 },
   { power: "battery", runtime: "winml", workload: "tsc", device: "NPU", intel: 8.3, amd: 44.6, qualcomm: 20.4 },
-  { power: "battery", runtime: "winml", workload: "tsc", device: "GPU", intel: 37.7, amd: 66.1, qualcomm: 91.5 },
+  { power: "battery", runtime: "winml", workload: "tsc", device: "GPU", intel: 37.8, amd: 66.1, qualcomm: 91.5 },
   { power: "battery", runtime: "winml", workload: "tsc", device: "CPU", intel: 157.6, amd: 149.3, qualcomm: 329.0 },
   { power: "battery", runtime: "winml", workload: "fakeaudio", device: "NPU", intel: 23.3, amd: 82.6, qualcomm: 132.0 },
-  { power: "battery", runtime: "winml", workload: "fakeaudio", device: "GPU", intel: 162.1, amd: 87.2, qualcomm: 70.0 },
+  { power: "battery", runtime: "winml", workload: "fakeaudio", device: "GPU", intel: 71.2, amd: 87.2, qualcomm: 70.0 },
   { power: "battery", runtime: "winml", workload: "fakeaudio", device: "CPU", intel: 95.6, amd: 101.3, qualcomm: 158.9 },
 ];
 
@@ -466,7 +466,7 @@ function PowerMatrix({ power }: { power: "ac" | "battery" }) {
           Contaminated PR #80 AC campaigns were dropped from the ledgers. The
           replacement bundled Whisper NPU AC mean is 718.9 ms; remeasured battery is
           ~523 ms. Windows ML Whisper NPU is ~200 ms AC / ~285 ms battery.
-          WinML GPU battery remains noisy versus bundled DML—do not rank on it alone.
+          WinML GPU battery was remeasured in isolation (~676 ms Whisper static); the full-matrix ~1298 ms cell was suite-order contamination.
         </Callout>
       ) : (
         <Callout tone="danger" title="Qualcomm battery CPU falls off a cliff">
@@ -569,9 +569,9 @@ function Caveats() {
             "AC+battery remeasured; prefer NPU/bundled cells for Intel ranks",
           ],
           [
-            "Intel WinML GPU battery noise",
-            "Whisper static GPU 562 AC → 1298 battery; bundled DML same matrix ~682",
-            "Isolate WinML GPU repeats before using for power comparisons",
+            "Intel WinML GPU battery (resolved)",
+            "Isolated probe ~676 ms; full-matrix 1298 ms was suite contamination",
+            "GPU battery cells superseded by probe campaigns c497e54c / a54a9a28",
           ],
           [
             "Qualcomm battery CPU collapse",
