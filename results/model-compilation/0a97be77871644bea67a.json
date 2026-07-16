@@ -1,0 +1,29 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-16T09:57:31.1478034Z",
+    "provenance_scope":  "pre-execution-input-artifact-and-compiler-context",
+    "artifact_stage":  "provider-input",
+    "execution_profile":  "npu-whole-diagnostic",
+    "graph_role":  "whole",
+    "target_vendor":  "Qualcomm",
+    "target_architecture":  "Arm64",
+    "artifact_path":  "C:\\Projects\\whisper-npu-hal\\models\\deepfake\\fakeaudio\\model.onnx",
+    "artifact_sha256":  "d4b2dde8f4f95862ecb9f5e90821d853adea3774e7c48857f60ee6084d5e85c6",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "Qualcomm execution-provider compiler",
+                     "version":  "2.47.0.0",
+                     "version_source":  "runtime binary file version: QnnHtp.dll"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compiled_cache_artifact":  {
+                                    "status":  "not-captured",
+                                    "reason":  "provider compilation occurs during session creation after this input-artifact record is generated"
+                                },
+    "compilation_host_snapshot_id":  "dfd64edbbac7727647dd",
+    "id":  "0a97be77871644bea67a"
+}
