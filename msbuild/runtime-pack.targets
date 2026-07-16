@@ -12,7 +12,7 @@
                               Condition="'$(EnableQualcomm)'!='true'" />
       <OnnxRuntimeHalConflict Include="$(OutDir)onnxruntime_providers_openvino.dll;$(OutDir)openvino*.dll;$(OutDir)tbb*.dll;$(OutDir)plugins.xml"
                               Condition="'$(EnableOvep)'!='true'" />
-      <OnnxRuntimeHalConflict Include="$(OutDir)onnxruntime_providers_vitisai.dll;$(OutDir)dyn_dispatch_core.dll;$(OutDir)dyn_bins.dll;$(OutDir)vaiml.dll;$(OutDir)aiecompiler_client.dll;$(OutDir)z.dll;$(OutDir)zstd.dll"
+      <OnnxRuntimeHalConflict Include="$(OutDir)onnxruntime_providers_vitisai.dll;$(OutDir)dyn_dispatch_core.dll;$(OutDir)dyn_bins.dll;$(OutDir)vaiml.dll;$(OutDir)aiecompiler_client.dll;$(OutDir)z.dll;$(OutDir)zlib.dll;$(OutDir)zstd.dll"
                               Condition="'$(EnableAmd)'!='true'" />
 
       <OnnxRuntimeHalRuntime Include="$(OrtBinDir)\onnxruntime*.dll"
@@ -46,7 +46,9 @@
       <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\vaiml.dll" Condition="Exists('$(OrtAmdBinDir)\vaiml.dll')" />
       <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\aiecompiler_client.dll" Condition="Exists('$(OrtAmdBinDir)\aiecompiler_client.dll')" />
       <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\DirectML.dll" Condition="Exists('$(OrtAmdBinDir)\DirectML.dll')" />
+      <!-- 1.8.0-beta named this z.dll; 1.7.1 GA ships zlib.dll. Stage whichever exists. -->
       <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\z.dll" Condition="Exists('$(OrtAmdBinDir)\z.dll')" />
+      <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\zlib.dll" Condition="Exists('$(OrtAmdBinDir)\zlib.dll')" />
       <OnnxRuntimeHalRuntime Include="$(OrtAmdBinDir)\zstd.dll" Condition="Exists('$(OrtAmdBinDir)\zstd.dll')" />
     </ItemGroup>
     <Delete Files="@(OnnxRuntimeHalConflict)" TreatErrorsAsWarnings="false"
