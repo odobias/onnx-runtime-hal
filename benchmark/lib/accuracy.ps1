@@ -77,6 +77,102 @@ function Measure-BenchmarkClassifierAgreement {
         compared = $compared
         decision_flips = $flips
         max_abs_probability_difference = $Result.max_abs_p_diff
+        basis = "fixture-expected-pred"
+    }
+}
+
+function Normalize-BenchmarkTranscript([string]$Text) {
+    if ($null -eq $Text) { return "" }
+    $normalized = $Text.ToUpperInvariant()
+    $normalized = [regex]::Replace($normalized, "[^A-Z0-9']+", " ")
+    return $normalized.Trim()
+}
+
+function Measure-BenchmarkWhisperBaselineAgreement {
+    param(
+        [Parameter(Mandatory)][object[]]$ClipResults,
+        [Parameter(Mandatory)][object[]]$EvalRows,
+        [Parameter(Mandatory)][object]$Aggregate
+    )
+    $byId = @{}
+    foreach ($row in $EvalRows) { $byId[[string]$row.id] = $row }
+
+    $finite = (Test-BenchmarkFiniteNumber $Aggregate.wer) -and
+        (Test-BenchmarkFiniteNumber $Aggregate.cer)
+    $compared = 0
+    $hypMismatches = 0
+    $baselineWordEdits = 0.0
+    $baselineRefWords = 0.0
+    $baselineCharEdits = 0.0
+    $baselineRefChars = 0.0
+    $clipDeltas = [System.Collections.Generic.List[object]]::new()
+
+    foreach ($clip in $ClipResults) {
+        $id = if ($clip.eval_id) { [string]$clip.eval_id } else { [string]$clip.id }
+        $eval = $byId[$id]
+        if (-not $eval -or -not ($eval.PSObject.Properties.Name -contains "baseline_wer")) {
+            continue
+        }
+        $compared++
+        $hyp = if ($clip.text) { [string]$clip.text } else { [string]$clip.transcription }
+        $baselineHyp = [string]$eval.baseline_hyp
+        if ($baselineHyp -and
+            (Normalize-BenchmarkTranscript $hyp) -ne (Normalize-BenchmarkTranscript $baselineHyp)) {
+            $hypMismatches++
+        }
+        $baselineWer = [double]$eval.baseline_wer
+        $baselineCer = [double]$eval.baseline_cer
+        $clipWer = [double]$clip.wer
+        $clipCer = [double]$clip.cer
+        if (Test-BenchmarkFiniteNumber $clip.ref_words) {
+            $baselineRefWords += [double]$clip.ref_words
+            $baselineWordEdits += $baselineWer * [double]$clip.ref_words
+        }
+        if (Test-BenchmarkFiniteNumber $clip.ref_chars) {
+            $baselineRefChars += [double]$clip.ref_chars
+            $baselineCharEdits += $baselineCer * [double]$clip.ref_chars
+        }
+        $clipDeltas.Add([ordered]@{
+            id = $id
+            wer = $clipWer
+            baseline_wer = $baselineWer
+            wer_delta = $clipWer - $baselineWer
+            cer = $clipCer
+            baseline_cer = $baselineCer
+            cer_delta = $clipCer - $baselineCer
+            hyp_matches_baseline = (
+                -not $baselineHyp -or
+                (Normalize-BenchmarkTranscript $hyp) -eq (Normalize-BenchmarkTranscript $baselineHyp)
+            )
+        })
+    }
+
+    $baselineWerAgg = if ($baselineRefWords -gt 0) {
+        $baselineWordEdits / $baselineRefWords
+    } else { $null }
+    $baselineCerAgg = if ($baselineRefChars -gt 0) {
+        $baselineCharEdits / $baselineRefChars
+    } else { $null }
+
+    return [pscustomobject]@{
+        outputs_finite = $finite
+        compared = $compared
+        decision_flips = $hypMismatches
+        max_abs_probability_difference = $null
+        basis = $(if ($compared -gt 0) {
+            "human-transcript-reference+baked-baseline"
+        } else {
+            "human-transcript-reference"
+        })
+        baseline_wer = $baselineWerAgg
+        baseline_cer = $baselineCerAgg
+        wer_delta = if ($null -ne $baselineWerAgg -and (Test-BenchmarkFiniteNumber $Aggregate.wer)) {
+            [double]$Aggregate.wer - [double]$baselineWerAgg
+        } else { $null }
+        cer_delta = if ($null -ne $baselineCerAgg -and (Test-BenchmarkFiniteNumber $Aggregate.cer)) {
+            [double]$Aggregate.cer - [double]$baselineCerAgg
+        } else { $null }
+        clips = @($clipDeltas)
     }
 }
 
@@ -136,6 +232,7 @@ function New-BenchmarkAccuracyRecord {
             intended_provider_resolved = $IntendedProviderResolved
             accuracy_eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or [bool]$ExecutionProfile.accuracyEligible
             npu_operation_assignment_recorded = $npuOperationAssignmentRecorded
+            baseline_compared = ([int]$ReferenceAgreement.compared -gt 0)
             valid = $Valid
         }
         metrics = $Result

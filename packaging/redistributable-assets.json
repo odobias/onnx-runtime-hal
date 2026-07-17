@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "description": "Allowlist of model/fixture trees copied into redistributable packages.",
+  "always_copy": [
+    "benchmark",
+    "tools",
+    "run-benchmark.ps1"
+  ],
+  "manifest": "packaging/portable.redistributable.json",
+  "paths": [
+    {
+      "id": "whisper-static",
+      "workload": "whisper-tiny-static",
+      "include": [
+        "workloads/whisper/models/static-onnx",
+        "workloads/whisper/manifest.json",
+        "workloads/audio",
+        "workloads/eval"
+      ]
+    },
+    {
+      "id": "tsc",
+      "workload": "tsc",
+      "include": [
+        "models/deepfake/tsc",
+        "models/deepfake/fixtures/tsc"
+      ]
+    },
+    {
+      "id": "fakeaudio-whole",
+      "workload": "fakeaudio",
+      "include": [
+        "models/deepfake/fakeaudio/model.onnx",
+        "models/deepfake/fixtures/fakeaudio",
+        "models/deepfake/audio-samples"
+      ]
+    },
+    {
+      "id": "fakeaudio-npu-split",
+      "workload": "fakeaudio",
+      "include": [
+        "models/deepfake/fakeaudio/model.backbone-fp32.onnx",
+        "models/deepfake/fakeaudio/model.frontend-fp32.onnx",
+        "models/deepfake/fixtures/fakeaudio-bb-fp32"
+      ]
+    }
+  ]
+}

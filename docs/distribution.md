@@ -45,16 +45,50 @@ reasons. `packaging/runner-package.schema.json` defines the version 1 contract.
 ## Build a package
 
 First install the SDKs relevant to the build host. Then build and assemble every
-locally viable runner:
+locally viable runner. The published matrix entry point stages SDKs per
+architecture and builds both packages:
+
+```powershell
+.\tools\build\build-all-runner-packages.ps1 -Clean
+.\tools\build\build-all-runner-packages.ps1 -Clean -InstallArm64Tools
+```
+
+Or build one architecture at a time:
 
 ```powershell
 .\tools\build\build-runner-package.ps1 -Architecture ARM64 -Clean
 .\tools\build\build-runner-package.ps1 -Architecture x64 -Clean
 ```
 
-The script calls `tools/build/build.ps1` separately for every runtime pack.
-Missing SDKs do not invalidate the package; they produce entries in `skipped`.
-A build failure for an SDK that was detected is fatal.
+`build-all-runner-packages.ps1` gates third-party staging first, then launches
+every runner build across the requested architectures in one parallel pool:
+
+1. Stage SDKs into non-overlapping roots (`third_party/onnxruntime-directml-x64`,
+   `third_party/onnxruntime-directml-ARM64`, WinML per-platform bins, OVEP, QNN).
+2. Build all `build.ps1` runner variants concurrently (`-ThrottleLimit`, default
+   auto). Unique `OutDir`/`IntDir` per `PlatformOutTag` make this safe.
+3. Assemble each `dist/npu-inference-bench-<arch>/` package (`-SkipBuild`).
+
+Use `-SkipSdkStage` when those roots are already populated. Vendor ORT ABIs
+still cannot share one process, so there is no single Visual Studio "Build All"
+configuration — only a parallel matrix of isolated builds. Missing SDKs do not
+invalidate the package; they produce entries in `skipped`. A build failure for
+an SDK that was detected is fatal. A summary is written to
+`dist/runner-packages-summary.json`.
+
+### Redistributable model assets
+
+Packages do **not** copy the full repo `models/` / `workloads/` trees. Asset
+inclusion is gated by `packaging/redistributable-assets.json`: Whisper static,
+TSC whole, and FakeAudio **whole + generic NPU backbone split**. The package
+replaces `benchmark/manifests/portable.json` with
+`packaging/portable.redistributable.json` so dynamic Whisper / OV-IR / AMD
+vendor Whisper / Intel-only FakeAudio splits stay out.
+
+Whisper eval clips in `workloads/eval/eval.jsonl` may carry baked
+`baseline_hyp` / `baseline_wer` / `baseline_cer` fields (mint with
+`tools/eval/bake-whisper-baselines.ps1`). Accuracy-quick then reports WER delta
+vs that baseline and treats hyp mismatches as trust-gate flips.
 
 Useful assembly options:
 

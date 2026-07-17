@@ -5,7 +5,10 @@ param(
     [string]$Architecture = $(if (
         [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq
         [System.Runtime.InteropServices.Architecture]::Arm64
-    ) { "arm64" } else { "x64" })
+    ) { "arm64" } else { "x64" }),
+    # Optional explicit staging root (include/lib/bin). Used by the multi-arch
+    # package orchestrator so x64 and ARM64 SDKs can coexist.
+    [string]$Destination = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +19,11 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = $utf8
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$destination = Join-Path $root "third_party\onnxruntime-directml"
+$destination = if ($Destination) {
+    $Destination
+} else {
+    Join-Path $root "third_party\onnxruntime-directml"
+}
 $work = Join-Path $root "build\downloads\onnxruntime-directml"
 $packageId = "microsoft.ml.onnxruntime.directml"
 $indexUrl = "https://api.nuget.org/v3-flatcontainer/$packageId/index.json"

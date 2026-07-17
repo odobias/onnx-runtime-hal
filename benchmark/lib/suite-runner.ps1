@@ -159,11 +159,17 @@ function Invoke-NativeBenchmark {
         $intended = @($clipResults | Where-Object {
             -not (Test-BenchmarkIntendedProvider $_ $RequestedDevice)
         }).Count -eq 0
-        $agreement = [pscustomobject]@{
-            outputs_finite = $finite
-            compared = $clipResults.Count
-            decision_flips = 0
-            basis = "human-transcript-reference"
+        $agreement = Measure-BenchmarkWhisperBaselineAgreement `
+            -ClipResults $clipResults -EvalRows $evalRows -Aggregate $aggregate
+        if ($null -ne $agreement.baseline_wer) {
+            $aggregate | Add-Member -NotePropertyName baseline_wer -NotePropertyValue $agreement.baseline_wer
+            $aggregate | Add-Member -NotePropertyName baseline_cer -NotePropertyValue $agreement.baseline_cer
+            $aggregate | Add-Member -NotePropertyName wer_delta -NotePropertyValue $agreement.wer_delta
+            $aggregate | Add-Member -NotePropertyName cer_delta -NotePropertyValue $agreement.cer_delta
+            Write-Host ("baseline   : WER={0:P2} CER={1:P2}  delta WER={2:+0.000%} CER={3:+0.000%}  hyp_mismatches={4}/{5}" -f `
+                $agreement.baseline_wer, $agreement.baseline_cer,
+                $agreement.wer_delta, $agreement.cer_delta,
+                $agreement.decision_flips, $agreement.compared) -ForegroundColor DarkCyan
         }
         $eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or
             [bool]$ExecutionProfile.accuracyEligible
@@ -172,7 +178,8 @@ function Invoke-NativeBenchmark {
         if ($RequestedDevice -eq "npu" -and -not $assignmentRecorded) {
             Write-Warning "$($Workload.id)/$($ExecutionProfile.id): NPU operation assignment was not recorded"
         }
-        $valid = $finite -and $intended -and $eligible -and $assignmentRecorded
+        $baselineOk = ([int]$agreement.compared -eq 0) -or ([int]$agreement.decision_flips -eq 0)
+        $valid = $finite -and $intended -and $eligible -and $assignmentRecorded -and $baselineOk
         $record = New-BenchmarkAccuracyRecord -Workload $Workload `
             -ExecutionProfile $ExecutionProfile -RuntimeTarget $Runtime `
             -RequestedDevice $RequestedDevice `

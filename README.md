@@ -252,6 +252,12 @@ separate runner directories while benchmark scripts, workloads, and models are
 copied once:
 
 ```powershell
+# Both architectures (stages SDKs, builds every viable runner pack).
+.\tools\build\build-all-runner-packages.ps1 -Clean
+# On an x64 host without MSVC ARM64 tools yet:
+.\tools\build\build-all-runner-packages.ps1 -Clean -InstallArm64Tools
+
+# Or one architecture at a time:
 .\tools\build\build-runner-package.ps1 -Architecture ARM64 -Clean
 .\tools\build\build-runner-package.ps1 -Architecture x64 -Clean
 ```
