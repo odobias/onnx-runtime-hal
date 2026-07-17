@@ -58,11 +58,12 @@ function Test-BenchmarkRunnerProvider {
     return $false
 }
 
-function Resolve-BenchmarkRunnerPack {
+function Get-BenchmarkExecutorCandidates {
     param(
         [Parameter(Mandatory)][object]$PackageManifest,
-        [Parameter(Mandatory)][ValidateSet("bundled", "winml")][string]$Runtime,
+        [Parameter(Mandatory)][ValidateSet("bundled", "winml")][string[]]$Runtime,
         [string]$Provider = "",
+        [string]$RunnerId = "",
         [Parameter(Mandatory)][string]$HostVendor,
         [string]$HostArchitecture = "",
         [int]$OsBuild = 0
@@ -79,43 +80,67 @@ function Resolve-BenchmarkRunnerPack {
     }
 
     $rejected = [System.Collections.Generic.List[string]]::new()
-    $candidates = @()
-    foreach ($runner in @($PackageManifest.value.runners)) {
-        if ([string]$runner.runtime_target -ne $Runtime) { continue }
-        if (-not (Test-BenchmarkRunnerProvider -Runner $runner -Provider $Provider)) { continue }
+    $candidates = [System.Collections.Generic.List[object]]::new()
+    foreach ($runtimeName in @($Runtime)) {
+        foreach ($runner in @($PackageManifest.value.runners)) {
+            if ([string]$runner.runtime_target -ne $runtimeName) { continue }
+            if ($RunnerId -and [string]$runner.id -ne $RunnerId) { continue }
+            if (-not (Test-BenchmarkRunnerProvider -Runner $runner -Provider $Provider)) { continue }
 
-        $vendors = @($runner.vendors | ForEach-Object { [string]$_ })
-        $vendorMatch = $vendors -contains "Any" -or $vendors -contains $HostVendor
-        if (-not $vendorMatch) {
-            $rejected.Add("$($runner.id): host vendor '$HostVendor' is unsupported")
-            continue
-        }
-        if ($runner.minimum_os_build -and $OsBuild -lt [int]$runner.minimum_os_build) {
-            $rejected.Add("$($runner.id): requires Windows build $($runner.minimum_os_build)")
-            continue
-        }
-        $runnerRoot = Join-Path $PackageManifest.root ([string]$runner.path -replace '/', '\')
-        $exe = Join-Path $runnerRoot ([string]$runner.executable)
-        if (-not (Test-Path -LiteralPath $exe)) {
-            $rejected.Add("$($runner.id): executable is missing")
-            continue
-        }
-        $candidates += [pscustomobject]@{
-            id = [string]$runner.id
-            runtime_target = [string]$runner.runtime_target
-            platform_tag = [string]$runner.platform_tag
-            root = $runnerRoot
-            exe = $exe
-            priority = [int]$runner.priority
-            manifest_entry = $runner
+            $vendors = @($runner.vendors | ForEach-Object { [string]$_ })
+            $vendorMatch = $vendors -contains "Any" -or $vendors -contains $HostVendor
+            if (-not $vendorMatch) {
+                $rejected.Add("$($runner.id)/${runtimeName}: host vendor '$HostVendor' is unsupported")
+                continue
+            }
+            if ($runner.minimum_os_build -and $OsBuild -lt [int]$runner.minimum_os_build) {
+                $rejected.Add("$($runner.id)/${runtimeName}: requires Windows build $($runner.minimum_os_build)")
+                continue
+            }
+            $runnerRoot = Join-Path $PackageManifest.root ([string]$runner.path -replace '/', '\')
+            $exe = Join-Path $runnerRoot ([string]$runner.executable)
+            if (-not (Test-Path -LiteralPath $exe)) {
+                $rejected.Add("$($runner.id)/${runtimeName}: executable is missing")
+                continue
+            }
+            $candidates.Add([pscustomobject]@{
+                id = [string]$runner.id
+                runtime_target = [string]$runner.runtime_target
+                platform_tag = [string]$runner.platform_tag
+                root = $runnerRoot
+                exe = $exe
+                priority = [int]$runner.priority
+                manifest_entry = $runner
+            })
         }
     }
-    $selected = @($candidates | Sort-Object priority -Descending | Select-Object -First 1)
+    return [pscustomobject]@{
+        candidates = @($candidates)
+        rejected = @($rejected)
+    }
+}
+
+function Resolve-BenchmarkRunnerPack {
+    param(
+        [Parameter(Mandatory)][object]$PackageManifest,
+        [Parameter(Mandatory)][ValidateSet("bundled", "winml")][string]$Runtime,
+        [string]$Provider = "",
+        [string]$RunnerId = "",
+        [Parameter(Mandatory)][string]$HostVendor,
+        [string]$HostArchitecture = "",
+        [int]$OsBuild = 0
+    )
+
+    $resolved = Get-BenchmarkExecutorCandidates -PackageManifest $PackageManifest `
+        -Runtime @($Runtime) -Provider $Provider -RunnerId $RunnerId `
+        -HostVendor $HostVendor -HostArchitecture $HostArchitecture -OsBuild $OsBuild
+    $selected = @($resolved.candidates | Sort-Object priority -Descending | Select-Object -First 1)
     if ($selected.Count) { return $selected[0] }
 
     $providerLabel = if ($Provider) { $Provider } else { "auto" }
-    $details = if ($rejected.Count) { " " + ($rejected -join "; ") } else { "" }
-    throw "No packaged runner supports runtime '$Runtime', provider '$providerLabel', vendor '$HostVendor', architecture '$HostArchitecture'.$details"
+    $runnerLabel = if ($RunnerId) { ", runner '$RunnerId'" } else { "" }
+    $details = if ($resolved.rejected.Count) { " " + ($resolved.rejected -join "; ") } else { "" }
+    throw "No packaged runner supports runtime '$Runtime', provider '$providerLabel'$runnerLabel, vendor '$HostVendor', architecture '$(ConvertTo-BenchmarkArchitecture $(if ($HostArchitecture) { $HostArchitecture } else { Get-BenchmarkHostArchitecture }))'.$details"
 }
 
 function Get-BenchmarkPackagedRuntimeSelections {

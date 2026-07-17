@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 # feeds only) runs without those deps.
 
 ROOT = os.path.dirname(os.path.dirname(HERE))
-DF = os.path.join(ROOT, "models", "deepfake")
+DF = os.path.join(ROOT, "workloads", "classifiers")
 TSC = os.path.join(DF, "tsc", "model.onnx")
 FA_BASE = os.path.join(DF, "fakeaudio", "model.onnx")
 FA_FE = os.path.join(DF, "fakeaudio", "model.frontend-fp32.onnx")

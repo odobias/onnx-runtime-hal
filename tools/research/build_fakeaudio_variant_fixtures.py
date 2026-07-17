@@ -1,10 +1,10 @@
-﻿"""Build C++ classifier fixtures for the fakeaudio precision variants so they can be
+"""Build C++ classifier fixtures for the fakeaudio precision variants so they can be
 replayed through the --classify harness on any NPU (this closes the Qualcomm QNN /
 Hexagon HTP gap the AMD/Intel toolkits could not cover).
 
 Run tools/research/export_fakeaudio_variants.py first (it emits the generic
 variant ONNX models), then this script. It produces four fixture dirs under
-models/deepfake/fixtures/:
+workloads/classifiers/fixtures/:
   fakeaudio-fp16safe     -> model.fp16-safe.onnx        (raw PCM input, whole-graph drop-in)
   fakeaudio-bb-fp32      -> model.backbone-fp32.onnx    (mel input; Qualcomm HTP runs this as-is)
   fakeaudio-bb-int8      -> model.backbone-int8.onnx    (mel input from the CPU front-end)
@@ -29,8 +29,8 @@ import onnxruntime as ort
 from onnx import helper
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
-FIXROOT = os.path.join(ROOT, "models", "deepfake", "fixtures")
+FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
+FIXROOT = os.path.join(ROOT, "workloads", "classifiers", "fixtures")
 BASEFIX = os.path.join(FIXROOT, "fakeaudio")
 SAMPLES = ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
 WINDOW = 308700

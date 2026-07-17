@@ -75,7 +75,7 @@ function Invoke-NativeBenchmark {
     $provenanceIds = @()
     $graphArtifacts = [ordered]@{}
     if ($ExecutionProfile.frontendContract) {
-        $frontend = Join-Path $root "models\deepfake\fakeaudio\model.frontend-fp32.onnx"
+        $frontend = Join-Path $root "workloads\classifiers\fakeaudio\model.frontend-fp32.onnx"
         if (Test-Path -LiteralPath $frontend) {
             $frontendProvenance = Write-BenchmarkCompilationProvenance `
                 -Root $root -ArtifactPath $frontend -ProfileId ([string]$ExecutionProfile.id) `

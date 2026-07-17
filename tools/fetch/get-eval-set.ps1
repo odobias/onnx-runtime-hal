@@ -46,7 +46,10 @@ if (Test-Path -LiteralPath $evalPath) {
     }
 }
 
-$script = Join-Path $PSScriptRoot "make_eval_set.py"
+$script = Join-Path (Split-Path $PSScriptRoot -Parent) "export\make_eval_set.py"
+if (-not (Test-Path -LiteralPath $script)) {
+    $script = Join-Path $PSScriptRoot "make_eval_set.py"
+}
 Write-Host "Building eval set (up to $Count utterances)..." -ForegroundColor Cyan
 & $vpy $script --outdir $evalDir --count $Count
 $ok = ($LASTEXITCODE -eq 0)

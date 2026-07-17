@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Correctness (not just latency) check for the TSC ONNX model, using real
 labeled samples pulled from the model's own training repo and a real
 tokenizer reconstruction -- see docstring at the bottom of this file for the
@@ -44,7 +44,7 @@ from tokenizers.processors import RobertaProcessing
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "tools", "research"))
-TSC_DIR = os.path.join(ROOT, "models", "deepfake", "tsc")
+TSC_DIR = os.path.join(ROOT, "workloads", "classifiers", "tsc")
 MODEL_PATH = os.path.join(TSC_DIR, "model.onnx")
 
 # Labeled samples live beside the model in validation_samples/{scam,clean}.txt --

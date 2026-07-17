@@ -1,17 +1,9 @@
-﻿# Downloads the deepfake-detection pipeline classifier models (FakeAudio /
-# Generated Audio Detector, and the Text Scam Classifier) from the private
-# Hugging Face model repo into models/deepfake/. Output is gitignored -- a fresh
-# clone/machine re-runs this script instead of committing model binaries.
+﻿# Downloads classifier models (FakeAudio / TSC) from the private Hugging Face
+# mirror into workloads/classifiers/. HF remote keys stay under deepfake/*;
+# local runtime paths are remapped. Output is gitignored.
 #
-# The models are mirrored to HF by scripts/push-models.ps1 (which snapshots the
-# whole models/ tree). This script pulls only the deepfake/* subtree, so it does
-# NOT touch any internal/corporate artifact repository.
-#
-# For a private repo you must first:  hf auth login
-#
-#   .\tools\fetch\get-classifier-models.ps1                    # fetch fakeaudio + tsc
+#   .\tools\fetch\get-classifier-models.ps1
 #   .\tools\fetch\get-classifier-models.ps1 -Models tsc
-#   .\tools\fetch\get-classifier-models.ps1 -Repo my-user/other-repo
 
 [CmdletBinding()]
 param(
@@ -26,16 +18,13 @@ chcp 65001 > $null
 $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-# HF stores these under deepfake/... so downloading into models/ lands them at
-# the paths the validators and benchmark expect (models/deepfake/...).
-$outDir = Join-Path $root "models"
-$outRoot = Join-Path $outDir "deepfake"
+$outRoot = Join-Path $root "workloads\classifiers"
+$staging = Join-Path $root "build\classifier-asset-staging"
 
 if ($Models -contains "all") { $Models = @("fakeaudio", "tsc") }
 
 $hf = (Get-Command hf -ErrorAction SilentlyContinue).Source
 if (-not $hf) {
-    # Fall back to the project venv's CLI so a fresh shell works without activating it.
     $venvHf = Join-Path $root ".venv\Scripts\hf.exe"
     if (Test-Path $venvHf) { $hf = $venvHf }
 }
@@ -44,7 +33,6 @@ if (-not $hf) {
     exit 1
 }
 
-# Qualify a bare repo name with the logged-in username (mirrors get-models.ps1).
 $repoId = $Repo
 if ($repoId -notmatch "/") {
     $ns = (& python -c "from huggingface_hub import whoami; print(whoami()['name'])" 2>$null)
@@ -55,45 +43,92 @@ if ($repoId -notmatch "/") {
     $repoId = "$($ns.Trim())/$Repo"
 }
 
-# Per-model include globs (HF filtering is fnmatch-style; '*' spans '/').
 $includes = @()
 if ($Models -contains "fakeaudio") {
-    # Fetch only the canonical model. Precision, split, and compiler-workaround
-    # variants are generated locally from these bytes by the fixture recipes.
     $includes += "deepfake/fakeaudio/model.onnx"
-    # Labeled real/deepfake clips used by the validator.
     $includes += "deepfake/audio-samples/*"
-    # Pre-baked C++ benchmark fixtures (model-ready tensors + CPU reference p), if
-    # present on HF, so benchmark\run-suite.ps1 can run this classifier WITHOUT the Python
-    # .venv. They are a snapshot of the validated preprocessing -- stale if the model
-    # or preprocessing changes; regenerate with run-suite.ps1 -RegenerateFixtures.
     $includes += "deepfake/fixtures/fakeaudio/*"
 }
 if ($Models -contains "tsc") {
-    # DistilBERT/RoBERTa-tokenized scam classifier: model + vocab/merges +
-    # the validation_samples/{scam,clean}.txt the validator scores against.
     $includes += "deepfake/tsc/*"
-    $includes += "deepfake/fixtures/tsc/*"   # pre-baked C++ fixtures (see note above)
+    $includes += "deepfake/fixtures/tsc/*"
 }
 
-Write-Host "Downloading $($Models -join ', ') from $repoId -> $outRoot ..." -ForegroundColor Cyan
-$dlArgs = @($repoId, "--repo-type", "model", "--local-dir", $outDir)
-# Keep each filter in one native argument so PowerShell cannot expand wildcards
-# against source files in this checkout before the hf CLI sees them.
+if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $staging | Out-Null
+
+Write-Host "Downloading $($Models -join ', ') from $repoId -> staging ..." -ForegroundColor Cyan
+$dlArgs = @($repoId, "--repo-type", "model", "--local-dir", $staging)
 foreach ($p in $includes) { $dlArgs += "--include=$p" }
 & $hf download @dlArgs
 if ($LASTEXITCODE -ne 0) { Write-Host "Download failed." -ForegroundColor Red; exit 1 }
 
-function Get-Size {
-    param([string]$Dir)
+function Move-Mapped([string]$HfRel, [string]$LocalRel) {
+    $src = Join-Path $staging ($HfRel -replace '/', '\')
+    $dst = Join-Path $root ($LocalRel -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $src)) {
+        Write-Host "  ! not in repo, skipping: $HfRel" -ForegroundColor DarkYellow
+        return
+    }
+    $dstParent = Split-Path $dst -Parent
+    New-Item -ItemType Directory -Force -Path $dstParent | Out-Null
+    if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Recurse -Force }
+    Move-Item -LiteralPath $src -Destination $dst -Force
+    Write-Host "  $HfRel -> $LocalRel" -ForegroundColor DarkGray
+}
+
+if ($Models -contains "fakeaudio") {
+    Move-Mapped "deepfake/fakeaudio/model.onnx" "workloads/classifiers/fakeaudio/model.onnx"
+    Move-Mapped "deepfake/audio-samples" "workloads/classifiers/audio-samples"
+    Move-Mapped "deepfake/fixtures/fakeaudio" "workloads/classifiers/fixtures/fakeaudio"
+}
+if ($Models -contains "tsc") {
+    Move-Mapped "deepfake/tsc" "workloads/classifiers/tsc"
+    Move-Mapped "deepfake/fixtures/tsc" "workloads/classifiers/fixtures/tsc"
+}
+
+# Prefer locally exported NPU-split artifacts when already present under legacy cache.
+$legacyFa = Join-Path $root "models\deepfake\fakeaudio"
+$dstFa = Join-Path $outRoot "fakeaudio"
+if (Test-Path -LiteralPath $legacyFa) {
+    foreach ($name in @(
+        "model.backbone-fp32.onnx",
+        "model.frontend-fp32.onnx",
+        "model.backbone.expanded-attention-bias.onnx"
+    )) {
+        $from = Join-Path $legacyFa $name
+        $to = Join-Path $dstFa $name
+        if ((Test-Path -LiteralPath $from) -and -not (Test-Path -LiteralPath $to)) {
+            New-Item -ItemType Directory -Force -Path $dstFa | Out-Null
+            Copy-Item -LiteralPath $from -Destination $to -Force
+            Write-Host "  legacy cache -> workloads/classifiers/fakeaudio/$name" -ForegroundColor DarkGray
+        }
+    }
+}
+$legacyFix = Join-Path $root "models\deepfake\fixtures"
+$dstFix = Join-Path $outRoot "fixtures"
+if (Test-Path -LiteralPath $legacyFix) {
+    foreach ($name in @("fakeaudio-bb-fp32", "fakeaudio-bb-expanded-attention-bias")) {
+        $from = Join-Path $legacyFix $name
+        $to = Join-Path $dstFix $name
+        if ((Test-Path -LiteralPath $from) -and -not (Test-Path -LiteralPath $to)) {
+            Copy-Item -LiteralPath $from -Destination $to -Recurse -Force
+            Write-Host "  legacy cache -> workloads/classifiers/fixtures/$name" -ForegroundColor DarkGray
+        }
+    }
+}
+
+Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+
+function Get-Size([string]$Dir) {
     if (-not (Test-Path $Dir)) { return 0 }
     [math]::Round(((Get-ChildItem $Dir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB), 1)
 }
 
 if ($Models -contains "fakeaudio") {
-    Write-Host "FakeAudio (GAD) ready: $(Join-Path $outRoot 'fakeaudio') ($(Get-Size (Join-Path $outRoot 'fakeaudio')) MB)" -ForegroundColor Green
+    Write-Host "FakeAudio ready: $(Join-Path $outRoot 'fakeaudio') ($(Get-Size (Join-Path $outRoot 'fakeaudio')) MB)" -ForegroundColor Green
 }
 if ($Models -contains "tsc") {
     Write-Host "TSC ready: $(Join-Path $outRoot 'tsc') ($(Get-Size (Join-Path $outRoot 'tsc')) MB)" -ForegroundColor Green
 }
-Write-Host "Total models/deepfake: $(Get-Size $outRoot) MB" -ForegroundColor Green
+Write-Host "Total workloads/classifiers: $(Get-Size $outRoot) MB" -ForegroundColor Green

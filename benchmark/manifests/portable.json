@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": 1,
   "suite": "portable",
   "description": "Portable inference benchmark workloads and supported executor classes.",
@@ -39,7 +39,7 @@
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "models/deepfake/fixtures/tsc",
+      "path": "workloads/classifiers/fixtures/tsc",
       "executionProfiles": [
         {
           "id": "whole-fp32",
@@ -55,12 +55,12 @@
       "id": "fakeaudio",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "models/deepfake/fixtures/fakeaudio",
+      "path": "workloads/classifiers/fixtures/fakeaudio",
       "executionProfiles": [
         {
           "id": "whole-fp32",
           "devices": ["cpu", "gpu"],
-          "path": "models/deepfake/fixtures/fakeaudio",
+          "path": "workloads/classifiers/fixtures/fakeaudio",
           "graphRole": "whole",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true
@@ -69,15 +69,15 @@
           "id": "npu-split-intel",
           "devices": ["npu"],
           "hostVendors": ["Intel"],
-          "path": "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias",
+          "path": "workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias",
           "graphRole": "backbone",
           "frontendContract": "cpu-fp32-logmel",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true,
           "outputs": [
-            "models/deepfake/fakeaudio/model.backbone.expanded-attention-bias.onnx",
-            "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
-            "models/deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
+            "workloads/classifiers/fakeaudio/model.backbone.expanded-attention-bias.onnx",
+            "workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
+            "workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
           ],
           "steps": [
             {
@@ -94,14 +94,14 @@
           "id": "npu-split-generic",
           "devices": ["npu"],
           "hostVendors": ["AMD", "Qualcomm"],
-          "path": "models/deepfake/fixtures/fakeaudio-bb-fp32",
+          "path": "workloads/classifiers/fixtures/fakeaudio-bb-fp32",
           "graphRole": "backbone",
           "frontendContract": "cpu-fp32-logmel",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true,
           "outputs": [
-            "models/deepfake/fakeaudio/model.backbone-fp32.onnx",
-            "models/deepfake/fixtures/fakeaudio-bb-fp32/model.tsv"
+            "workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
+            "workloads/classifiers/fixtures/fakeaudio-bb-fp32/model.tsv"
           ],
           "steps": [
             {
@@ -117,7 +117,7 @@
         {
           "id": "npu-whole-diagnostic",
           "devices": ["npu"],
-          "path": "models/deepfake/fixtures/fakeaudio",
+          "path": "workloads/classifiers/fixtures/fakeaudio",
           "graphRole": "whole",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": false,
