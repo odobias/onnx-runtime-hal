@@ -42,8 +42,12 @@ if (-not $Force -and (Test-Path $lib) -and (Test-Path $ovepDll) -and (Test-Path 
 # 1) Matched wheels in a dedicated venv (onnxruntime-openvino pins the OpenVINO ABI).
 if (-not (Test-Path $venvPy)) {
     Write-Host "- creating venv $venv" -ForegroundColor DarkCyan
-    $py = if (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { "python" }
-    & $py -3 -m venv $venv
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -3 -m venv $venv
+    } else {
+        # Plain python.exe does not accept the py-launcher "-3" switch.
+        & python -m venv $venv
+    }
     if (-not (Test-Path $venvPy)) { throw "failed to create venv at $venv (is python installed?)" }
 }
 Write-Host "- installing onnxruntime-openvino==$OrtVersion + openvino==$OpenvinoVersion" -ForegroundColor DarkCyan

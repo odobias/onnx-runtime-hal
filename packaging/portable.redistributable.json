@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "suite": "portable",
+  "description": "Redistributable subset: Whisper static, TSC whole, FakeAudio whole + generic NPU backbone split.",
+  "workloads": [
+    {
+      "id": "whisper-tiny-static",
+      "kind": "asr",
+      "backend": "onnx-static",
+      "path": "workloads/whisper/models/static-onnx",
+      "executionProfiles": [
+        {
+          "id": "static-onnx",
+          "devices": ["npu", "gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "tsc",
+      "kind": "classifier",
+      "backend": "onnx-fixture",
+      "path": "models/deepfake/fixtures/tsc",
+      "executionProfiles": [
+        {
+          "id": "whole-fp32",
+          "devices": ["npu", "gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "full-model-cpu-fp32"
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
+    },
+    {
+      "id": "fakeaudio",
+      "kind": "classifier",
+      "backend": "onnx-fixture",
+      "path": "models/deepfake/fixtures/fakeaudio",
+      "executionProfiles": [
+        {
+          "id": "whole-fp32",
+          "devices": ["cpu", "gpu"],
+          "path": "models/deepfake/fixtures/fakeaudio",
+          "graphRole": "whole",
+          "referenceContract": "full-model-cpu-fp32",
+          "accuracyEligible": true
+        },
+        {
+          "id": "npu-split-generic",
+          "devices": ["npu", "gpu", "cpu"],
+          "path": "models/deepfake/fixtures/fakeaudio-bb-fp32",
+          "graphRole": "backbone",
+          "frontendContract": "cpu-fp32-logmel",
+          "referenceContract": "full-model-cpu-fp32",
+          "accuracyEligible": true
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-﻿# Build output
-build/
-dist/
+﻿# Build output (root only — do not swallow tools/build/*.ps1)
+/build/
+/dist/
 bin/
 obj/
 
@@ -20,7 +20,9 @@ workloads/classifiers/tsc/
 workloads/classifiers/fakeaudio/
 workloads/classifiers/audio-samples/
 workloads/classifiers/fixtures/
-workloads/eval/
+# Eval WAVs stay local/fetched; bake baselines into the tracked manifest.
+workloads/eval/*
+!workloads/eval/eval.jsonl
 workloads/audio/
 # Legacy/generated payload root. Classifier assets still use models/deepfake
 # while the remaining model families migrate to workloads/.

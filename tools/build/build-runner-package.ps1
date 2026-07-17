@@ -10,7 +10,11 @@ param(
     [string]$Output = "",
     [string[]]$AdditionalRunnerRoot = @(),
     [string]$RyzenAiDir = "",
-    [string]$OrtDir = ""
+    [string]$OrtDir = "",
+    # Concurrent runner builds. 0 = auto (up to 4). 1 = sequential.
+    # Safe because OutDir/IntDir are per PlatformOutTag; shared third_party
+    # trees are read-only during the build phase (stage SDKs first).
+    [int]$ThrottleLimit = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -127,7 +131,7 @@ function New-RunnerRecord([object]$Definition, [string]$Source, [string]$Destina
     return $record
 }
 
-function Invoke-RunnerBuild([object]$Definition) {
+function Invoke-RunnerBuild([object]$Definition, [int]$MaxCpuCount = 0) {
     $arguments = @{
         Platform = $Architecture
         Configuration = $Configuration
@@ -136,9 +140,87 @@ function Invoke-RunnerBuild([object]$Definition) {
     $arguments[[string]$Definition.build_switch] = $true
     if ($RyzenAiDir) { $arguments.RyzenAiDir = $RyzenAiDir }
     if ($OrtDir) { $arguments.OrtDir = $OrtDir }
+    if ($MaxCpuCount -gt 0) { $arguments.MaxCpuCount = $MaxCpuCount }
     & (Join-Path $root "tools\build\build.ps1") @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Build failed for runner '$($Definition.id)'."
+    }
+}
+
+function Invoke-RunnerBuildsParallel([object[]]$Definitions, [int]$Limit) {
+    $buildScript = Join-Path $root "tools\build\build.ps1"
+    $logDir = Join-Path $root "build\logs\runner-package"
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    # Avoid N concurrent /m:auto builds melting the host.
+    $innerCpu = [Math]::Max(1, [int][Math]::Floor([Environment]::ProcessorCount / $Limit))
+    Write-Host ("Building {0} runners with ThrottleLimit={1} (MSBuild /m:{2} each)" -f `
+        $Definitions.Count, $Limit, $innerCpu) -ForegroundColor Cyan
+
+    $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    $pwsh = if ($pwshCmd) { $pwshCmd.Source } else { (Get-Process -Id $PID).Path }
+    $queue = [System.Collections.Generic.Queue[object]]::new()
+    foreach ($definition in $Definitions) { $queue.Enqueue($definition) }
+    $running = [System.Collections.Generic.List[object]]::new()
+    $results = [System.Collections.Generic.List[object]]::new()
+
+    while ($queue.Count -gt 0 -or $running.Count -gt 0) {
+        while ($running.Count -lt $Limit -and $queue.Count -gt 0) {
+            $definition = $queue.Dequeue()
+            $id = [string]$definition.id
+            $logPath = Join-Path $logDir ("{0}-{1}.log" -f $Architecture, $id)
+            $argList = [System.Collections.Generic.List[string]]::new()
+            $argList.Add("-NoProfile")
+            $argList.Add("-File")
+            $argList.Add($buildScript)
+            $argList.Add("-Platform"); $argList.Add($Architecture)
+            $argList.Add("-Configuration"); $argList.Add($Configuration)
+            $argList.Add("-DisableIntel")
+            $argList.Add(("-" + [string]$definition.build_switch))
+            $argList.Add("-MaxCpuCount"); $argList.Add("$innerCpu")
+            if ($RyzenAiDir) {
+                $argList.Add("-RyzenAiDir"); $argList.Add($RyzenAiDir)
+            }
+            if ($OrtDir) {
+                $argList.Add("-OrtDir"); $argList.Add($OrtDir)
+            }
+
+            Write-Host ("  start {0}" -f $id) -ForegroundColor DarkCyan
+            $proc = Start-Process -FilePath $pwsh `
+                -ArgumentList @($argList.ToArray()) `
+                -PassThru -NoNewWindow `
+                -RedirectStandardOutput $logPath `
+                -RedirectStandardError (Join-Path $logDir ("{0}-{1}.err.log" -f $Architecture, $id))
+            $running.Add([pscustomobject]@{
+                id = $id
+                process = $proc
+                log = $logPath
+            })
+        }
+
+        Start-Sleep -Milliseconds 400
+        $stillRunning = [System.Collections.Generic.List[object]]::new()
+        foreach ($job in $running) {
+            if (-not $job.process.HasExited) {
+                $stillRunning.Add($job)
+                continue
+            }
+            $code = [int]$job.process.ExitCode
+            $results.Add([pscustomobject]@{
+                id = $job.id
+                exit_code = $code
+                log = $job.log
+            })
+            $color = if ($code -eq 0) { "Green" } else { "Red" }
+            Write-Host ("  done  {0}: exit={1} log={2}" -f $job.id, $code, $job.log) `
+                -ForegroundColor $color
+        }
+        $running = $stillRunning
+    }
+
+    $failures = @($results | Where-Object { $_.exit_code -ne 0 })
+    if ($failures.Count) {
+        $names = ($failures | ForEach-Object { $_.id }) -join ", "
+        throw "Parallel build failed for runner(s): $names"
     }
 }
 
@@ -229,6 +311,88 @@ function Import-RunnerArtifact([string]$Artifact, [hashtable]$Seen) {
     return $record
 }
 
+function Copy-RedistributableAssets([string]$Root, [string]$Output) {
+    $catalogPath = Join-Path $Root "packaging\redistributable-assets.json"
+    if (-not (Test-Path -LiteralPath $catalogPath)) {
+        throw "Redistributable asset catalog missing: $catalogPath"
+    }
+    $catalog = Get-Content -LiteralPath $catalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $copied = [System.Collections.Generic.List[string]]::new()
+
+    function Copy-AssetPath([string]$Relative) {
+        $relative = $Relative.Replace('/', '\')
+        $source = Join-Path $Root $relative
+        if (-not (Test-Path -LiteralPath $source)) {
+            throw "Redistributable asset missing: $source"
+        }
+        $destination = Join-Path $Output $relative
+        $destParent = Split-Path $destination -Parent
+        if ($destParent) {
+            New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+        }
+        if (Test-Path -LiteralPath $source -PathType Container) {
+            Copy-Item -LiteralPath $source -Destination $destination -Recurse -Force
+        } else {
+            Copy-Item -LiteralPath $source -Destination $destination -Force
+        }
+        $copied.Add(($Relative.Replace('\', '/')))
+    }
+
+    foreach ($entry in @($catalog.always_copy)) {
+        Copy-AssetPath -Relative ([string]$entry)
+    }
+
+    $variants = [System.Collections.Generic.List[object]]::new()
+    foreach ($entry in @($catalog.paths)) {
+        foreach ($include in @($entry.include)) {
+            Copy-AssetPath -Relative ([string]$include)
+        }
+        $variants.Add([ordered]@{
+            id = [string]$entry.id
+            workload = [string]$entry.workload
+            include = @($entry.include | ForEach-Object { ([string]$_).Replace('\', '/') })
+        })
+    }
+
+    $slimManifest = Join-Path $Root ([string]$catalog.manifest -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $slimManifest)) {
+        throw "Redistributable portable manifest missing: $slimManifest"
+    }
+    $manifestDir = Join-Path $Output "benchmark\manifests"
+    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+    Copy-Item -LiteralPath $slimManifest `
+        -Destination (Join-Path $manifestDir "portable.json") -Force
+    $copied.Add("benchmark/manifests/portable.json")
+
+    # Drop accidental HF / research caches if any always_copy tree dragged them in.
+    foreach ($junk in @(
+        (Join-Path $Output "models\.cache"),
+        (Join-Path $Output "tools\research\__pycache__")
+    )) {
+        if (Test-Path -LiteralPath $junk) {
+            Remove-Item -LiteralPath $junk -Recurse -Force
+        }
+    }
+
+    $totalBytes = 0L
+    foreach ($dirName in @("models", "workloads")) {
+        $dir = Join-Path $Output $dirName
+        if (Test-Path -LiteralPath $dir) {
+            $totalBytes += @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue |
+                Measure-Object -Property Length -Sum).Sum
+        }
+    }
+
+    Write-Host "Redistributable assets: one variant per workload" -ForegroundColor Cyan
+    return [ordered]@{
+        catalog = "packaging/redistributable-assets.json"
+        portable_manifest = "benchmark/manifests/portable.json"
+        model_variants = @($variants)
+        copied_paths = @($copied)
+        total_mb = [math]::Round($totalBytes / 1MB, 1)
+    }
+}
+
 if ($Clean -and (Test-Path -LiteralPath $Output)) {
     Remove-Item -LiteralPath $Output -Recurse -Force
 }
@@ -237,14 +401,36 @@ New-Item -ItemType Directory -Path (Join-Path $Output "runners") -Force | Out-Nu
 $records = [System.Collections.Generic.List[object]]::new()
 $skipped = [System.Collections.Generic.List[object]]::new()
 $seen = @{}
+$buildable = [System.Collections.Generic.List[object]]::new()
 foreach ($id in $selectedIds) {
     $definition = Get-Definition $id
     if (@($definition.architectures) -notcontains $Architecture) {
         $skipped.Add([ordered]@{ id = $id; reason = "unsupported on $Architecture" })
         continue
     }
+    $buildable.Add($definition)
+}
+
+if (-not $SkipBuild -and $buildable.Count) {
+    $limit = $ThrottleLimit
+    if ($limit -le 0) {
+        $limit = [Math]::Max(1, [Math]::Min(4, [Math]::Min(
+            $buildable.Count,
+            [Environment]::ProcessorCount
+        )))
+    }
+    if ($limit -le 1 -or $buildable.Count -le 1) {
+        foreach ($definition in $buildable) {
+            Invoke-RunnerBuild $definition
+        }
+    } else {
+        Invoke-RunnerBuildsParallel -Definitions @($buildable) -Limit $limit
+    }
+}
+
+foreach ($definition in $buildable) {
+    $id = [string]$definition.id
     $source = Join-Path $root "build\$Architecture$([string]$definition.platform_suffix)\$Configuration"
-    if (-not $SkipBuild) { Invoke-RunnerBuild $definition }
     if (-not (Test-Path -LiteralPath (Join-Path $source "NpuInferenceBench.exe"))) {
         $skipped.Add([ordered]@{ id = $id; reason = "build output is missing: $source" })
         continue
@@ -262,14 +448,9 @@ foreach ($additionalRoot in $AdditionalRunnerRoot) {
 $includedIds = @($records | ForEach-Object { [string]$_.id })
 $effectiveSkipped = @($skipped | Where-Object { $includedIds -notcontains [string]$_.id })
 
+$assetSummary = $null
 if (-not $SkipAssets) {
-    foreach ($directory in @("benchmark", "models", "tools", "workloads")) {
-        $source = Join-Path $root $directory
-        if (Test-Path -LiteralPath $source) {
-            Copy-Item -LiteralPath $source -Destination $Output -Recurse -Force
-        }
-    }
-    Copy-Item -LiteralPath (Join-Path $root "run-benchmark.ps1") -Destination $Output -Force
+    $assetSummary = Copy-RedistributableAssets -Root $root -Output $Output
 }
 
 $manifest = [ordered]@{
@@ -281,6 +462,9 @@ $manifest = [ordered]@{
     runners = @($records)
     skipped = $effectiveSkipped
 }
+if ($assetSummary) {
+    $manifest.assets = $assetSummary
+}
 $manifest | ConvertTo-Json -Depth 10 |
     Set-Content -LiteralPath (Join-Path $Output "runner-package.json") -Encoding UTF8
 Write-Host "Runner package: $Output" -ForegroundColor Green
@@ -289,4 +473,11 @@ foreach ($record in $records) {
 }
 foreach ($skip in $effectiveSkipped) {
     Write-Host "  skipped : $($skip.id) - $($skip.reason)" -ForegroundColor DarkYellow
+}
+if ($assetSummary) {
+    Write-Host ("  assets  : {0} model variant(s), ~{1} MB" -f `
+        $assetSummary.model_variants.Count, $assetSummary.total_mb) -ForegroundColor DarkCyan
+    foreach ($variant in @($assetSummary.model_variants)) {
+        Write-Host ("           - {0} ({1})" -f $variant.id, $variant.workload) -ForegroundColor DarkGray
+    }
 }

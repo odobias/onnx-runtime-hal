@@ -33,6 +33,19 @@ Write-Host "Ensuring eval-set toolchain (datasets, soundfile)..." -ForegroundCol
 & $vpy -m pip install --upgrade pip --quiet
 & $vpy -m pip install --quiet "datasets" "soundfile" "numpy"
 
+$evalPath = Join-Path $evalDir "eval.jsonl"
+$priorBaselines = @{}
+if (Test-Path -LiteralPath $evalPath) {
+    Get-Content -LiteralPath $evalPath -Encoding UTF8 | ForEach-Object {
+        if (-not $_) { return }
+        $row = $_ | ConvertFrom-Json
+        if (-not $row.id) { return }
+        if ($row.PSObject.Properties.Name -contains "baseline_wer") {
+            $priorBaselines[[string]$row.id] = $row
+        }
+    }
+}
+
 $script = Join-Path $PSScriptRoot "make_eval_set.py"
 Write-Host "Building eval set (up to $Count utterances)..." -ForegroundColor Cyan
 & $vpy $script --outdir $evalDir --count $Count
@@ -44,8 +57,28 @@ if (-not $ok) {
     if (-not (Test-Path $jfk)) { & (Join-Path $PSScriptRoot "get-audio.ps1") }
     $ref = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
     $rec = [ordered]@{ id = "jfk"; audio = "workloads/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
-    ($rec | ConvertTo-Json -Compress) | Set-Content -Path (Join-Path $evalDir "eval.jsonl") -Encoding UTF8
+    ($rec | ConvertTo-Json -Compress) | Set-Content -Path $evalPath -Encoding UTF8
     Write-Host "Wrote 1 utterance (jfk) to workloads\eval\eval.jsonl" -ForegroundColor Green
+}
+
+if ($priorBaselines.Count -gt 0 -and (Test-Path -LiteralPath $evalPath)) {
+    $merged = 0
+    $lines = Get-Content -LiteralPath $evalPath -Encoding UTF8 | ForEach-Object {
+        if (-not $_) { return $_ }
+        $row = $_ | ConvertFrom-Json
+        $prior = $priorBaselines[[string]$row.id]
+        if ($prior) {
+            foreach ($field in @("baseline_hyp", "baseline_wer", "baseline_cer", "baseline_source")) {
+                if ($prior.PSObject.Properties.Name -contains $field) {
+                    $row | Add-Member -NotePropertyName $field -NotePropertyValue $prior.$field -Force
+                }
+            }
+            $merged++
+        }
+        ($row | ConvertTo-Json -Compress -Depth 8)
+    }
+    $lines | Set-Content -LiteralPath $evalPath -Encoding UTF8
+    Write-Host "Preserved baked baselines for $merged clip(s)." -ForegroundColor DarkCyan
 }
 
 exit 0

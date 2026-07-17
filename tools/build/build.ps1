@@ -35,7 +35,10 @@ param(
     [switch]$BundleAmdModel,
     [string]$RyzenAiDir = "",
     [string]$OrtDir = "",
-    [switch]$Rebuild
+    [switch]$Rebuild,
+    # Cap MSBuild node parallelism (/m:N). Use a lower value when several
+    # isolated runner builds are launched concurrently.
+    [int]$MaxCpuCount = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -99,9 +102,17 @@ if ($requestedOrtPack -and -not $DisableIntel) {
     $DisableIntel = $true
 }
 if ($EnableDirectML -and -not $OrtDir) {
-    $directmlDir = Join-Path $root "third_party\onnxruntime-directml"
-    if (-not (Test-Path (Join-Path $directmlDir "include\onnxruntime_cxx_api.h"))) {
-        Write-Host "DirectML SDK missing. Run: .\tools\fetch\get-onnxruntime-directml.ps1" -ForegroundColor Red
+    # Prefer arch-specific staging (multi-arch parallel builds), then the legacy
+    # flat third_party/onnxruntime-directml directory.
+    $candidates = @(
+        (Join-Path $root "third_party\onnxruntime-directml-$Platform"),
+        (Join-Path $root "third_party\onnxruntime-directml")
+    )
+    $directmlDir = $candidates | Where-Object {
+        Test-Path (Join-Path $_ "include\onnxruntime_cxx_api.h")
+    } | Select-Object -First 1
+    if (-not $directmlDir) {
+        Write-Host "DirectML SDK missing. Run: .\tools\fetch\get-onnxruntime-directml.ps1 -Architecture $($Platform.ToLowerInvariant())" -ForegroundColor Red
         exit 1
     }
     $OrtDir = $directmlDir
@@ -127,10 +138,14 @@ $args = @(
     "/p:EnableOvep=$([bool]$EnableOvep)".ToLower(),
     "/p:EnableAmd=$([bool]$EnableAmd)".ToLower(),
     "/p:EnableQualcomm=$([bool]$EnableQualcomm)".ToLower(),
-    "/m",
     "/nologo",
     "/v:minimal"
 )
+if ($MaxCpuCount -gt 0) {
+    $args += "/m:$MaxCpuCount"
+} else {
+    $args += "/m"
+}
 if ($BundleAmdModel) {
     $args += "/p:BundleAmdModel=true"
 }
