@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Correctness (not just latency) check for the FakeAudio / Generated Audio
 Detector ONNX model, using real labeled audio pulled from the team's own
 manual efficacy review -- see provenance below.
@@ -56,8 +56,8 @@ import soundfile as sf
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "tools", "research"))
-MODEL_PATH = os.path.join(ROOT, "models", "deepfake", "fakeaudio", "model.onnx")
-SAMPLES_DIR = os.path.join(ROOT, "models", "deepfake", "audio-samples")
+MODEL_PATH = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio", "model.onnx")
+SAMPLES_DIR = os.path.join(ROOT, "workloads", "classifiers", "audio-samples")
 WINDOW_SAMPLES = 308700  # 7.0s @ 44.1kHz, per the model's static input shape
 
 # Ground truth from the manual "Generated audio detector efficacy" review

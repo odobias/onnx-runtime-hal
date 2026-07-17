@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": 1,
   "suite": "portable",
   "description": "Redistributable subset: Whisper static, TSC whole, FakeAudio whole + generic NPU backbone split.",
@@ -23,7 +23,7 @@
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "models/deepfake/fixtures/tsc",
+      "path": "workloads/classifiers/fixtures/tsc",
       "executionProfiles": [
         {
           "id": "whole-fp32",
@@ -39,12 +39,12 @@
       "id": "fakeaudio",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "models/deepfake/fixtures/fakeaudio",
+      "path": "workloads/classifiers/fixtures/fakeaudio",
       "executionProfiles": [
         {
           "id": "whole-fp32",
           "devices": ["cpu", "gpu"],
-          "path": "models/deepfake/fixtures/fakeaudio",
+          "path": "workloads/classifiers/fixtures/fakeaudio",
           "graphRole": "whole",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true
@@ -52,7 +52,7 @@
         {
           "id": "npu-split-generic",
           "devices": ["npu", "gpu", "cpu"],
-          "path": "models/deepfake/fixtures/fakeaudio-bb-fp32",
+          "path": "workloads/classifiers/fixtures/fakeaudio-bb-fp32",
           "graphRole": "backbone",
           "frontendContract": "cpu-fp32-logmel",
           "referenceContract": "full-model-cpu-fp32",

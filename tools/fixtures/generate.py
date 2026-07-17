@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Dump the deepfake classifiers' *validated* ONNX input tensors (and the CPU
 reference probabilities) to a flat on-disk fixture format the C++ classifier
 benchmark can replay.
@@ -41,7 +41,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-FIX_ROOT = os.path.join(ROOT, "models", "deepfake", "fixtures")
+FIX_ROOT = os.path.join(ROOT, "workloads", "classifiers", "fixtures")
 
 # numpy dtype -> the two tokens the C++ loader understands.
 DTYPE_TOKEN = {np.dtype(np.int64): "i64", np.dtype(np.float32): "f32"}

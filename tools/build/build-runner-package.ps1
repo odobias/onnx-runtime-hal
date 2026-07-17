@@ -319,6 +319,24 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
     $catalog = Get-Content -LiteralPath $catalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $copied = [System.Collections.Generic.List[string]]::new()
 
+    # Prefer workloads/classifiers; migrate from legacy models/deepfake when needed.
+    $migrate = Join-Path $Root "tools\fetch\migrate-classifier-layout.ps1"
+    if (Test-Path -LiteralPath $migrate) {
+        & $migrate
+    }
+
+    if ($catalog.require_eval_wavs) {
+        $evalDir = Join-Path $Root "workloads\eval"
+        $wavs = @(Get-ChildItem -LiteralPath $evalDir -Filter "ls_*.wav" -File -ErrorAction SilentlyContinue)
+        if ($wavs.Count -lt 1) {
+            throw "Redistributable eval WAVs missing under workloads/eval (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
+        }
+        $evalJsonl = Join-Path $evalDir "eval.jsonl"
+        if (-not (Test-Path -LiteralPath $evalJsonl)) {
+            throw "Redistributable eval manifest missing: $evalJsonl"
+        }
+    }
+
     function Copy-AssetPath([string]$Relative) {
         $relative = $Relative.Replace('/', '\')
         $source = Join-Path $Root $relative
@@ -364,26 +382,21 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
         -Destination (Join-Path $manifestDir "portable.json") -Force
     $copied.Add("benchmark/manifests/portable.json")
 
-    # Drop accidental HF / research caches if any always_copy tree dragged them in.
-    foreach ($junk in @(
-        (Join-Path $Output "models\.cache"),
-        (Join-Path $Output "tools\research\__pycache__")
-    )) {
-        if (Test-Path -LiteralPath $junk) {
-            Remove-Item -LiteralPath $junk -Recurse -Force
-        }
+    # Packages must not ship a top-level models/ runtime root.
+    $modelsOut = Join-Path $Output "models"
+    if (Test-Path -LiteralPath $modelsOut) {
+        Remove-Item -LiteralPath $modelsOut -Recurse -Force
     }
 
     $totalBytes = 0L
-    foreach ($dirName in @("models", "workloads")) {
-        $dir = Join-Path $Output $dirName
-        if (Test-Path -LiteralPath $dir) {
-            $totalBytes += @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue |
-                Measure-Object -Property Length -Sum).Sum
-        }
+    $workloadsDir = Join-Path $Output "workloads"
+    if (Test-Path -LiteralPath $workloadsDir) {
+        $totalBytes = @(Get-ChildItem -LiteralPath $workloadsDir -Recurse -File -ErrorAction SilentlyContinue |
+            Measure-Object -Property Length -Sum).Sum
     }
 
-    Write-Host "Redistributable assets: one variant per workload" -ForegroundColor Cyan
+    Write-Host ("Redistributable assets: {0} variant group(s) under workloads/" -f $variants.Count) `
+        -ForegroundColor Cyan
     return [ordered]@{
         catalog = "packaging/redistributable-assets.json"
         portable_manifest = "benchmark/manifests/portable.json"

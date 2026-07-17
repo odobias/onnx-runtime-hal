@@ -1,4 +1,4 @@
-# Reusable ONNX Runtime HAL
+﻿# Reusable ONNX Runtime HAL
 
 `OnnxRuntimeHal` is a Windows-first C++17 static library for loading and running
 arbitrary ONNX models through the repository's CPU, DirectML, OpenVINO, VitisAI,
@@ -36,7 +36,7 @@ The benchmark executable is also a reference consumer:
 
 ```powershell
 .\build\ARM64\Release\NpuInferenceBench.exe run-onnx `
-  .\models\deepfake\tsc\model.onnx `
+  .\workloads\classifiers\tsc\model.onnx `
   .\tests\runtime-hal-tsc-inputs.json `
   --device cpu `
   --strict-device `

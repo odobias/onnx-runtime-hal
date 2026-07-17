@@ -27,9 +27,9 @@ import onnxruntime as ort
 from onnxruntime.transformers import float16
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
+FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
 MODEL = os.path.join(FA, "model.onnx")
-FIX = os.path.join(ROOT, "models", "deepfake", "fixtures", "fakeaudio")
+FIX = os.path.join(ROOT, "workloads", "classifiers", "fixtures", "fakeaudio")
 SAMPLES = ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
 WINDOW = 308700
 

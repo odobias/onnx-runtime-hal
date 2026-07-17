@@ -14,7 +14,7 @@ import onnx
 from onnx import numpy_helper
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODEL = os.path.join(ROOT, "models", "deepfake", "fakeaudio", "model.onnx")
+MODEL = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio", "model.onnx")
 
 DTYPE = {v: k for k, v in onnx.TensorProto.DataType.items()}
 

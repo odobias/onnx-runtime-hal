@@ -1,4 +1,4 @@
-﻿"""Regenerate the useful fakeaudio (MS-CLAP / HTSAT) precision variants from the
+"""Regenerate the useful fakeaudio (MS-CLAP / HTSAT) precision variants from the
 one checked-in base model, so we ship a *recipe* in git instead of a pile of
 derived weights on HF. Every output here is a deterministic function of
 workloads/classifiers/fakeaudio/model.onnx (fetched from the HF mirror on demand).
@@ -48,9 +48,9 @@ from onnx import shape_inference
 from onnxruntime.transformers import float16
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
+FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
 MODEL = os.path.join(FA, "model.onnx")
-FIX = os.path.join(ROOT, "models", "deepfake", "fixtures", "fakeaudio")
+FIX = os.path.join(ROOT, "workloads", "classifiers", "fixtures", "fakeaudio")
 SAMPLES = ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
 WINDOW = 308700
 # The log-mel boundary: front-end = input..CUT, backbone = CUT..output.

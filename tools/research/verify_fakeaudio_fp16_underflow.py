@@ -25,7 +25,7 @@ sys.path.insert(0, HERE)
 import validate_fakeaudio_onnx as fa  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(HERE))
-FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
+FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
 BASE = os.path.join(FA, "model.onnx")
 MEL = os.path.join(FA, "_probe.melenergy.onnx")   # input -> MatMul_output_0 (pre-clamp)
 LOGO = os.path.join(FA, "_probe.logout.onnx")     # input -> Log_output_0

@@ -24,8 +24,8 @@ workloads/classifiers/fixtures/
 workloads/eval/*
 !workloads/eval/eval.jsonl
 workloads/audio/
-# Legacy/generated payload root. Classifier assets still use models/deepfake
-# while the remaining model families migrate to workloads/.
+# Legacy/non-runtime cache only (do not use as suite asset root).
+# Classifier runtime lives under workloads/classifiers/.
 /models/
 *.wav
 *.blob

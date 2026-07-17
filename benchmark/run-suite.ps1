@@ -31,6 +31,8 @@
 #   .\benchmark\run-suite.ps1 -Runtime winml -Device npu,gpu,cpu
 #   .\benchmark\run-suite.ps1 -Device gpu -Provider DmlExecutionProvider
 #   .\benchmark\run-suite.ps1 -Precision preferred  # let each executor choose precision
+#   .\run-benchmark.ps1 -Executor fastest -Only whisper
+#   .\run-benchmark.ps1 -Executor most-accurate -Only whisper -Device npu,gpu,cpu
 #   .\benchmark\run-suite.ps1 -Only whisper         # just the ASR model
 #   .\benchmark\run-suite.ps1 -RegenerateFixtures   # rebuild classifier fixtures first
 #
@@ -65,6 +67,8 @@ param(
     [string]$AttemptLedger = "",
     [string]$AccuracyLedger = "",
     [string]$RunnerManifest = "",
+    [string]$RunnerId = "",
+    [ValidateSet("", "fastest", "most-accurate")][string]$Executor = "",
     [switch]$ExplainRunnerSelection,
     [switch]$RegenerateFixtures,
     [switch]$NoResults
@@ -101,10 +105,38 @@ $runnerPackage = $null
 if ($RunnerManifest) {
     $runnerPackage = Get-BenchmarkRunnerPackageManifest -Path $RunnerManifest
 }
+if ($Executor -and -not $runnerPackage) {
+    Write-Host "-Executor requires -RunnerManifest (package mode)." -ForegroundColor Red
+    exit 1
+}
+if ($Executor -and $RunnerId) {
+    Write-Host "-Executor and -RunnerId are mutually exclusive." -ForegroundColor Red
+    exit 1
+}
 $bundledTag = switch ($hostVendor) {
     'AMD'      { "$hostArch-amd" }
     'Qualcomm' { "$hostArch-qualcomm" }
     default    { $hostArch }
+}
+
+if ($Executor) {
+    $selection = Invoke-BenchmarkExecutorSelection `
+        -Objective $Executor `
+        -PackageManifest $runnerPackage `
+        -SuiteScript $PSCommandPath `
+        -Root $root `
+        -Device $Device `
+        -Only $Only `
+        -Profile $Profile `
+        -HostVendor $hostVendor `
+        -HostArchitecture $hostArch `
+        -Runtime $Runtime `
+        -Provider $Provider `
+        -Configuration $Configuration `
+        -Precision $Precision `
+        -Manifest $Manifest
+    if (-not $selection.winner) { exit 1 }
+    exit 0
 }
 
 function Get-RequestedBenchmarkTags {
@@ -151,8 +183,8 @@ if ($Runtime -eq "all") {
         if ($runnerPackage) {
             try {
                 $null = Resolve-BenchmarkRunnerPack -PackageManifest $runnerPackage `
-                    -Runtime $targetRuntime -Provider $Provider -HostVendor $hostVendor `
-                    -HostArchitecture $hostArch
+                    -Runtime $targetRuntime -Provider $Provider -RunnerId $RunnerId `
+                    -HostVendor $hostVendor -HostArchitecture $hostArch
             } catch {
                 Write-Host "NOT PERFORMED: runtime '$targetRuntime' is unavailable." -ForegroundColor Yellow
                 Write-Host "  missing prerequisite: $($_.Exception.Message)" -ForegroundColor Yellow
@@ -179,7 +211,8 @@ if ($Runtime -eq "all") {
         }
         foreach ($pair in @(
             @("Audio", $Audio), @("Results", $Results), @("ClassifierResults", $ClassifierResults),
-            @("Manifest", $Manifest), @("AttemptLedger", $AttemptLedger), @("AccuracyLedger", $AccuracyLedger)
+            @("Manifest", $Manifest), @("AttemptLedger", $AttemptLedger), @("AccuracyLedger", $AccuracyLedger),
+            @("RunnerId", $RunnerId)
         )) {
             if ($pair[1]) { $childArgs[$pair[0]] = $pair[1] }
         }
@@ -203,8 +236,8 @@ $selectedRunnerId = ""
 if ($runnerPackage) {
     try {
         $selectedRunner = Resolve-BenchmarkRunnerPack -PackageManifest $runnerPackage `
-            -Runtime $Runtime -Provider $Provider -HostVendor $hostVendor `
-            -HostArchitecture $hostArch
+            -Runtime $Runtime -Provider $Provider -RunnerId $RunnerId `
+            -HostVendor $hostVendor -HostArchitecture $hostArch
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Red
         exit 1
@@ -289,11 +322,9 @@ if ($Mode -eq "accuracy-quick" -and -not $accuracyLedgerExplicit) {
         throw "Immutable accuracy run already exists: $AccuracyLedger"
     }
 }
-# Classifier fixtures + their ONNX models are colocated under models/deepfake/ (the
-# model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx, so fixtures must
-# live beside the models). tools/fixtures/generate.py writes here too. (The workloads/
-# classifiers/ layout in the manifest is the in-progress target for a later migration.)
-$fixRoot = Join-Path $root "models\deepfake\fixtures"
+# Classifier fixtures + ONNX models are colocated under workloads/classifiers/
+# (model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx).
+$fixRoot = Join-Path $root "workloads\classifiers\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
 $providerTag = if ($Provider) { $Provider } else { "auto" }

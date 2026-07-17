@@ -138,6 +138,10 @@ For automatic provider selection, the logical device chains are:
 An explicit `-Provider` performs one provider attempt. `-Provider auto` enables
 the fallback chain.
 
+In a redistributable package, `-Executor fastest` or `-Executor most-accurate`
+races the packaged runners on the eval/fixture samples (Whisper uses baked
+baseline WER) and prints the winning runner/runtime/device.
+
 The provider implementations are:
 
 - Qualcomm Snapdragon: QNN execution provider.

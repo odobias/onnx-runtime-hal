@@ -13,9 +13,15 @@ dist/npu-inference-bench-ARM64/
   runner-package.json
   run-benchmark.ps1
   benchmark/
-  tools/
-  models/
+  tools/                    # allowlisted helpers (fetch/eval/fixtures/validate)
   workloads/
+    whisper/models/static-onnx/
+    eval/                   # eval.jsonl + ls_*.wav (+ baked baselines)
+    audio/
+    classifiers/
+      tsc/
+      fakeaudio/
+      fixtures/
   runners/
     ort/
       NpuInferenceBench.exe
@@ -33,6 +39,9 @@ dist/npu-inference-bench-ARM64/
       Microsoft.Windows.AI.MachineLearning.dll
       runner.json
 ```
+
+There is no top-level `models/` tree in the package. All runtime assets live under
+`workloads/`.
 
 The x64 package uses the same layout and may contain `amd`, `ovep`, `dml`,
 `winml`, and portable `ort` runners. A package contains only one PE
@@ -78,17 +87,19 @@ an SDK that was detected is fatal. A summary is written to
 
 ### Redistributable model assets
 
-Packages do **not** copy the full repo `models/` / `workloads/` trees. Asset
-inclusion is gated by `packaging/redistributable-assets.json`: Whisper static,
-TSC whole, and FakeAudio **whole + generic NPU backbone split**. The package
+Packages copy only the allowlist in `packaging/redistributable-assets.json`:
+Whisper static, TSC whole, and FakeAudio **whole + generic NPU backbone split**,
+all under `workloads/`. Eval WAVs are required at assemble time. The package
 replaces `benchmark/manifests/portable.json` with
 `packaging/portable.redistributable.json` so dynamic Whisper / OV-IR / AMD
-vendor Whisper / Intel-only FakeAudio splits stay out.
+vendor Whisper / Intel-only FakeAudio splits stay out. `tools/` is trimmed to
+fetch/eval/fixtures/validate helpers (no research/export/build trees).
 
-Whisper eval clips in `workloads/eval/eval.jsonl` may carry baked
+Whisper eval clips in `workloads/eval/eval.jsonl` carry baked
 `baseline_hyp` / `baseline_wer` / `baseline_cer` fields (mint with
-`tools/eval/bake-whisper-baselines.ps1`). Accuracy-quick then reports WER delta
-vs that baseline and treats hyp mismatches as trust-gate flips.
+`tools/eval/bake-whisper-baselines.ps1`). Accuracy-quick reports WER delta vs
+that baseline. `-Executor fastest|most-accurate` races packaged runners on those
+samples and returns the winner.
 
 Useful assembly options:
 

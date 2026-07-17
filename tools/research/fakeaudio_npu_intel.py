@@ -47,7 +47,7 @@ sys.path.insert(0, HERE)
 import validate_fakeaudio_onnx as fa  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(HERE))
-FA = os.path.join(ROOT, "models", "deepfake", "fakeaudio")
+FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
 BASE = os.path.join(FA, "model.onnx")
 FE = os.path.join(FA, "model.frontend-fp32.onnx")
 BB = os.path.join(FA, "model.backbone-fp32.onnx")
