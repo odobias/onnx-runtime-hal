@@ -16,7 +16,7 @@ Pipeline (all static shapes, plain ONNX ops -- see export_static_kv.py):
 Cross-KV tensors are set ONCE on the persistent decoder infer request (they never
 change across steps), so only input_ids / cache_position / self-KV are updated per
 token. Compare against the OV-IR genai-bounded-kv and static-no-kv ONNX baselines
-in results/quantization-benchmark.* .
+in results/local/quantization-benchmark.* .
 
   .venv\\Scripts\\python.exe scripts\\experiments\\bench_static_kv_ov.py
 """

@@ -45,11 +45,11 @@ Get the 1.7.1 GA installer + matching NPU driver from AMD's install docs
 The NPU findings that were measured on 1.8.0-beta / VitisAI (ORT 1.25.1) and should be
 re-checked:
 
-- `results/fakeaudio-logmel-precision.md` -> "NPU reality (AMD XDNA2 / VitisAI)":
+- `results/reports/fakeaudio-logmel-precision.md` -> "NPU reality (AMD XDNA2 / VitisAI)":
   fp32 full model `max_abs_p_diff` 0.996; fp32 backbone-only (CPU mel fed in) still 0.99;
   calibrated int8 backbone 0.51. Claim: VAIML mishandles the HTSAT backbone independently
   of the front-end underflow.
-- `results/int8-vitis-quantization.md` (VitisAI int8 path).
+- `results/reports/int8-vitis-quantization.md` (VitisAI int8 path).
 - Whisper `onnx-static` on NPU via VitisAI (should port cleanly — sanity check it still does).
 
 ## Steps on the AMD box

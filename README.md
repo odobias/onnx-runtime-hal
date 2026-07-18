@@ -156,43 +156,28 @@ set of vendor DLLs can serve every machine would produce misleading results.
 
 ## Repository architecture
 
+Source, published evidence, and local artifacts are separated on purpose.
+See [`LAYOUT.md`](LAYOUT.md) for the full contract.
+
 ```text
-benchmark/
-  run-suite.ps1              manifest-driven benchmark of record
-  run-whisper.ps1            one Whisper invocation
-  compare-devices.ps1        secondary comparison report
-  manifests/portable.json    all portable workloads
-  schemas/                   result contracts
-  lib/harness.ps1            shared sweep and aggregation code
-  research/                  quantization-only sweeps
+runner/                      C++ app + OnnxRuntimeHal
+workloads/                   adapters + tracked eval.jsonl (payloads gitignored)
+projects/ + msbuild/         MSBuild projects and shared props
+tests/                       runtime and packaging tests
+benchmark/                   suite-of-record harness, manifests, schemas
+tools/                       bootstrap, fetch, setup, export, research, repros
+packaging/                   runner catalogs (metadata only; packages → dist/)
+docs/                        guides and engineering notes
+results/
+  accuracy-runs/             immutable accuracy campaigns
+  run-attempts/              published attempt matrix
+  host-snapshots/            host/runtime fingerprints
+  model-compilation/         provider-input provenance
+  ledgers/                   latency CSVs + frozen history
+  reports/                   historical human reports (not suite-of-record)
+  local/                     ephemeral research outputs (gitignored)
 
-runner/
-  cli/main.cpp               thin process entry point
-  cli/generic_onnx_cli.cpp   arbitrary ONNX tensor-manifest runner
-  benchmark/                 timing, reporting, and workload dispatch
-  core/                      workload factory
-  runtime/                   reusable sessions, provider selection, diagnostics
-  include/npu_inference_bench/
-
-projects/
-  OnnxRuntimeHal/            reusable static runtime library
-  OnnxRuntimeHal.Tests/      focused runtime contract tests
-
-workloads/
-  whisper/backends/          Whisper engine adapters
-  whisper/models/            downloaded model payloads
-  classifiers/               classifier runner and downloaded assets
-  eval/                      labeled evaluation clips
-  audio/                     sample audio
-
-tools/
-  build/                     bootstrap and MSBuild entry points
-  setup/                     vendor runtime setup
-  fetch/                     Hugging Face asset synchronization
-  export/                    model export utilities
-  fixtures/                  required classifier fixture generation
-  validate/                  correctness validators
-  research/                  non-authoritative probes and experiments
+build/ dist/ third_party/    local artifacts only (gitignored)
 ```
 
 ## Build

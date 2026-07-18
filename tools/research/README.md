@@ -16,7 +16,7 @@ models. These are plain ORT classifiers (not OpenVINO GenAI, not the C++
 
 | Script | What it does |
 |---|---|
-| `benchmark_deepfake_onnx.py` | Load/latency **and** correctness benchmark across ORT execution providers. Writes `results/deepfake-benchmark.{csv,md}`. |
+| `benchmark_deepfake_onnx.py` | Load/latency **and** correctness benchmark across ORT execution providers. Writes `results/reports/deepfake-benchmark.{csv,md}`. |
 | `validate_tsc_onnx.py`       | Correctness-only check for the Text Scam Classifier on its own labeled sanity set. |
 | `validate_fakeaudio_onnx.py` | Correctness-only check for the Generated Audio Detector on labeled clips. |
 
@@ -146,7 +146,7 @@ want it for.** Two independent reasons:
    filename — duplicate exported symbols and internal singletons collide. AMD
    ships a *custom core* (~1.20–1.22 with VitisAI baked in), not a stock-core
    plugin, so it's the whole seam that blocks a single package. See
-   `results/single-binary-cross-vendor.md` for the full analysis.
+   `results/reports/single-binary-cross-vendor.md` for the full analysis.
 
 **What to do instead — directory separation (what the repo already does):**
 keep the canonical `onnxruntime.dll` name *inside each vendor's DLL pack*, in
@@ -172,9 +172,9 @@ symbol clash.
 
 ## Outputs
 
-- `results/deepfake-benchmark.csv` — one row per (model, EP, run); includes
+- `results/reports/deepfake-benchmark.csv` — one row per (model, EP, run); includes
   per-sample `eval_detail` (label / prediction / p) and host/arch/ORT stamps.
-- `results/deepfake-benchmark.md` — latency+accuracy summary plus per-model,
+- `results/reports/deepfake-benchmark.md` — latency+accuracy summary plus per-model,
   per-sample probability tables (doubling as a cross-EP numerical-agreement
   check: identical p across EPs means the accelerator isn't silently changing
   outputs).

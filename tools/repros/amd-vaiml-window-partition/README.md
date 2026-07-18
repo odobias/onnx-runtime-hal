@@ -47,13 +47,13 @@ lightweight graph-generation packages (`numpy`, `onnx`), and checks that
 `onnxruntime` exposes `VitisAIExecutionProvider`:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\bootstrap.ps1 -InstallPythonDeps
+.\tools\repros\amd-vaiml-window-partition\bootstrap.ps1 -InstallPythonDeps
 ```
 
 Override the SDK Python if needed:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\bootstrap.ps1 `
+.\tools\repros\amd-vaiml-window-partition\bootstrap.ps1 `
   -Python C:\path\to\ryzen-ai-env\python.exe `
   -InstallPythonDeps
 ```
@@ -69,7 +69,7 @@ If the AMD SDK is missing, bootstrap can download the official AMD installer and
 NPU driver archive and verify their SHA-256 hashes:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\bootstrap.ps1 `
+.\tools\repros\amd-vaiml-window-partition\bootstrap.ps1 `
   -DownloadRyzenAI `
   -AcceptAmdDownloadTerms
 ```
@@ -83,38 +83,38 @@ bullshit.
 From the repository root:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\run.ps1
+.\tools\repros\amd-vaiml-window-partition\run.ps1
 ```
 
 Run bootstrap first, then execute the repro:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\run.ps1 -Bootstrap -InstallPythonDeps
+.\tools\repros\amd-vaiml-window-partition\run.ps1 -Bootstrap -InstallPythonDeps
 ```
 
 Override the SDK Python if needed:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\run.ps1 `
+.\tools\repros\amd-vaiml-window-partition\run.ps1 `
   -Python C:\path\to\ryzen-ai-env\python.exe
 ```
 
 Force model regeneration:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\run.ps1 -RegenerateModel
+.\tools\repros\amd-vaiml-window-partition\run.ps1 -RegenerateModel
 ```
 
 Verify the cached VAIML path after one cold run:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\run.ps1 -ReuseCache
+.\tools\repros\amd-vaiml-window-partition\run.ps1 -ReuseCache
 ```
 
 Use an explicit VAIML cache directory:
 
 ```powershell
-.\repros\amd-vaiml-window-partition\run.ps1 `
+.\tools\repros\amd-vaiml-window-partition\run.ps1 `
   -CacheDir C:\temp\amd-vaiml-window-repro-cache
 ```
 

@@ -1,6 +1,6 @@
 ﻿# fakeaudio on the Qualcomm NPU (QNN / Hexagon HTP)
 
-Companion to `results/fakeaudio-intel-npu.md`. It replays the same
+Companion to `results/reports/fakeaudio-intel-npu.md`. It replays the same
 `export_fakeaudio_variants.py` precision variants on the Qualcomm Hexagon HTP
 (the one NPU AMD's and Intel's write-ups could not cover). **Result: the model
 runs correctly on the Snapdragon NPU via the FE-fp32(CPU) + backbone(NPU) split,
