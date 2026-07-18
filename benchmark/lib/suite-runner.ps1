@@ -75,7 +75,7 @@ function Invoke-NativeBenchmark {
     $provenanceIds = @()
     $graphArtifacts = [ordered]@{}
     if ($ExecutionProfile.frontendContract) {
-        $frontend = Join-Path $root "workloads\classifiers\fakeaudio\model.frontend-fp32.onnx"
+        $frontend = Join-Path $root "src\workloads\classifiers\fakeaudio\model.frontend-fp32.onnx"
         if (Test-Path -LiteralPath $frontend) {
             $frontendProvenance = Write-BenchmarkCompilationProvenance `
                 -Root $root -ArtifactPath $frontend -ProfileId ([string]$ExecutionProfile.id) `
@@ -115,7 +115,7 @@ function Invoke-NativeBenchmark {
             $eval = $evalRows[$i]
             $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
             if (-not (Test-Path -LiteralPath $clipPath)) {
-                $clipPath = Join-Path $root "workloads\eval\$($eval.id).wav"
+                $clipPath = Join-Path $root "src\workloads\eval\$($eval.id).wav"
             }
             if (-not (Test-Path -LiteralPath $clipPath)) {
                 $message = "Whisper evaluation audio is missing: $clipPath"
@@ -185,7 +185,7 @@ function Invoke-NativeBenchmark {
             -RequestedDevice $RequestedDevice `
             -RequestedProvider $(if ($Provider) { $Provider } else { "auto" }) `
             -ModelHash (Get-BenchmarkPathHash $path) `
-            -FixtureHash (Get-BenchmarkPathHash (Join-Path $root "workloads\eval\eval.jsonl")) `
+            -FixtureHash (Get-BenchmarkPathHash (Join-Path $root "src\workloads\eval\eval.jsonl")) `
             -GraphArtifacts $graphArtifacts `
             -EnvironmentSnapshotId $environmentSnapshot.id `
             -CompilationProvenanceIds $provenanceIds -Result $aggregate `

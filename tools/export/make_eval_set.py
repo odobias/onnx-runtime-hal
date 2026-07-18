@@ -7,8 +7,8 @@ soundfile, which avoids the torchcodec/ffmpeg dependency dance that recent
 `datasets` versions otherwise trigger.
 
 Output layout (repo-relative paths written into the jsonl):
-    workloads/eval/<id>.wav
-    workloads/eval/eval.jsonl   ->  {"id","audio","ref","duration_s"} per line
+    src/workloads/eval/<id>.wav
+    src/workloads/eval/eval.jsonl   ->  {"id","audio","ref","duration_s"} per line
 """
 import argparse
 import io
@@ -45,7 +45,7 @@ def load_audio(entry) -> tuple[np.ndarray, int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--outdir", required=True, help="workloads/eval directory")
+    ap.add_argument("--outdir", required=True, help="src/workloads/eval directory")
     ap.add_argument("--count", type=int, default=20, help="max utterances")
     args = ap.parse_args()
 
@@ -78,7 +78,7 @@ def main() -> int:
             to_wav_int16(wav_path, samples, sr)
             rec = {
                 "id": cid,
-                "audio": f"workloads/eval/{cid}.wav",
+                "audio": f"src/workloads/eval/{cid}.wav",
                 "ref": str(row["text"]).strip(),
                 "duration_s": round(len(samples) / sr, 2),
             }

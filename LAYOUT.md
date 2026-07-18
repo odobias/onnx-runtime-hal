@@ -1,41 +1,45 @@
 # Repository layout
 
-This repo keeps product source, published benchmark evidence, and local
-artifacts in separate places. If a path is not listed under **Source** or
-**Published evidence**, treat it as disposable local state.
-
-## Source (commit)
+Top-level folders are grouped so humans can find things without a scavenger hunt.
 
 | Path | Role |
 |------|------|
-| `runner/` | C++ benchmark app; public HAL headers under `runner/include/` |
-| `projects/OnnxRuntimeHal/` | Reusable C++ static library (`OnnxRuntimeHal.lib`) |
-| `workloads/` | Workload adapters (C++) and tracked `eval/eval.jsonl` |
-| `projects/` | MSBuild `.vcxproj` files (no `.cpp` here) |
-| `msbuild/` | Shared props/targets |
-| `tests/` | C++ and packaging tests |
+| `src/` | C++ product (`runner/`, `workloads/`, `tests/`) |
+| `eng/` | Build system (`projects/`, `msbuild/`) + packaging metadata |
 | `benchmark/` | Suite-of-record harness, manifests, schemas |
 | `tools/` | Bootstrap, fetch, setup, export, validate, research, repros |
-| `packaging/` | Runner catalogs and redistributable **metadata** (not packages) |
 | `docs/` | Guides and engineering notes |
+| `results/` | Published evidence (+ `reports/`, gitignored `local/`) |
 
-Root identity files stay at the repo root for MSBuild and package shims:
+Root identity files (stay put for MSBuild / package shims):
 
 - `NpuInferenceBench.sln`, `Directory.Build.props`
-- `run-benchmark.ps1` (forwards to `benchmark/run-suite.ps1`)
+- `run-benchmark.ps1` → `benchmark/run-suite.ps1`
+- `README.md`, `LAYOUT.md`, `.gitignore`
 
-## Published evidence (commit selectively)
+Local-only (gitignored, may be absent): `build/`, `dist/`, `third_party/`, `cache/`, `.venv*`.
+
+## Source detail
 
 | Path | Role |
 |------|------|
-| `results/accuracy-runs/` | Immutable accuracy campaigns (default suite mode) |
-| `results/run-attempts/` | Published attempt matrix per environment snapshot |
-| `results/host-snapshots/` | Host/runtime fingerprints |
-| `results/model-compilation/` | Provider-input provenance |
-| `results/ledgers/` | Latency CSVs and frozen accuracy history |
-| `results/reports/` | Historical human reports (MD/CSV/canvas); not suite-of-record |
+| `src/runner/` | App, HAL public headers (`include/`), HAL impl (`runtime/`) |
+| `src/workloads/` | Whisper/classifier adapters; `eval/eval.jsonl` tracked |
+| `src/tests/` | HAL C++ tests + packaging PowerShell tests |
+| `eng/projects/` | `.vcxproj` only (no `.cpp`) |
+| `eng/msbuild/` | Shared props/targets (C++23, backends, HAL consumer props) |
+| `eng/packaging/` | Runner catalogs/schemas — **not** package output |
+| `eng/projects/OnnxRuntimeHal/` | Reusable `OnnxRuntimeHal.lib` project |
 
-See [`results/README.md`](results/README.md) for write contracts and validity rules.
+## Published evidence (`results/`)
+
+| Path | Role |
+|------|------|
+| `accuracy-runs/`, `run-attempts/` | Immutable per-run campaigns |
+| `host-snapshots/`, `model-compilation/` | Environment / provider-input provenance |
+| `ledgers/` | Latency CSVs + frozen history (`attempts.jsonl` local-only) |
+| `reports/` | Historical human reports (not suite-of-record) |
+| `local/` | Ephemeral research output (gitignored) |
 
 ## Local artifacts (never commit)
 
@@ -43,21 +47,13 @@ See [`results/README.md`](results/README.md) for write contracts and validity ru
 |------|------|
 | `build/` | MSBuild output trees |
 | `dist/npu-inference-bench-*` | Assembled benchmark redistributables |
-| `dist/onnx-runtime-hal-*` | Packaged reusable `OnnxRuntimeHal` (`include/` + `lib/`) || `third_party/` | Downloaded vendor SDKs / ORT drops |
+| `dist/onnx-runtime-hal-*` | Packaged HAL (`include/` + `lib/`) |
+| `third_party/` | Downloaded vendor SDKs / ORT drops |
 | `cache/` | Provider compilation cache |
-| `.venv*`, `__pycache__/` | Python toolchains |
-| `workloads/whisper/models/` | Fetched/exported Whisper payloads |
-| `workloads/classifiers/{tsc,fakeaudio,fixtures,audio-samples}/` | Classifier assets |
-| `workloads/eval/*` except `eval.jsonl` | Eval WAVs and local eval junk |
-| `workloads/audio/` | Sample audio |
+| `src/workloads/**` payloads | Models, fixtures, WAVs (see `.gitignore`) |
 | `results/local/` | Ephemeral research/sweep outputs |
-| `results/ledgers/attempts.jsonl` | Rolling local attempt buffer |
-
-`packaging/` is **not** package output. Built packages live only under `dist/`.
 
 ## Authority
 
 - Benchmark-of-record: C++ runner + `benchmark/run-suite.ps1`
-- `tools/research/` and `benchmark/research/` are probes/sweeps; their outputs
-  belong in `results/local/` (ephemeral) or `results/reports/` (kept snapshots),
-  never loose next to evidence directories
+- `tools/research/` / `benchmark/research/` outputs → `results/local/` or `results/reports/`

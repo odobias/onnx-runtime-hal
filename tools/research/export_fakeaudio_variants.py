@@ -1,7 +1,7 @@
 """Regenerate the useful fakeaudio (MS-CLAP / HTSAT) precision variants from the
 one checked-in base model, so we ship a *recipe* in git instead of a pile of
 derived weights on HF. Every output here is a deterministic function of
-workloads/classifiers/fakeaudio/model.onnx (fetched from the HF mirror on demand).
+src/workloads/classifiers/fakeaudio/model.onnx (fetched from the HF mirror on demand).
 
 Why these variants exist (all measured, see the fidelity table this prints):
 

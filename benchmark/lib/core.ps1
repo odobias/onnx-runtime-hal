@@ -326,5 +326,5 @@ function Resolve-BenchmarkHostVendor([string]$Selector, [object]$Platform = $nul
 
 # Path to the unified ONNX Runtime + OpenVINO EP binary. It ships openvino 2025.4.1
 # DLLs that cannot share an output folder with the Intel GenAI build's openvino
-# 2026.x, so it lives in its own "x64-ovep" tree (see msbuild\common.props). Intel
+# 2026.x, so it lives in its own "x64-ovep" tree (see eng\msbuild\common.props). Intel
 # NPUs are x64, so this path is x64-only by construction.

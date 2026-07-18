@@ -34,8 +34,8 @@ $PSNativeCommandUseErrorActionPreference = $false
 Initialize-BenchmarkConsole
 
 $root = Split-Path $PSScriptRoot -Parent
-if (-not $Manifest) { $Manifest = Join-Path $root "workloads\whisper\manifest.json" }
-if (-not $EvalSet) { $EvalSet = Join-Path $root "workloads\eval\eval.jsonl" }
+if (-not $Manifest) { $Manifest = Join-Path $root "src\workloads\whisper\manifest.json" }
+if (-not $EvalSet) { $EvalSet = Join-Path $root "src\workloads\eval\eval.jsonl" }
 $exe = Join-Path $root "build\x64\$Configuration\NpuInferenceBench.exe"
 
 foreach ($p in @($Manifest, $EvalSet, $exe)) {

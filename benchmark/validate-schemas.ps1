@@ -58,7 +58,7 @@ function Assert-ColumnsEqual {
 
 $asr = Get-JsonColumns (Join-Path $root "benchmark\schemas\asr-results.columns.json")
 $classifier = Get-JsonColumns (Join-Path $root "benchmark\schemas\classifier-results.columns.json")
-$cppSource = Join-Path $root "runner\benchmark\benchmark_ledger.ipp"
+$cppSource = Join-Path $root "src\runner\benchmark\benchmark_ledger.ipp"
 
 Assert-ColumnsEqual "ASR JSON schema" $asr "C++ ASR writer" `
     (Get-CppHeaderColumns $cppSource "kBenchmarkCsvHeader")

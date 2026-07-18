@@ -1,4 +1,4 @@
-# Bake CPU fp32 Whisper-static hypotheses + WER/CER into workloads/eval/eval.jsonl
+# Bake CPU fp32 Whisper-static hypotheses + WER/CER into src/workloads/eval/eval.jsonl
 # so later suite runs can compare against a frozen baseline.
 #
 #   .\tools\eval\bake-whisper-baselines.ps1
@@ -23,7 +23,7 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $root "benchmark\lib\harness.ps1")
 Initialize-BenchmarkConsole | Out-Null
 
-$evalPath = Join-Path $root "workloads\eval\eval.jsonl"
+$evalPath = Join-Path $root "src\workloads\eval\eval.jsonl"
 if (-not (Test-Path -LiteralPath $evalPath)) {
     throw "Eval set missing: $evalPath (run tools/fetch/get-eval-set.ps1 first)"
 }
@@ -45,7 +45,7 @@ if (-not (Test-Path -LiteralPath $exe)) {
     throw "Benchmark executable missing: $exe"
 }
 
-$modelDir = Join-Path $root "workloads\whisper\models\static-onnx"
+$modelDir = Join-Path $root "src\workloads\whisper\models\static-onnx"
 if (-not (Test-Path -LiteralPath (Join-Path $modelDir "encoder_model.onnx"))) {
     throw "Whisper static model missing: $modelDir"
 }
@@ -58,7 +58,7 @@ if (-not $evalRows.Count) { throw "eval.jsonl is empty" }
 $clipSpecs = foreach ($eval in $evalRows) {
     $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
     if (-not (Test-Path -LiteralPath $clipPath)) {
-        $clipPath = Join-Path $root "workloads\eval\$($eval.id).wav"
+        $clipPath = Join-Path $root "src\workloads\eval\$($eval.id).wav"
     }
     if (-not (Test-Path -LiteralPath $clipPath)) {
         throw "Eval audio missing for $($eval.id)"
@@ -111,7 +111,7 @@ $source = [ordered]@{
             [string]$native.payload.clips[0].device
         } else { "" }
     )
-    model = "workloads/whisper/models/static-onnx"
+    model = "src/workloads/whisper/models/static-onnx"
     baked_at_utc = [DateTime]::UtcNow.ToString("o")
     contract = "whisper-eval-v1"
 }
@@ -120,7 +120,7 @@ $updated = foreach ($eval in $evalRows) {
     $id = [string]$eval.id
     $clip = $byId[$id]
     if (-not $clip) { throw "Bake result missing clip '$id'" }
-    $audioRel = "workloads/eval/$id.wav"
+    $audioRel = "src/workloads/eval/$id.wav"
     if (-not (Test-Path -LiteralPath (Join-Path $root ($audioRel -replace '/', '\')))) {
         $audioRel = [string]$eval.audio
     }
@@ -137,7 +137,7 @@ $updated = foreach ($eval in $evalRows) {
     }
 }
 
-$backup = Join-Path $root ("workloads\eval\eval.jsonl.bak-{0:yyyyMMdd-HHmmss}" -f (Get-Date))
+$backup = Join-Path $root ("src\workloads\eval\eval.jsonl.bak-{0:yyyyMMdd-HHmmss}" -f (Get-Date))
 Copy-Item -LiteralPath $evalPath -Destination $backup -Force
 $updated | ForEach-Object {
     ($_ | ConvertTo-Json -Compress -Depth 6)

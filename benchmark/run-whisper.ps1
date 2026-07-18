@@ -38,15 +38,15 @@ Initialize-BenchmarkConsole
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Model) {
     switch ($Backend) {
-        "amd" { $Model = Join-Path $root "workloads\whisper\models\vendor\amd" }
-        "intel-onnx" { $Model = Join-Path $root "workloads\whisper\models\dynamic-onnx" }
-        "onnx-static" { $Model = Join-Path $root "workloads\whisper\models\static-onnx" }
-        "onnx-dynamic" { $Model = Join-Path $root "workloads\whisper\models\dynamic-onnx" }
-        "qualcomm" { $Model = Join-Path $root "workloads\whisper\models\static-onnx" }
-        default { $Model = Join-Path $root "workloads\whisper\models\ov-ir\fp16" }
+        "amd" { $Model = Join-Path $root "src\workloads\whisper\models\vendor\amd" }
+        "intel-onnx" { $Model = Join-Path $root "src\workloads\whisper\models\dynamic-onnx" }
+        "onnx-static" { $Model = Join-Path $root "src\workloads\whisper\models\static-onnx" }
+        "onnx-dynamic" { $Model = Join-Path $root "src\workloads\whisper\models\dynamic-onnx" }
+        "qualcomm" { $Model = Join-Path $root "src\workloads\whisper\models\static-onnx" }
+        default { $Model = Join-Path $root "src\workloads\whisper\models\ov-ir\fp16" }
     }
 }
-if (-not $Audio) { $Audio = Join-Path $root "workloads\audio\jfk.wav" }
+if (-not $Audio) { $Audio = Join-Path $root "src\workloads\audio\jfk.wav" }
 if (-not $Results) { $Results = Join-Path $root "results\ledgers\asr.csv" }
 
 $exe = Join-Path $root "build\$Platform\$Configuration\NpuInferenceBench.exe"

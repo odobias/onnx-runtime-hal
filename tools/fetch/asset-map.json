@@ -1,18 +1,18 @@
 {
-  "note": "Canonical mapping between benchmark-first repository paths and the Hugging Face asset snapshot. HF remote keys under deepfake/* stay stable; local runtime paths live under workloads/.",
+  "note": "Canonical mapping between benchmark-first repository paths and the Hugging Face asset snapshot. HF remote keys under deepfake/* stay stable; local runtime paths live under src/workloads/.",
   "map": [
-    { "local": "workloads/whisper/models/static-onnx", "hf": "whisper/en-static-onnx" },
-    { "local": "workloads/whisper/models/dynamic-onnx", "hf": "whisper/en-onnx" },
-    { "local": "workloads/whisper/models/ov-ir", "hf": "whisper/en-ov" },
-    { "local": "workloads/whisper/models/vendor/amd", "hf": "whisper/amd" },
-    { "local": "workloads/whisper/manifest.json", "hf": "manifest.json", "kind": "file" },
-    { "local": "workloads/whisper/manifest.research.json", "hf": "manifest.research.json", "kind": "file" },
-    { "local": "workloads/audio/jfk.wav", "hf": "audio/jfk.wav", "kind": "file" },
-    { "local": "workloads/eval", "hf": "eval" },
-    { "local": "workloads/classifiers/fakeaudio/model.onnx", "hf": "deepfake/fakeaudio/model.onnx", "kind": "file" },
-    { "local": "workloads/classifiers/tsc", "hf": "deepfake/tsc" },
-    { "local": "workloads/classifiers/audio-samples", "hf": "deepfake/audio-samples" },
-    { "local": "workloads/classifiers/fixtures/fakeaudio", "hf": "deepfake/fixtures/fakeaudio" },
-    { "local": "workloads/classifiers/fixtures/tsc", "hf": "deepfake/fixtures/tsc" }
+    { "local": "src/workloads/whisper/models/static-onnx", "hf": "whisper/en-static-onnx" },
+    { "local": "src/workloads/whisper/models/dynamic-onnx", "hf": "whisper/en-onnx" },
+    { "local": "src/workloads/whisper/models/ov-ir", "hf": "whisper/en-ov" },
+    { "local": "src/workloads/whisper/models/vendor/amd", "hf": "whisper/amd" },
+    { "local": "src/workloads/whisper/manifest.json", "hf": "manifest.json", "kind": "file" },
+    { "local": "src/workloads/whisper/manifest.research.json", "hf": "manifest.research.json", "kind": "file" },
+    { "local": "src/workloads/audio/jfk.wav", "hf": "audio/jfk.wav", "kind": "file" },
+    { "local": "src/workloads/eval", "hf": "eval" },
+    { "local": "src/workloads/classifiers/fakeaudio/model.onnx", "hf": "deepfake/fakeaudio/model.onnx", "kind": "file" },
+    { "local": "src/workloads/classifiers/tsc", "hf": "deepfake/tsc" },
+    { "local": "src/workloads/classifiers/audio-samples", "hf": "deepfake/audio-samples" },
+    { "local": "src/workloads/classifiers/fixtures/fakeaudio", "hf": "deepfake/fixtures/fakeaudio" },
+    { "local": "src/workloads/classifiers/fixtures/tsc", "hf": "deepfake/fixtures/tsc" }
   ]
 }

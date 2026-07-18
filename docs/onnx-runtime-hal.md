@@ -77,7 +77,7 @@ Whisper-style custom decode loops may need the underlying `Ort::Session`. Prefer
 `runtime::detail::OrtSessionAccess::get(session)` — same-compiler C++ only, and
 only when the library was built with `NPU_INFERENCE_BENCH_ORT`.
 
-In-repo Whisper backends still include private `runner/runtime/ort_ep.hpp`
+In-repo Whisper backends still include private `src/runner/runtime/ort_ep.hpp`
 helpers; those headers are **not** part of the redistributable package.
 
 ## Package an install tree
@@ -109,7 +109,7 @@ dist/onnx-runtime-hal-<arch>-<flavor>/
 ```
 
 Then `#include <onnx_runtime_hal.hpp>` and link. Stage ORT / vendor DLLs beside
-the executable (see `msbuild/runtime-pack.targets` or your own packager).
+the executable (see the packaged `msbuild/runtime-pack.targets` or your own packager).
 
 The consumer must use the **same flavor** that built `OnnxRuntimeHal.lib`
 (bundled ORT, Windows ML, OpenVINO EP, AMD, or Qualcomm). Mixing incompatible
@@ -121,8 +121,8 @@ The benchmark executable is also a reference consumer of the public API:
 
 ```powershell
 .\build\ARM64\Release\NpuInferenceBench.exe run-onnx `
-  .\workloads\classifiers\tsc\model.onnx `
-  .\tests\runtime-hal-tsc-inputs.json `
+  .\src\workloads\classifiers\tsc\model.onnx `
+  .\src\tests\runtime-hal-tsc-inputs.json `
   --device cpu `
   --strict-device `
   --output-dir .\build\onnx-output
@@ -146,5 +146,5 @@ The input manifest contains named binary tensors:
 
 ## Build inside this repo
 
-`projects/OnnxRuntimeHal/OnnxRuntimeHal.vcxproj` produces `OnnxRuntimeHal.lib`
+`eng/projects/OnnxRuntimeHal/OnnxRuntimeHal.vcxproj` produces `OnnxRuntimeHal.lib`
 under `build/<PlatformOutTag>/<Configuration>/`.

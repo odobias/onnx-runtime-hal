@@ -148,7 +148,7 @@ the fallback chain.
 
 In a redistributable package, `-Executor fastest` or `-Executor most-accurate`
 races the packaged runners on the eval/fixture samples (Whisper uses baked
-baseline WER) and prints the winning runner/runtime/device.
+baseline WER) and prints the winning runner, runtime, and device.
 
 The provider implementations are:
 
@@ -168,22 +168,12 @@ Source, published evidence, and local artifacts are separated on purpose.
 See [`LAYOUT.md`](LAYOUT.md) for the full contract.
 
 ```text
-runner/                      C++ app + OnnxRuntimeHal
-workloads/                   adapters + tracked eval.jsonl (payloads gitignored)
-projects/ + msbuild/         MSBuild projects and shared props
-tests/                       runtime and packaging tests
+src/                         C++ product (runner, workloads, tests)
+eng/                         MSBuild projects/props + packaging metadata
 benchmark/                   suite-of-record harness, manifests, schemas
 tools/                       bootstrap, fetch, setup, export, research, repros
-packaging/                   runner catalogs (metadata only; packages → dist/)
 docs/                        guides and engineering notes
-results/
-  accuracy-runs/             immutable accuracy campaigns
-  run-attempts/              published attempt matrix
-  host-snapshots/            host/runtime fingerprints
-  model-compilation/         provider-input provenance
-  ledgers/                   latency CSVs + frozen history
-  reports/                   historical human reports (not suite-of-record)
-  local/                     ephemeral research outputs (gitignored)
+results/                     published evidence (+ reports/, local/)
 
 build/ dist/ third_party/    local artifacts only (gitignored)
 ```

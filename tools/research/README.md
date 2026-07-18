@@ -35,7 +35,7 @@ classifiers can now be replayed through the C++ app to get true on-NPU numbers,
 without re-implementing the (non-trivial, already-validated) preprocessing in C++:
 
 1. `dump_fixtures.py` snapshots the validators' exact feeds **and** the CPU
-   reference probability to `workloads\classifiers\fixtures\<model>\` (gitignored):
+   reference probability to `src\workloads\classifiers\fixtures\<model>\` (gitignored):
    `model.tsv` / `samples.tsv` / `inputs.tsv` + raw `data\*.bin` tensors.
 2. `NpuInferenceBench.App --classify <fixture_dir> [device] [runs]` loads those
    tensors, builds an ORT session on the requested EP (NPU→GPU→CPU fallback, or
@@ -53,9 +53,9 @@ without re-implementing the (non-trivial, already-validated) preprocessing in C+
 # Snapshot fixtures once (needs the Python venv + models), then replay in C++:
 .venv\Scripts\python.exe tools\fixtures\generate.py
 $exe = "build\x64\Release\NpuInferenceBench.exe"
-& $exe --classify workloads\classifiers\fixtures\tsc       cpu 20 --results results\ledgers\classifiers.csv
-& $exe --classify workloads\classifiers\fixtures\tsc       gpu 20 --results results\ledgers\classifiers.csv
-& $exe --classify workloads\classifiers\fixtures\fakeaudio npu 20 --provider VitisAIExecutionProvider --results results\ledgers\classifiers.csv
+& $exe --classify src\workloads\classifiers\fixtures\tsc       cpu 20 --results results\ledgers\classifiers.csv
+& $exe --classify src\workloads\classifiers\fixtures\tsc       gpu 20 --results results\ledgers\classifiers.csv
+& $exe --classify src\workloads\classifiers\fixtures\fakeaudio npu 20 --provider VitisAIExecutionProvider --results results\ledgers\classifiers.csv
 ```
 
 Measured on this x64 box (CPU + DirectML GPU), matching the Python results
@@ -70,7 +70,7 @@ reproducing the CPU probabilities (`max |Δp|` ≤ 1e-6):
 | fakeaudio | CPUExecutionProvider | ~66 | 3/5 |
 | fakeaudio | DmlExecutionProvider | ~38 | 3/5 |
 
-The VitisAI/QNN/OpenVINO EP branches are wired in `workloads\classifiers\ort_classifier.cpp`
+The VitisAI/QNN/OpenVINO EP branches are wired in `src\workloads\classifiers\ort_classifier.cpp`
 but **untested** — they need the matching hardware/SDK (Ryzen AI, ARM64 Snapdragon,
 OVEP build) and the corresponding `-EnableAmd` / `-EnableQualcomm` / `-EnableOvep`
 build. fp32 graphs also need vendor quantization/compile to actually land on an NPU.
@@ -85,7 +85,7 @@ build. fp32 graphs also need vendor quantization/compile to actually land on an 
 ```
 
 Models come from `tools\fetch\get-classifier-models.ps1` (gitignored under
-`workloads\classifiers\`). The FakeAudio sample clips are gitignored too; if they're
+`src\workloads\classifiers\`). The FakeAudio sample clips are gitignored too; if they're
 absent that model falls back to synthetic latency-only and reports blank
 accuracy.
 

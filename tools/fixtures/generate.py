@@ -15,7 +15,7 @@ Why fixtures instead of doing preprocessing in C++:
   measuring real per-EP latency AND per-EP numerical agreement (does the
   accelerator reproduce the CPU probability?).
 
-Output (gitignored, under workloads/classifiers/fixtures/<model>/):
+Output (gitignored, under src/workloads/classifiers/fixtures/<model>/):
   model.tsv    onnx_path <tab> positive_index <tab> threshold <tab> pos_label <tab> neg_label
                (onnx_path is stored RELATIVE to the fixture dir, forward-slashed, so a
                 fixture tree stays valid after being pushed to / pulled from HF onto a

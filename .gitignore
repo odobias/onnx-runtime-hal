@@ -14,18 +14,18 @@ third_party/
 __pycache__/
 
 # Workload payloads (fetched/exported by tools; never committed)
-workloads/whisper/models/
-workloads/whisper/manifest*.json
-workloads/classifiers/tsc/
-workloads/classifiers/fakeaudio/
-workloads/classifiers/audio-samples/
-workloads/classifiers/fixtures/
+src/workloads/whisper/models/
+src/workloads/whisper/manifest*.json
+src/workloads/classifiers/tsc/
+src/workloads/classifiers/fakeaudio/
+src/workloads/classifiers/audio-samples/
+src/workloads/classifiers/fixtures/
 # Eval WAVs stay local/fetched; bake baselines into the tracked manifest.
-workloads/eval/*
-!workloads/eval/eval.jsonl
-workloads/audio/
+src/workloads/eval/*
+!src/workloads/eval/eval.jsonl
+src/workloads/audio/
 # Legacy/non-runtime cache only (do not use as suite asset root).
-# Classifier runtime lives under workloads/classifiers/.
+# Classifier runtime lives under src/workloads/classifiers/.
 /models/
 *.wav
 *.blob

@@ -142,10 +142,10 @@ def find_lm_head_matmuls(model_path: Path, vocab_size: int):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", default="workloads/whisper/models/dynamic-onnx")
-    ap.add_argument("--out", default="workloads/whisper/models/dynamic-onnx-int8")
-    ap.add_argument("--eval", default="workloads/eval/eval.jsonl")
-    ap.add_argument("--extra-wav", default="workloads/audio/jfk.wav")
+    ap.add_argument("--src", default="src/workloads/whisper/models/dynamic-onnx")
+    ap.add_argument("--out", default="src/workloads/whisper/models/dynamic-onnx-int8")
+    ap.add_argument("--eval", default="src/workloads/eval/eval.jsonl")
+    ap.add_argument("--extra-wav", default="src/workloads/audio/jfk.wav")
     ap.add_argument("--max-clips", type=int, default=13)
     ap.add_argument("--max-steps", type=int, default=24)
     ap.add_argument("--dec-len", type=int, default=128,
