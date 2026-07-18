@@ -1,4 +1,4 @@
-﻿# Ensures the Intel OpenVINO GenAI C++ SDK is available at third_party\openvino_genai.
+﻿# Ensures the Intel OpenVINO GenAI C++ SDK is available at artifacts\third_party\openvino_genai.
 # Strategy: reuse an existing local SDK via a directory junction (no re-download);
 # otherwise download + extract the archive.
 #
@@ -19,7 +19,7 @@ chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$thirdParty = Join-Path $root "third_party"
+$thirdParty = Join-Path $root "artifacts\third_party"
 $target = Join-Path $thirdParty "openvino_genai"
 
 New-Item -ItemType Directory -Force -Path $thirdParty | Out-Null

@@ -3,7 +3,7 @@
 # Two-phase orchestration:
 #   1. Gate / stage every third-party SDK into non-overlapping paths.
 #   2. Launch every runner build (all arches) in one parallel pool, then assemble
-#      dist/npu-inference-bench-<arch>/ packages.
+#      artifacts/dist/npu-inference-bench-<arch>/ packages.
 #
 # Vendor ORT packs cannot share one process, so each runner is still a separate
 # MSBuild of NpuInferenceBench.sln. OutDir/IntDir are unique per PlatformOutTag,
@@ -17,9 +17,9 @@
 #   .\tools\build\build-all-runner-packages.ps1 -ThrottleLimit 6
 #
 # Outputs:
-#   dist/npu-inference-bench-x64/
-#   dist/npu-inference-bench-ARM64/
-#   dist/runner-packages-summary.json
+#   artifacts/dist/npu-inference-bench-x64/
+#   artifacts/dist/npu-inference-bench-ARM64/
+#   artifacts/dist/runner-packages-summary.json
 
 [CmdletBinding()]
 param(
@@ -66,7 +66,7 @@ function Write-Step([string]$Message) {
 
 function Get-DirectMlOrtDir([string]$Architecture) {
     if ($OrtDir) { return $OrtDir }
-    return (Join-Path $root "third_party\onnxruntime-directml-$Architecture")
+    return (Join-Path $root "artifacts\third_party\onnxruntime-directml-$Architecture")
 }
 
 function Test-OrtSdkRoot([string]$Path) {
@@ -162,7 +162,7 @@ function Stage-AllPrereqs([string[]]$Architectures) {
             } else {
                 Write-Host "  missing DirectML ORT $arch : $dml" -ForegroundColor DarkYellow
             }
-            $winmlDll = Join-Path $root "third_party\windows-ml\bin\$arch\onnxruntime.dll"
+            $winmlDll = Join-Path $root "artifacts\third_party\windows-ml\bin\$arch\onnxruntime.dll"
             if (Test-Path -LiteralPath $winmlDll) {
                 Write-Host "  ok Windows ML $arch" -ForegroundColor Green
             } else {
@@ -170,7 +170,7 @@ function Stage-AllPrereqs([string[]]$Architectures) {
             }
         }
         if ($Architectures -contains "x64") {
-            $ovep = Join-Path $root "third_party\onnxruntime-openvino\bin\onnxruntime_providers_openvino.dll"
+            $ovep = Join-Path $root "artifacts\third_party\onnxruntime-openvino\bin\onnxruntime_providers_openvino.dll"
             if (Test-Path -LiteralPath $ovep) {
                 Write-Host "  ok OVEP" -ForegroundColor Green
             } else {
@@ -178,7 +178,7 @@ function Stage-AllPrereqs([string[]]$Architectures) {
             }
         }
         if ($Architectures -contains "ARM64") {
-            $qnn = Join-Path $root "third_party\qnn-ep\onnxruntime_providers_qnn.dll"
+            $qnn = Join-Path $root "artifacts\third_party\qnn-ep\onnxruntime_providers_qnn.dll"
             if (Test-Path -LiteralPath $qnn) {
                 Write-Host "  ok Qualcomm QNN EP" -ForegroundColor Green
             } else {
@@ -211,7 +211,7 @@ function Stage-AllPrereqs([string[]]$Architectures) {
         [System.Runtime.InteropServices.Architecture]::Arm64
     ) { "ARM64" } else { "x64" }
     if ($Architectures -contains $hostArch) {
-        $flat = Join-Path $root "third_party\onnxruntime-directml"
+        $flat = Join-Path $root "artifacts\third_party\onnxruntime-directml"
         $source = Get-DirectMlOrtDir $hostArch
         if ((Test-OrtSdkRoot $source) -and ($flat -ne $source)) {
             Write-Host "Refresh legacy DirectML ORT link target: $flat" -ForegroundColor DarkGray
@@ -237,7 +237,7 @@ function Stage-AllPrereqs([string[]]$Architectures) {
     }
 
     if ($Architectures -contains "ARM64") {
-        # Writes third_party/onnxruntime (ARM64) + third_party/qnn-ep. Safe after
+        # Writes artifacts/third_party/onnxruntime (ARM64) + artifacts/third_party/qnn-ep. Safe after
         # DirectML ORT was staged into arch-specific directories; x64 builds pass
         # -OrtDir explicitly and will not read this tree.
         Write-Host "Qualcomm QNN (ARM64)" -ForegroundColor DarkCyan
@@ -262,7 +262,7 @@ function Get-BuildJobs([string[]]$Architectures) {
             $jobOrt = $null
             switch ($id) {
                 { $_ -in @("ort", "dml") } { $jobOrt = Get-DirectMlOrtDir $arch }
-                "qualcomm" { $jobOrt = Join-Path $root "third_party\onnxruntime" }
+                "qualcomm" { $jobOrt = Join-Path $root "artifacts\third_party\onnxruntime" }
             }
             $jobs.Add([pscustomobject]@{
                 key = "$arch/$id"
@@ -277,7 +277,7 @@ function Get-BuildJobs([string[]]$Architectures) {
 }
 
 function Invoke-MatrixBuildsParallel([object[]]$Jobs, [int]$Limit) {
-    $logDir = Join-Path $root "build\logs\runner-package"
+    $logDir = Join-Path $root "artifacts\build\logs\runner-package"
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     $innerCpu = [Math]::Max(1, [int][Math]::Floor([Environment]::ProcessorCount / $Limit))
     Write-Host ("Building {0} runners across architectures with ThrottleLimit={1} (MSBuild /m:{2} each)" -f `
@@ -368,7 +368,7 @@ function Assemble-ArchitecturePackage([string]$Architecture) {
 }
 
 function Get-PackageSummary([string]$Architecture) {
-    $manifestPath = Join-Path $root "dist\npu-inference-bench-$Architecture\runner-package.json"
+    $manifestPath = Join-Path $root "artifacts\dist\npu-inference-bench-$Architecture\runner-package.json"
     if (-not (Test-Path -LiteralPath $manifestPath)) {
         return [ordered]@{
             architecture = $Architecture
@@ -431,7 +431,7 @@ MSVC ARM64 cross tools not installed. Re-run with -InstallArm64Tools, or install
             package = $null
             included = @()
             skipped = @(@{ id = "*"; reason = $_.Exception.Message })
-            path = (Join-Path $root "dist\npu-inference-bench-$arch\runner-package.json")
+            path = (Join-Path $root "artifacts\dist\npu-inference-bench-$arch\runner-package.json")
         })
     }
 }
@@ -489,7 +489,7 @@ try {
                     package = $null
                     included = @()
                     skipped = @(@{ id = "*"; reason = $_.Exception.Message })
-                    path = (Join-Path $root "dist\npu-inference-bench-$arch\runner-package.json")
+                    path = (Join-Path $root "artifacts\dist\npu-inference-bench-$arch\runner-package.json")
                 })
             }
         }
@@ -506,14 +506,14 @@ try {
                 package = $null
                 included = @()
                 skipped = @(@{ id = "*"; reason = $_.Exception.Message })
-                path = (Join-Path $root "dist\npu-inference-bench-$arch\runner-package.json")
+                path = (Join-Path $root "artifacts\dist\npu-inference-bench-$arch\runner-package.json")
             })
         }
     }
 }
 
 Write-Step "Summary"
-$summaryPath = Join-Path $root "dist\runner-packages-summary.json"
+$summaryPath = Join-Path $root "artifacts\dist\runner-packages-summary.json"
 $payload = [ordered]@{
     schema_version = 1
     generated_at_utc = [DateTime]::UtcNow.ToString("o")

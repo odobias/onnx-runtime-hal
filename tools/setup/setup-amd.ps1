@@ -1,6 +1,6 @@
 ﻿# Ensures the AMD Ryzen AI SDK (VitisAI EP toolchain) and a compatible NPU driver
 # are installed, so the AMD backend can build and run. Mirrors setup-intel.ps1:
-# idempotent, reuse-or-install, and everything transient lands under third_party\.
+# idempotent, reuse-or-install, and everything transient lands under artifacts\third_party\.
 #
 #   .\setup-amd.ps1
 #   .\setup-amd.ps1 -SkipDriver               # SDK only (driver already current)
@@ -38,7 +38,7 @@ chcp 65001 > $null
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if (-not $InstallDir)  { $InstallDir  = "C:\Program Files\RyzenAI\$Version" }
 if (-not $CondaEnv)    { $CondaEnv    = "ryzen-ai-$Version" }
-if (-not $DownloadDir) { $DownloadDir = Join-Path $root "third_party\amd-ryzenai\_download" }
+if (-not $DownloadDir) { $DownloadDir = Join-Path $root "artifacts\third_party\amd-ryzenai\_download" }
 
 # --- helpers ----------------------------------------------------------------
 
@@ -87,7 +87,7 @@ function Test-SdkInstalled {
 }
 
 function Write-SdkMetadata {
-    $metadataDir = Join-Path $root "third_party\amd-ryzenai"
+    $metadataDir = Join-Path $root "artifacts\third_party\amd-ryzenai"
     New-Item -ItemType Directory -Force -Path $metadataDir | Out-Null
     ([ordered]@{
         schema_version = 1

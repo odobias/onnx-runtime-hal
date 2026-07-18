@@ -103,9 +103,9 @@
       <ModelPayload Include="$(BundledModelDir)\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(ModelPayload)"
-          DestinationFiles="@(ModelPayload->'$(OutDir)src\workloads\whisper\models\static-onnx\%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(ModelPayload->'$(OutDir)artifacts\workloads\whisper\models\static-onnx\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" Condition="'@(ModelPayload)' != ''" />
-    <Message Importance="high" Text="Bundled static ONNX model -> $(OutDir)src\workloads\whisper\models\static-onnx" Condition="'@(ModelPayload)' != ''" />
+    <Message Importance="high" Text="Bundled static ONNX model -> $(OutDir)artifacts\workloads\whisper\models\static-onnx" Condition="'@(ModelPayload)' != ''" />
   </Target>
 
   <!-- Optionally bundle the AMD Ryzen AI (VitisAI) model so an EnableAmd build can
@@ -114,14 +114,14 @@
        off by default, enable with /p:BundleAmdModel=true. Also Exists-gated on the
        model being fetched (run .\tools\fetch\get-amd-model.ps1 once before publishing). -->
   <Target Name="BundleAmdModel" AfterTargets="Build"
-          Condition="'$(BundleAmdModel)'=='true' and '$(EnableAmd)'=='true' and Exists('$(NpuInferenceBenchRoot)src\workloads\whisper\models\vendor\amd')">
+          Condition="'$(BundleAmdModel)'=='true' and '$(EnableAmd)'=='true' and Exists('$(NpuInferenceBenchRoot)artifacts\workloads\whisper\models\vendor\amd')">
     <ItemGroup>
-      <AmdModelPayload Include="$(NpuInferenceBenchRoot)src\workloads\whisper\models\vendor\amd\**\*" />
+      <AmdModelPayload Include="$(NpuInferenceBenchRoot)artifacts\workloads\whisper\models\vendor\amd\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(AmdModelPayload)"
-          DestinationFiles="@(AmdModelPayload->'$(OutDir)src\workloads\whisper\models\vendor\amd\%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(AmdModelPayload->'$(OutDir)artifacts\workloads\whisper\models\vendor\amd\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" Condition="'@(AmdModelPayload)' != ''" />
-    <Message Importance="high" Text="Bundled AMD VitisAI model -> $(OutDir)src\workloads\whisper\models\vendor\amd" Condition="'@(AmdModelPayload)' != ''" />
+    <Message Importance="high" Text="Bundled AMD VitisAI model -> $(OutDir)artifacts\workloads\whisper\models\vendor\amd" Condition="'@(AmdModelPayload)' != ''" />
   </Target>
 
   <!-- Bundle the labeled eval set + sample audio next to the exe so the build output
@@ -130,13 +130,13 @@
        skips it (run .\tools\fetch\get-eval-set.ps1 once before publishing). -->
   <Target Name="BundleBenchmarkData" AfterTargets="Build" Condition="'$(BundleModel)'=='true'">
     <ItemGroup>
-      <EvalPayload Include="$(NpuInferenceBenchRoot)src\workloads\eval\**\*" Condition="Exists('$(NpuInferenceBenchRoot)src\workloads\eval')" />
-      <SampleAudio Include="$(NpuInferenceBenchRoot)src\workloads\audio\jfk.wav" Condition="Exists('$(NpuInferenceBenchRoot)src\workloads\audio\jfk.wav')" />
+      <EvalPayload Include="$(NpuInferenceBenchRoot)artifacts\workloads\eval\**\*" Condition="Exists('$(NpuInferenceBenchRoot)artifacts\workloads\eval')" />
+      <SampleAudio Include="$(NpuInferenceBenchRoot)artifacts\workloads\audio\jfk.wav" Condition="Exists('$(NpuInferenceBenchRoot)artifacts\workloads\audio\jfk.wav')" />
     </ItemGroup>
     <Copy SourceFiles="@(EvalPayload)"
-          DestinationFiles="@(EvalPayload->'$(OutDir)src\workloads\eval\%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(EvalPayload->'$(OutDir)artifacts\workloads\eval\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" Condition="'@(EvalPayload)' != ''" />
-    <Copy SourceFiles="@(SampleAudio)" DestinationFolder="$(OutDir)src\workloads\audio" SkipUnchangedFiles="true" Condition="'@(SampleAudio)' != ''" />
+    <Copy SourceFiles="@(SampleAudio)" DestinationFolder="$(OutDir)artifacts\workloads\audio" SkipUnchangedFiles="true" Condition="'@(SampleAudio)' != ''" />
     <Message Importance="high" Text="Bundled eval set + sample audio -> $(OutDir)models" Condition="'@(EvalPayload)' != '' or '@(SampleAudio)' != ''" />
   </Target>
 

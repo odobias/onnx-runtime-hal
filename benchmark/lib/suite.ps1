@@ -50,7 +50,7 @@ function Ensure-BenchmarkClassifierFixtures {
         $Regenerate -or -not (Test-Path -LiteralPath (Join-Path $FixtureDirectories[$_] "model.tsv"))
     })
     if (-not $need.Count) { return }
-    $python = Join-Path $Root ".venv\Scripts\python.exe"
+    $python = Join-Path $Root "artifacts/venv\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $python)) {
         Write-Host "Fixtures missing for $($need -join ', '); Python generation is unavailable." -ForegroundColor Yellow
         return

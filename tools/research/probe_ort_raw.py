@@ -24,7 +24,7 @@ def io(s):
 
 
 def main():
-    d = sys.argv[1] if len(sys.argv) > 1 else "src/workloads/whisper/models/dynamic-onnx"
+    d = sys.argv[1] if len(sys.argv) > 1 else "artifacts/workloads/whisper/models/dynamic-onnx"
     th = os.cpu_count()
     print(f"ORT {ort.__version__}  threads={th}\n")
 

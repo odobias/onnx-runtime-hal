@@ -108,7 +108,7 @@ function Get-BenchmarkEnvironmentSnapshot {
         }
     }
     $sdkManifests = @()
-    $thirdParty = Join-Path $Root "third_party"
+    $thirdParty = Join-Path $Root "artifacts\third_party"
     foreach ($manifest in @(Get-ChildItem -LiteralPath $thirdParty -Filter "VERSION.json" `
             -File -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName)) {
         try {

@@ -12,7 +12,7 @@ chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$pkg = Join-Path $root "build\x64\Release"
+$pkg = Join-Path $root "artifacts\build\x64\Release"
 $exe = Join-Path $pkg "NpuInferenceBench.exe"
 $sys = Join-Path $env:SystemRoot "System32"
 
@@ -24,9 +24,9 @@ Write-Host "Scrubbed PATH = $cleanPath" -ForegroundColor DarkGray
 Write-Host ("RYZEN_AI_INSTALLATION_PATH (proc) = {0}" -f $env:RYZEN_AI_INSTALLATION_PATH) -ForegroundColor DarkGray
 Write-Host ""
 
-$staticModel = Join-Path $pkg "src\workloads\whisper\models\static-onnx"
-$amdModel    = Join-Path $pkg "src\workloads\whisper\models\vendor\amd"
-$audio       = Join-Path $pkg "src\workloads\audio\jfk.wav"
+$staticModel = Join-Path $pkg "artifacts\workloads\whisper\models\static-onnx"
+$amdModel    = Join-Path $pkg "artifacts\workloads\whisper\models\vendor\amd"
+$audio       = Join-Path $pkg "artifacts\workloads\audio\jfk.wav"
 
 # (backend, device, model, cacheSubdir). -HotOnly skips CPU/GPU and reuses the NPU
 # caches a prior full run compiled, so it's fast and free of the VitisAI compile spam.

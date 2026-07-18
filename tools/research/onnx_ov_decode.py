@@ -8,7 +8,7 @@ greedy KV-cache decode loop. This is the FAST path with real cold/warm caching:
 Same decode logic as onnx_decode.py, so quality/confidence are identical; only
 the runtime under it changes (ORT -> OpenVINO). Targets CPU / GPU / NPU.
 
-  .venv\\Scripts\\python.exe scripts\\onnx_ov_decode.py models\\whisper\\en-onnx models\\eval\\eval.jsonl CPU
+  artifacts/venv\\Scripts\\python.exe scripts\\onnx_ov_decode.py models\\whisper\\en-onnx models\\eval\\eval.jsonl CPU
 """
 import json
 import os
@@ -139,7 +139,7 @@ class OVWhisper:
 
 
 def main():
-    model_dir = sys.argv[1] if len(sys.argv) > 1 else "src/workloads/whisper/models/dynamic-onnx"
+    model_dir = sys.argv[1] if len(sys.argv) > 1 else "artifacts/workloads/whisper/models/dynamic-onnx"
     eval_path = sys.argv[2] if len(sys.argv) > 2 else "src/workloads/eval/eval.jsonl"
     device = sys.argv[3] if len(sys.argv) > 3 else "CPU"
     cache = os.path.join("cache", f"onnx-ov-{device}")

@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
-  "description": "Allowlist of trees copied into redistributable packages. All model assets live under src/workloads/.",
+  "description": "Allowlist of trees copied into redistributable packages. Model/fixture payloads live under artifacts/workloads/; tracked eval.jsonl stays under src/workloads/eval/.",
   "always_copy": [
     "benchmark",
     "run-benchmark.ps1",
+    "src/workloads/eval/eval.jsonl",
     "tools/eval",
     "tools/fetch",
     "tools/fixtures",
@@ -16,36 +17,36 @@
       "id": "whisper-static",
       "workload": "whisper-tiny-static",
       "include": [
-        "src/workloads/whisper/models/static-onnx",
-        "src/workloads/whisper/manifest.json",
-        "src/workloads/audio",
-        "src/workloads/eval"
+        "artifacts/workloads/whisper/models/static-onnx",
+        "artifacts/workloads/whisper/manifest.json",
+        "artifacts/workloads/audio",
+        "artifacts/workloads/eval"
       ]
     },
     {
       "id": "tsc",
       "workload": "tsc",
       "include": [
-        "src/workloads/classifiers/tsc",
-        "src/workloads/classifiers/fixtures/tsc"
+        "artifacts/workloads/classifiers/tsc",
+        "artifacts/workloads/classifiers/fixtures/tsc"
       ]
     },
     {
       "id": "fakeaudio-whole",
       "workload": "fakeaudio",
       "include": [
-        "src/workloads/classifiers/fakeaudio/model.onnx",
-        "src/workloads/classifiers/fixtures/fakeaudio",
-        "src/workloads/classifiers/audio-samples"
+        "artifacts/workloads/classifiers/fakeaudio/model.onnx",
+        "artifacts/workloads/classifiers/fixtures/fakeaudio",
+        "artifacts/workloads/classifiers/audio-samples"
       ]
     },
     {
       "id": "fakeaudio-npu-split",
       "workload": "fakeaudio",
       "include": [
-        "src/workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
-        "src/workloads/classifiers/fakeaudio/model.frontend-fp32.onnx",
-        "src/workloads/classifiers/fixtures/fakeaudio-bb-fp32"
+        "artifacts/workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
+        "artifacts/workloads/classifiers/fakeaudio/model.frontend-fp32.onnx",
+        "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32"
       ]
     }
   ]

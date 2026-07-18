@@ -1,7 +1,7 @@
 ﻿# Assemble the vendored ONNX Runtime + OpenVINO Execution Provider distribution the
 # unified binary links + ships for the Intel native path. Produces:
 #
-#   third_party/onnxruntime-openvino/
+#   artifacts/third_party/onnxruntime-openvino/
 #     include/            ORT C/C++ headers            (from the official ORT release)
 #     lib/onnxruntime.lib import library               (from the official ORT release)
 #     bin/                onnxruntime*.dll (OVEP build) + openvino*/tbb*.dll runtime
@@ -14,7 +14,7 @@
 # -EnableOvep points OrtDir here and the App vcxproj colocates bin/* beside the exe.
 #
 # Idempotent: skips assembly when the distro already looks complete (use -Force to
-# rebuild). Requires python on PATH (creates .venv-ovep) and network on first run.
+# rebuild). Requires python on PATH (creates artifacts/venv-ovep) and network on first run.
 [CmdletBinding()]
 param(
     [string]$OrtVersion = "1.24.1",
@@ -27,8 +27,8 @@ chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$tp = Join-Path $root "third_party\onnxruntime-openvino"
-$venv = Join-Path $root ".venv-ovep"
+$tp = Join-Path $root "artifacts\third_party\onnxruntime-openvino"
+$venv = Join-Path $root "artifacts/venv-ovep"
 $venvPy = Join-Path $venv "Scripts\python.exe"
 
 $lib = Join-Path $tp "lib\onnxruntime.lib"

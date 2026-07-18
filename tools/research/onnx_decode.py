@@ -3,7 +3,7 @@
 sessions. No optimum generate() overhead. Correct forced/suppress tokens read
 from generation_config.json. Reports cold vs hot latency + WER/CER + confidence.
 
-  .venv\\Scripts\\python.exe scripts\\onnx_decode.py models\\whisper\\en-onnx models\\eval\\eval.jsonl [provider]
+  artifacts/venv\\Scripts\\python.exe scripts\\onnx_decode.py models\\whisper\\en-onnx models\\eval\\eval.jsonl [provider]
 """
 import json
 import os
@@ -131,7 +131,7 @@ class OnnxWhisper:
 
 
 def main():
-    model_dir = sys.argv[1] if len(sys.argv) > 1 else "src/workloads/whisper/models/dynamic-onnx"
+    model_dir = sys.argv[1] if len(sys.argv) > 1 else "artifacts/workloads/whisper/models/dynamic-onnx"
     eval_path = sys.argv[2] if len(sys.argv) > 2 else "src/workloads/eval/eval.jsonl"
     provider = sys.argv[3] if len(sys.argv) > 3 else "CPUExecutionProvider"
 

@@ -1,4 +1,4 @@
-# One-shot / idempotent copy: models/deepfake -> src/workloads/classifiers
+# One-shot / idempotent copy: models/deepfake -> artifacts/workloads/classifiers
 # Preserves the sibling layout fixtures need (../../family/model.onnx).
 #
 #   .\tools\fetch\migrate-classifier-layout.ps1
@@ -15,7 +15,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $src = Join-Path $root "models\deepfake"
-$dst = Join-Path $root "src\workloads\classifiers"
+$dst = Join-Path $root "artifacts\workloads\classifiers"
 
 if (-not (Test-Path -LiteralPath $src)) {
     Write-Host "No legacy models/deepfake tree; nothing to migrate." -ForegroundColor DarkYellow
@@ -24,7 +24,7 @@ if (-not (Test-Path -LiteralPath $src)) {
 
 $sentinel = Join-Path $dst "tsc\model.onnx"
 if ((Test-Path -LiteralPath $sentinel) -and -not $Force) {
-    Write-Host "src/workloads/classifiers already populated ($sentinel). Pass -Force to overwrite." -ForegroundColor DarkCyan
+    Write-Host "artifacts/workloads/classifiers already populated ($sentinel). Pass -Force to overwrite." -ForegroundColor DarkCyan
     exit 0
 }
 
@@ -40,4 +40,4 @@ foreach ($name in @("tsc", "fakeaudio", "audio-samples", "fixtures")) {
     Copy-Item -LiteralPath $from -Destination $to -Recurse -Force
     Write-Host "  $name" -ForegroundColor DarkGray
 }
-Write-Host "Classifier runtime root is now src/workloads/classifiers (models/deepfake is legacy cache)." -ForegroundColor Green
+Write-Host "Classifier payload root is now artifacts/workloads/classifiers (models/deepfake is legacy cache)." -ForegroundColor Green

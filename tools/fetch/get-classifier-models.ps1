@@ -1,5 +1,5 @@
 ﻿# Downloads classifier models (FakeAudio / TSC) from the private Hugging Face
-# mirror into src/workloads/classifiers/. HF remote keys stay under deepfake/*;
+# mirror into artifacts/workloads/classifiers/. HF remote keys stay under deepfake/*;
 # local runtime paths are remapped. Output is gitignored.
 #
 #   .\tools\fetch\get-classifier-models.ps1
@@ -18,14 +18,14 @@ chcp 65001 > $null
 $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$outRoot = Join-Path $root "src\workloads\classifiers"
-$staging = Join-Path $root "build\classifier-asset-staging"
+$outRoot = Join-Path $root "artifacts\workloads\classifiers"
+$staging = Join-Path $root "artifacts\build\classifier-asset-staging"
 
 if ($Models -contains "all") { $Models = @("fakeaudio", "tsc") }
 
 $hf = (Get-Command hf -ErrorAction SilentlyContinue).Source
 if (-not $hf) {
-    $venvHf = Join-Path $root ".venv\Scripts\hf.exe"
+    $venvHf = Join-Path $root "artifacts/venv\Scripts\hf.exe"
     if (Test-Path $venvHf) { $hf = $venvHf }
 }
 if (-not $hf) {
@@ -78,13 +78,13 @@ function Move-Mapped([string]$HfRel, [string]$LocalRel) {
 }
 
 if ($Models -contains "fakeaudio") {
-    Move-Mapped "deepfake/fakeaudio/model.onnx" "src/workloads/classifiers/fakeaudio/model.onnx"
-    Move-Mapped "deepfake/audio-samples" "src/workloads/classifiers/audio-samples"
-    Move-Mapped "deepfake/fixtures/fakeaudio" "src/workloads/classifiers/fixtures/fakeaudio"
+    Move-Mapped "deepfake/fakeaudio/model.onnx" "artifacts/workloads/classifiers/fakeaudio/model.onnx"
+    Move-Mapped "deepfake/audio-samples" "artifacts/workloads/classifiers/audio-samples"
+    Move-Mapped "deepfake/fixtures/fakeaudio" "artifacts/workloads/classifiers/fixtures/fakeaudio"
 }
 if ($Models -contains "tsc") {
-    Move-Mapped "deepfake/tsc" "src/workloads/classifiers/tsc"
-    Move-Mapped "deepfake/fixtures/tsc" "src/workloads/classifiers/fixtures/tsc"
+    Move-Mapped "deepfake/tsc" "artifacts/workloads/classifiers/tsc"
+    Move-Mapped "deepfake/fixtures/tsc" "artifacts/workloads/classifiers/fixtures/tsc"
 }
 
 # Prefer locally exported NPU-split artifacts when already present under legacy cache.
@@ -101,7 +101,7 @@ if (Test-Path -LiteralPath $legacyFa) {
         if ((Test-Path -LiteralPath $from) -and -not (Test-Path -LiteralPath $to)) {
             New-Item -ItemType Directory -Force -Path $dstFa | Out-Null
             Copy-Item -LiteralPath $from -Destination $to -Force
-            Write-Host "  legacy cache -> src/workloads/classifiers/fakeaudio/$name" -ForegroundColor DarkGray
+            Write-Host "  legacy cache -> artifacts/workloads/classifiers/fakeaudio/$name" -ForegroundColor DarkGray
         }
     }
 }
@@ -113,7 +113,7 @@ if (Test-Path -LiteralPath $legacyFix) {
         $to = Join-Path $dstFix $name
         if ((Test-Path -LiteralPath $from) -and -not (Test-Path -LiteralPath $to)) {
             Copy-Item -LiteralPath $from -Destination $to -Recurse -Force
-            Write-Host "  legacy cache -> src/workloads/classifiers/fixtures/$name" -ForegroundColor DarkGray
+            Write-Host "  legacy cache -> artifacts/workloads/classifiers/fixtures/$name" -ForegroundColor DarkGray
         }
     }
 }
@@ -131,4 +131,4 @@ if ($Models -contains "fakeaudio") {
 if ($Models -contains "tsc") {
     Write-Host "TSC ready: $(Join-Path $outRoot 'tsc') ($(Get-Size (Join-Path $outRoot 'tsc')) MB)" -ForegroundColor Green
 }
-Write-Host "Total src/workloads/classifiers: $(Get-Size $outRoot) MB" -ForegroundColor Green
+Write-Host "Total artifacts/workloads/classifiers: $(Get-Size $outRoot) MB" -ForegroundColor Green

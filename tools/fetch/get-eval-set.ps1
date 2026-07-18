@@ -3,7 +3,7 @@
 # Falls back to the single jfk.wav clip (with a known reference) if the download
 # fails, so the benchmark harness always has something to run.
 #
-#   .\get-eval-set.ps1              # up to 20 utterances -> src/workloads/eval/eval.jsonl
+#   .\get-eval-set.ps1              # WAVs -> artifacts/workloads/eval; manifest -> src/workloads/eval/eval.jsonl
 #   .\get-eval-set.ps1 -Count 5
 
 [CmdletBinding()]
@@ -17,10 +17,12 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$evalDir = Join-Path $root "src\workloads\eval"
+$evalDir = Join-Path $root "artifacts\workloads\eval"
+$trackedJsonl = Join-Path $root "src\workloads\eval\eval.jsonl"
 New-Item -ItemType Directory -Force -Path $evalDir | Out-Null
+New-Item -ItemType Directory -Force -Path (Split-Path $trackedJsonl -Parent) | Out-Null
 
-$venv = Join-Path $root ".venv"
+$venv = Join-Path $root "artifacts/venv"
 $vpy = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path $vpy)) {
     $py = (Get-Command python -ErrorAction SilentlyContinue).Source
@@ -33,7 +35,8 @@ Write-Host "Ensuring eval-set toolchain (datasets, soundfile)..." -ForegroundCol
 & $vpy -m pip install --upgrade pip --quiet
 & $vpy -m pip install --quiet "datasets" "soundfile" "numpy"
 
-$evalPath = Join-Path $evalDir "eval.jsonl"
+$evalPath = $trackedJsonl
+$generatedJsonl = Join-Path $evalDir "eval.jsonl"
 $priorBaselines = @{}
 if (Test-Path -LiteralPath $evalPath) {
     Get-Content -LiteralPath $evalPath -Encoding UTF8 | ForEach-Object {
@@ -53,14 +56,20 @@ if (-not (Test-Path -LiteralPath $script)) {
 Write-Host "Building eval set (up to $Count utterances)..." -ForegroundColor Cyan
 & $vpy $script --outdir $evalDir --count $Count
 $ok = ($LASTEXITCODE -eq 0)
+if ($ok -and (Test-Path -LiteralPath $generatedJsonl)) {
+    Copy-Item -LiteralPath $generatedJsonl -Destination $trackedJsonl -Force
+    Remove-Item -LiteralPath $generatedJsonl -Force -ErrorAction SilentlyContinue
+    $evalPath = $trackedJsonl
+}
 
 if (-not $ok) {
     Write-Host "Dataset build failed; falling back to jfk.wav clip." -ForegroundColor Yellow
-    $jfk = Join-Path $root "src\workloads\audio\jfk.wav"
+    $jfk = Join-Path $root "artifacts\workloads\audio\jfk.wav"
     if (-not (Test-Path $jfk)) { & (Join-Path $PSScriptRoot "get-audio.ps1") }
     $ref = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
-    $rec = [ordered]@{ id = "jfk"; audio = "src/workloads/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
-    ($rec | ConvertTo-Json -Compress) | Set-Content -Path $evalPath -Encoding UTF8
+    $rec = [ordered]@{ id = "jfk"; audio = "artifacts/workloads/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
+    ($rec | ConvertTo-Json -Compress) | Set-Content -Path $trackedJsonl -Encoding UTF8
+    $evalPath = $trackedJsonl
     Write-Host "Wrote 1 utterance (jfk) to src\workloads\eval\eval.jsonl" -ForegroundColor Green
 }
 

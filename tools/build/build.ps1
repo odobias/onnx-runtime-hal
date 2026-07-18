@@ -103,10 +103,10 @@ if ($requestedOrtPack -and -not $DisableIntel) {
 }
 if ($EnableDirectML -and -not $OrtDir) {
     # Prefer arch-specific staging (multi-arch parallel builds), then the legacy
-    # flat third_party/onnxruntime-directml directory.
+    # flat artifacts/third_party/onnxruntime-directml directory.
     $candidates = @(
-        (Join-Path $root "third_party\onnxruntime-directml-$Platform"),
-        (Join-Path $root "third_party\onnxruntime-directml")
+        (Join-Path $root "artifacts\third_party\onnxruntime-directml-$Platform"),
+        (Join-Path $root "artifacts\third_party\onnxruntime-directml")
     )
     $directmlDir = $candidates | Where-Object {
         Test-Path (Join-Path $_ "include\onnxruntime_cxx_api.h")
@@ -118,7 +118,7 @@ if ($EnableDirectML -and -not $OrtDir) {
     $OrtDir = $directmlDir
 }
 if ($EnableWinML) {
-    $winmlDir = Join-Path $root "third_party\windows-ml"
+    $winmlDir = Join-Path $root "artifacts\third_party\windows-ml"
     if (-not (Test-Path (Join-Path $winmlDir "include\WinMLEpCatalog.h")) -or
         -not (Test-Path (Join-Path $winmlDir "bin\$Platform\onnxruntime.dll"))) {
         Write-Host "Windows ML SDK missing. Run: .\tools\setup\setup-winml.ps1 -Platform $Platform" -ForegroundColor Red
@@ -174,7 +174,7 @@ $platformOutTag = if ($EnableOvep) {
 } else {
     $Platform
 }
-$exe = Join-Path $root "build\$platformOutTag\$Configuration\NpuInferenceBench.exe"
+$exe = Join-Path $root "artifacts\build\$platformOutTag\$Configuration\NpuInferenceBench.exe"
 Write-Host ""
 Write-Host "Built: $exe" -ForegroundColor Green
 Write-Host "Run  : .\benchmark\run-whisper.ps1" -ForegroundColor Cyan

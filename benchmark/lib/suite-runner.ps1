@@ -33,9 +33,9 @@ function Invoke-NativeBenchmark {
             }
         }
         if ($needsBuild) {
-            $vpy = Join-Path $root ".venv\Scripts\python.exe"
+            $vpy = Join-Path $root "artifacts/venv\Scripts\python.exe"
             if (-not (Test-Path $vpy)) {
-                $message = "fixture recipe requires the project .venv: $($ExecutionProfile.path)"
+                $message = "fixture recipe requires the project artifacts/venv: $($ExecutionProfile.path)"
                 Write-Host $message -ForegroundColor Yellow
                 Write-SuiteAttempt $Workload $ExecutionProfile $RequestedDevice "assets-missing" $message $null
                 return $false
@@ -75,7 +75,7 @@ function Invoke-NativeBenchmark {
     $provenanceIds = @()
     $graphArtifacts = [ordered]@{}
     if ($ExecutionProfile.frontendContract) {
-        $frontend = Join-Path $root "src\workloads\classifiers\fakeaudio\model.frontend-fp32.onnx"
+        $frontend = Join-Path $root "artifacts\workloads\classifiers\fakeaudio\model.frontend-fp32.onnx"
         if (Test-Path -LiteralPath $frontend) {
             $frontendProvenance = Write-BenchmarkCompilationProvenance `
                 -Root $root -ArtifactPath $frontend -ProfileId ([string]$ExecutionProfile.id) `
@@ -115,7 +115,7 @@ function Invoke-NativeBenchmark {
             $eval = $evalRows[$i]
             $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
             if (-not (Test-Path -LiteralPath $clipPath)) {
-                $clipPath = Join-Path $root "src\workloads\eval\$($eval.id).wav"
+                $clipPath = Join-Path $root "artifacts\workloads\eval\$($eval.id).wav"
             }
             if (-not (Test-Path -LiteralPath $clipPath)) {
                 $message = "Whisper evaluation audio is missing: $clipPath"

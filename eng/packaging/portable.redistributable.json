@@ -7,7 +7,7 @@
       "id": "whisper-tiny-static",
       "kind": "asr",
       "backend": "onnx-static",
-      "path": "src/workloads/whisper/models/static-onnx",
+      "path": "artifacts/workloads/whisper/models/static-onnx",
       "executionProfiles": [
         {
           "id": "static-onnx",
@@ -23,7 +23,7 @@
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "src/workloads/classifiers/fixtures/tsc",
+      "path": "artifacts/workloads/classifiers/fixtures/tsc",
       "executionProfiles": [
         {
           "id": "whole-fp32",
@@ -39,12 +39,12 @@
       "id": "fakeaudio",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "src/workloads/classifiers/fixtures/fakeaudio",
+      "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
       "executionProfiles": [
         {
           "id": "whole-fp32",
           "devices": ["cpu", "gpu"],
-          "path": "src/workloads/classifiers/fixtures/fakeaudio",
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
           "graphRole": "whole",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true
@@ -52,7 +52,7 @@
         {
           "id": "npu-split-generic",
           "devices": ["npu", "gpu", "cpu"],
-          "path": "src/workloads/classifiers/fixtures/fakeaudio-bb-fp32",
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32",
           "graphRole": "backbone",
           "frontendContract": "cpu-fp32-logmel",
           "referenceContract": "full-model-cpu-fp32",

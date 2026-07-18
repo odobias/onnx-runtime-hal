@@ -34,9 +34,9 @@ $PSNativeCommandUseErrorActionPreference = $false
 Initialize-BenchmarkConsole
 
 $root = Split-Path $PSScriptRoot -Parent
-if (-not $Manifest) { $Manifest = Join-Path $root "src\workloads\whisper\manifest.json" }
+if (-not $Manifest) { $Manifest = Join-Path $root "artifacts\workloads\whisper\manifest.json" }
 if (-not $EvalSet) { $EvalSet = Join-Path $root "src\workloads\eval\eval.jsonl" }
-$exe = Join-Path $root "build\x64\$Configuration\NpuInferenceBench.exe"
+$exe = Join-Path $root "artifacts\build\x64\$Configuration\NpuInferenceBench.exe"
 
 foreach ($p in @($Manifest, $EvalSet, $exe)) {
     if (-not (Test-Path $p)) { Write-Host "Missing: $p" -ForegroundColor Red; exit 1 }
@@ -79,9 +79,9 @@ if ($MaxClips -gt 0 -and $clips.Count -gt $MaxClips) { $clips = $clips[0..($MaxC
 Write-Host ("Variant: {0} ({1}, {2} MB, backend {3}) | Devices: {4} | Eval clips: {5} | Runs/clip: {6}" -f `
         $v.id, $v.precision, $v.size_mb, $v.backend, ($Devices -join ", "), $clips.Count, $Runs) -ForegroundColor Cyan
 
-$reportsDir = Join-Path $root "build\reports"
+$reportsDir = Join-Path $root "artifacts\build\reports"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
-$cacheRoot = Join-Path $root "cache"
+$cacheRoot = Join-Path $root "artifacts\cache"
 
 # All devices run in this one session, so a single power reading applies to the
 # whole comparison. Power source + clip invocation come from benchmark/lib/harness.ps1.

@@ -18,7 +18,7 @@ namespace fs = std::filesystem;
 namespace fe = npu_inference_bench::frontend;
 
 struct Row {
-    std::string model_package;      // e.g. en-static-onnx (leaf of src/workloads/whisper/models/static-onnx)
+    std::string model_package;      // e.g. en-static-onnx (leaf of artifacts/workloads/whisper/models/static-onnx)
     std::string variant_id;         // manifest id or label fallback
     std::string base_model;         // e.g. openai/whisper-tiny.en
     std::string precision;          // fp32, fp16, int8, int4, fp32-static, ...

@@ -15,7 +15,7 @@ Why fixtures instead of doing preprocessing in C++:
   measuring real per-EP latency AND per-EP numerical agreement (does the
   accelerator reproduce the CPU probability?).
 
-Output (gitignored, under src/workloads/classifiers/fixtures/<model>/):
+Output (gitignored, under artifacts/workloads/classifiers/fixtures/<model>/):
   model.tsv    onnx_path <tab> positive_index <tab> threshold <tab> pos_label <tab> neg_label
                (onnx_path is stored RELATIVE to the fixture dir, forward-slashed, so a
                 fixture tree stays valid after being pushed to / pulled from HF onto a
@@ -25,8 +25,8 @@ Output (gitignored, under src/workloads/classifiers/fixtures/<model>/):
   inputs.tsv   sample_id <tab> input_name <tab> dtype(f32|i64) <tab> shape(csv) <tab> file
   data/*.bin   raw little-endian tensors
 
-    .venv\\Scripts\\python.exe scripts\\experiments\\dump_fixtures.py
-    .venv\\Scripts\\python.exe scripts\\experiments\\dump_fixtures.py --models tsc
+    artifacts/venv\\Scripts\\python.exe scripts\\experiments\\dump_fixtures.py
+    artifacts/venv\\Scripts\\python.exe scripts\\experiments\\dump_fixtures.py --models tsc
 """
 import argparse
 import importlib

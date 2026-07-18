@@ -20,7 +20,7 @@ Provenance (2026-07-09, via Glean):
     this exact model -- there's no BigQuery/GCS-hosted labeled audio
     benchmark accessible to us (the "Audio benchmark dataset" section of that
     page is still "TBD").
-  - src/workloads/classifiers/audio-samples/*.wav were downloaded (via yt-dlp, see
+  - artifacts/workloads/classifiers/audio-samples/*.wav were downloaded (via yt-dlp, see
     below) from a handful of the *unambiguously* labeled entries in that list
     (skipping every "not sure" / "probably" hedge and any now-unavailable
     video): 3 Real, 2 Deepfake, ~15s each, resampled to 44.1kHz mono.

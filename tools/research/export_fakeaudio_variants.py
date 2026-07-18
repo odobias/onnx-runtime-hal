@@ -1,7 +1,7 @@
 """Regenerate the useful fakeaudio (MS-CLAP / HTSAT) precision variants from the
 one checked-in base model, so we ship a *recipe* in git instead of a pile of
 derived weights on HF. Every output here is a deterministic function of
-src/workloads/classifiers/fakeaudio/model.onnx (fetched from the HF mirror on demand).
+artifacts/workloads/classifiers/fakeaudio/model.onnx (fetched from the HF mirror on demand).
 
 Why these variants exist (all measured, see the fidelity table this prints):
 
@@ -33,7 +33,7 @@ Measured NPU reality on AMD XDNA2 / VitisAI (do not lose this hard-won result):
   whose compilers are not VAIML and may well behave -- UNVERIFIED (no such HW here).
 
 Usage:
-  .venv\\Scripts\\python.exe scripts\\experiments\\export_fakeaudio_variants.py
+  artifacts/venv\\Scripts\\python.exe scripts\\experiments\\export_fakeaudio_variants.py
   optional: --out-dir <dir>  --skip-int8  --no-validate
 """
 import argparse

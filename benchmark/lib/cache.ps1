@@ -10,7 +10,7 @@ function Get-BenchmarkCachePath {
     )
     $segments = @($Platform, $Provider, $Workload, $Profile, $Device) |
         ForEach-Object { ([string]$_ -replace '[^A-Za-z0-9_.-]', '_') }
-    return Join-Path $Root ("build\cache\benchmark\" + ($segments -join '\'))
+    return Join-Path $Root ("artifacts\cache\benchmark\" + ($segments -join '\'))
 }
 
 function Reset-BenchmarkCache {

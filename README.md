@@ -30,7 +30,7 @@ benchmark ledgers.
 
 ```powershell
 .\tools\build\package-onnx-runtime-hal.ps1 -Flavor ort
-# -> dist/onnx-runtime-hal-<arch>-ort/{include,lib,msbuild}
+# -> artifacts/dist/onnx-runtime-hal-<arch>-ort/{include,lib,msbuild}
 ```
 
 `NpuInferenceBench run-onnx` is a generic tensor-manifest reference consumer.
@@ -159,8 +159,9 @@ The provider implementations are:
 - CPU: ONNX Runtime CPU or OpenVINO CPU.
 
 Vendor ONNX Runtime distributions are not binary-compatible. Separate runtime
-packages and the `build/<platform>-ovep` output remain necessary; pretending one
-set of vendor DLLs can serve every machine would produce misleading results.
+packages and the `artifacts/build/<platform>-ovep` output remain necessary;
+pretending one set of vendor DLLs can serve every machine would produce
+misleading results.
 
 ## Repository architecture
 
@@ -173,9 +174,8 @@ eng/                         MSBuild projects/props + packaging metadata
 benchmark/                   suite-of-record harness, manifests, schemas
 tools/                       bootstrap, fetch, setup, export, research, repros
 docs/                        guides and engineering notes
-results/                     published evidence (+ reports/, local/)
-
-build/ dist/ third_party/    local artifacts only (gitignored)
+results/                     published evidence (+ reports/)
+artifacts/                   all generated/local outputs (gitignored)
 ```
 
 ## Build

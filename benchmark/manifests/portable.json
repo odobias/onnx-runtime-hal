@@ -7,7 +7,7 @@
       "id": "whisper-tiny-static",
       "kind": "asr",
       "backend": "onnx-static",
-      "path": "src/workloads/whisper/models/static-onnx",
+      "path": "artifacts/workloads/whisper/models/static-onnx",
       "executionProfiles": [
         {
           "id": "static-onnx",
@@ -23,7 +23,7 @@
       "id": "whisper-tiny-dynamic",
       "kind": "asr",
       "backend": "onnx-dynamic",
-      "path": "src/workloads/whisper/models/dynamic-onnx",
+      "path": "artifacts/workloads/whisper/models/dynamic-onnx",
       "executionProfiles": [
         {
           "id": "dynamic-kv-onnx",
@@ -39,7 +39,7 @@
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "src/workloads/classifiers/fixtures/tsc",
+      "path": "artifacts/workloads/classifiers/fixtures/tsc",
       "executionProfiles": [
         {
           "id": "whole-fp32",
@@ -55,12 +55,12 @@
       "id": "fakeaudio",
       "kind": "classifier",
       "backend": "onnx-fixture",
-      "path": "src/workloads/classifiers/fixtures/fakeaudio",
+      "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
       "executionProfiles": [
         {
           "id": "whole-fp32",
           "devices": ["cpu", "gpu"],
-          "path": "src/workloads/classifiers/fixtures/fakeaudio",
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
           "graphRole": "whole",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true
@@ -69,15 +69,15 @@
           "id": "npu-split-intel",
           "devices": ["npu"],
           "hostVendors": ["Intel"],
-          "path": "src/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias",
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias",
           "graphRole": "backbone",
           "frontendContract": "cpu-fp32-logmel",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true,
           "outputs": [
-            "src/workloads/classifiers/fakeaudio/model.backbone.expanded-attention-bias.onnx",
-            "src/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
-            "src/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
+            "artifacts/workloads/classifiers/fakeaudio/model.backbone.expanded-attention-bias.onnx",
+            "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
+            "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
           ],
           "steps": [
             {
@@ -94,14 +94,14 @@
           "id": "npu-split-generic",
           "devices": ["npu"],
           "hostVendors": ["AMD", "Qualcomm"],
-          "path": "src/workloads/classifiers/fixtures/fakeaudio-bb-fp32",
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32",
           "graphRole": "backbone",
           "frontendContract": "cpu-fp32-logmel",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": true,
           "outputs": [
-            "src/workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
-            "src/workloads/classifiers/fixtures/fakeaudio-bb-fp32/model.tsv"
+            "artifacts/workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
+            "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32/model.tsv"
           ],
           "steps": [
             {
@@ -117,7 +117,7 @@
         {
           "id": "npu-whole-diagnostic",
           "devices": ["npu"],
-          "path": "src/workloads/classifiers/fixtures/fakeaudio",
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
           "graphRole": "whole",
           "referenceContract": "full-model-cpu-fp32",
           "accuracyEligible": false,
