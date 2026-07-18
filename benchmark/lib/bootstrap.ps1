@@ -52,7 +52,7 @@ function Add-BenchmarkUnifiedAutoVariant {
         [Parameter(Mandatory)] [string]$Manifest,
         [Parameter(Mandatory)] [string]$Models
     )
-    $modelRel = "workloads/whisper/models/static-onnx"
+    $modelRel = "src/workloads/whisper/models/static-onnx"
     $modelDir = Join-Path $Models "whisper\en-static-onnx"
     if (-not (Test-Path $Manifest) -or -not (Test-Path $modelDir)) { return $false }
 
@@ -75,7 +75,7 @@ function Add-BenchmarkUnifiedAutoVariant {
 }
 
 # Ensure everything a sweep needs exists, building the app and fetching
-# workloads/eval/audio on demand so `benchmark-quant.ps1` works from a fresh checkout.
+# src/workloads/eval/audio on demand so `benchmark-quant.ps1` works from a fresh checkout.
 # Idempotent: every step is skipped when its output is already present. This
 # assumes the toolchain + vendor SDK are installed (that is bootstrap.ps1's job);
 # if the build can't run it says exactly that. Model fetches for the neutral

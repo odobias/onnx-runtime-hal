@@ -52,7 +52,7 @@ def run(model_dir, wav, max_tokens=100):
 
 
 if __name__ == "__main__":
-    wav = "workloads/audio/jfk.wav"
+    wav = "src/workloads/audio/jfk.wav"
     for md in sys.argv[1:]:
         print(f"==================== {md} (ORT CPU, unpadded) ====================")
         run(md, wav)

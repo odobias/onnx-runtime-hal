@@ -30,7 +30,7 @@ function Get-BenchmarkEvalRows {
         [Parameter(Mandatory)][string]$Root,
         [string]$Audio = ""
     )
-    $manifest = Join-Path $Root "workloads\eval\eval.jsonl"
+    $manifest = Join-Path $Root "src\workloads\eval\eval.jsonl"
     if (-not (Test-Path -LiteralPath $manifest)) { return @() }
     $rows = @(Get-Content -LiteralPath $manifest -Encoding UTF8 |
         Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })

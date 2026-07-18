@@ -85,7 +85,7 @@ foreach ($fmt in $Formats) {
         backend    = "intel"
         precision  = $fmt
         method     = $methodOf[$fmt]
-        model_dir  = "workloads/whisper/models/ov-ir/$fmt"   # repo-relative for portability
+        model_dir  = "src/workloads/whisper/models/ov-ir/$fmt"   # repo-relative for portability
         devices    = $Devices
         size_mb    = $sizeMb
     }

@@ -131,8 +131,8 @@ class OnnxWhisper:
 
 
 def main():
-    model_dir = sys.argv[1] if len(sys.argv) > 1 else "workloads/whisper/models/dynamic-onnx"
-    eval_path = sys.argv[2] if len(sys.argv) > 2 else "workloads/eval/eval.jsonl"
+    model_dir = sys.argv[1] if len(sys.argv) > 1 else "src/workloads/whisper/models/dynamic-onnx"
+    eval_path = sys.argv[2] if len(sys.argv) > 2 else "src/workloads/eval/eval.jsonl"
     provider = sys.argv[3] if len(sys.argv) > 3 else "CPUExecutionProvider"
 
     from transformers import WhisperProcessor

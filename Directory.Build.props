@@ -34,7 +34,7 @@
          is a self-contained package. Set /p:BundleModel=false to skip the (large)
          copy during iterative dev builds. -->
     <BundleModel Condition="'$(BundleModel)'==''">true</BundleModel>
-    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(NpuInferenceBenchRoot)workloads\whisper\models\static-onnx</BundledModelDir>
+    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(NpuInferenceBenchRoot)src\workloads\whisper\models\static-onnx</BundledModelDir>
 
     <!-- The AMD-native whisper/amd model is ONLY used by the `amd` backend
          variant; the unified auto/onnx-static path runs the portable static model

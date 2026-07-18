@@ -115,8 +115,8 @@ class OVWhisperStatic:
 
 
 def main():
-    model_dir = sys.argv[1] if len(sys.argv) > 1 else "workloads/whisper/models/dynamic-onnx"
-    eval_path = sys.argv[2] if len(sys.argv) > 2 else "workloads/eval/eval.jsonl"
+    model_dir = sys.argv[1] if len(sys.argv) > 1 else "src/workloads/whisper/models/dynamic-onnx"
+    eval_path = sys.argv[2] if len(sys.argv) > 2 else "src/workloads/eval/eval.jsonl"
     device = sys.argv[3] if len(sys.argv) > 3 else "NPU"
     maxlen = int(sys.argv[4]) if len(sys.argv) > 4 else 64
     cache = os.path.join("cache", f"onnx-static-{device}-{maxlen}")

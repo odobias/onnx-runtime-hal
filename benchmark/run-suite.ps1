@@ -303,7 +303,7 @@ if (-not $AttemptLedger) { $AttemptLedger = Join-Path $root "results\ledgers\att
 $accuracyLedgerExplicit = [bool]$AccuracyLedger
 if (-not $Manifest) { $Manifest = Join-Path $root "benchmark\manifests\portable.json" }
 $audioExplicit = [bool]$Audio
-if (-not $Audio) { $Audio = Join-Path $root "workloads\eval\ls_000.wav" }
+if (-not $Audio) { $Audio = Join-Path $root "src\workloads\eval\ls_000.wav" }
 
 if (-not (Test-Path $Manifest)) {
     Write-Host "Benchmark manifest missing: $Manifest" -ForegroundColor Red
@@ -322,9 +322,9 @@ if ($Mode -eq "accuracy-quick" -and -not $accuracyLedgerExplicit) {
         throw "Immutable accuracy run already exists: $AccuracyLedger"
     }
 }
-# Classifier fixtures + ONNX models are colocated under workloads/classifiers/
+# Classifier fixtures + ONNX models are colocated under src/workloads/classifiers/
 # (model.tsv paths are fixture-relative, e.g. ../../fakeaudio/model.onnx).
-$fixRoot = Join-Path $root "workloads\classifiers\fixtures"
+$fixRoot = Join-Path $root "src\workloads\classifiers\fixtures"
 $classifierFix = @{ tsc = (Join-Path $fixRoot "tsc"); fakeaudio = (Join-Path $fixRoot "fakeaudio") }
 
 $providerTag = if ($Provider) { $Provider } else { "auto" }

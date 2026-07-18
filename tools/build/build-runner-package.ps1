@@ -34,7 +34,7 @@ if (-not $Output) {
     $Output = Join-Path $root "dist\npu-inference-bench-$Architecture"
 }
 $Output = [IO.Path]::GetFullPath($Output)
-$catalog = Get-Content (Join-Path $root "packaging\runner-catalog.json") `
+$catalog = Get-Content (Join-Path $root "eng\packaging\runner-catalog.json") `
     -Raw -Encoding UTF8 | ConvertFrom-Json
 $definitions = @($catalog.runners)
 $selectedIds = if ($Runner.Count) { @($Runner) } else {
@@ -312,14 +312,14 @@ function Import-RunnerArtifact([string]$Artifact, [hashtable]$Seen) {
 }
 
 function Copy-RedistributableAssets([string]$Root, [string]$Output) {
-    $catalogPath = Join-Path $Root "packaging\redistributable-assets.json"
+    $catalogPath = Join-Path $Root "eng\packaging\redistributable-assets.json"
     if (-not (Test-Path -LiteralPath $catalogPath)) {
         throw "Redistributable asset catalog missing: $catalogPath"
     }
     $catalog = Get-Content -LiteralPath $catalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $copied = [System.Collections.Generic.List[string]]::new()
 
-    # Prefer workloads/classifiers; migrate from legacy models/deepfake when needed.
+    # Prefer src/workloads/classifiers; migrate from legacy models/deepfake when needed.
     $migrate = Join-Path $Root "tools\fetch\migrate-classifier-layout.ps1"
     if (Test-Path -LiteralPath $migrate) {
         & $migrate
@@ -329,7 +329,7 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
         $evalDir = Join-Path $Root "workloads\eval"
         $wavs = @(Get-ChildItem -LiteralPath $evalDir -Filter "ls_*.wav" -File -ErrorAction SilentlyContinue)
         if ($wavs.Count -lt 1) {
-            throw "Redistributable eval WAVs missing under workloads/eval (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
+            throw "Redistributable eval WAVs missing under src/workloads/eval (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
         }
         $evalJsonl = Join-Path $evalDir "eval.jsonl"
         if (-not (Test-Path -LiteralPath $evalJsonl)) {
@@ -395,7 +395,7 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
             Measure-Object -Property Length -Sum).Sum
     }
 
-    Write-Host ("Redistributable assets: {0} variant group(s) under workloads/" -f $variants.Count) `
+    Write-Host ("Redistributable assets: {0} variant group(s) under src/workloads/" -f $variants.Count) `
         -ForegroundColor Cyan
     return [ordered]@{
         catalog = "packaging/redistributable-assets.json"

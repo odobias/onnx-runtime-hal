@@ -14,7 +14,7 @@ dist/npu-inference-bench-ARM64/
   run-benchmark.ps1
   benchmark/
   tools/                    # allowlisted helpers (fetch/eval/fixtures/validate)
-  workloads/
+  src/workloads/
     whisper/models/static-onnx/
     eval/                   # eval.jsonl + ls_*.wav (+ baked baselines)
     audio/
@@ -41,7 +41,7 @@ dist/npu-inference-bench-ARM64/
 ```
 
 There is no top-level `models/` tree in the package. All runtime assets live under
-`workloads/`.
+`src/workloads/`.
 
 The x64 package uses the same layout and may contain `amd`, `ovep`, `dml`,
 `winml`, and portable `ort` runners. A package contains only one PE
@@ -49,7 +49,7 @@ architecture; mixed x64/ARM64 artifacts are rejected.
 
 `runner-package.json` records the runners actually assembled, files and SHA-256
 hashes, supported vendors/providers, minimum Windows build, and explicit skip
-reasons. `packaging/runner-package.schema.json` defines the version 1 contract.
+reasons. `eng/packaging/runner-package.schema.json` defines the version 1 contract.
 
 ## Build a package
 
@@ -87,15 +87,15 @@ an SDK that was detected is fatal. A summary is written to
 
 ### Redistributable model assets
 
-Packages copy only the allowlist in `packaging/redistributable-assets.json`:
+Packages copy only the allowlist in `eng/packaging/redistributable-assets.json`:
 Whisper static, TSC whole, and FakeAudio **whole + generic NPU backbone split**,
-all under `workloads/`. Eval WAVs are required at assemble time. The package
+all under `src/workloads/`. Eval WAVs are required at assemble time. The package
 replaces `benchmark/manifests/portable.json` with
-`packaging/portable.redistributable.json` so dynamic Whisper / OV-IR / AMD
+`eng/packaging/portable.redistributable.json` so dynamic Whisper / OV-IR / AMD
 vendor Whisper / Intel-only FakeAudio splits stay out. `tools/` is trimmed to
 fetch/eval/fixtures/validate helpers (no research/export/build trees).
 
-Whisper eval clips in `workloads/eval/eval.jsonl` carry baked
+Whisper eval clips in `src/workloads/eval/eval.jsonl` carry baked
 `baseline_hyp` / `baseline_wer` / `baseline_cer` fields (mint with
 `tools/eval/bake-whisper-baselines.ps1`). Accuracy-quick reports WER delta vs
 that baseline. `-Executor fastest|most-accurate` races packaged runners on those

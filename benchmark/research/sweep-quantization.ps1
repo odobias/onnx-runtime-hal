@@ -28,7 +28,7 @@ param(
     [string[]]$Variant = @(),
     [string]$Configuration = "Release",
     [ValidateSet("x64", "ARM64")][string]$BuildPlatform = "",
-    # Skip the self-contained bootstrap (build + fetch workloads/eval/audio). Use when
+    # Skip the self-contained bootstrap (build + fetch src/workloads/eval/audio). Use when
     # you have already prepared the environment and want the sweep to start faster.
     [switch]$SkipBootstrap,
     # Reuse any persisted compiled-model cache under cache/<variant>-<device> instead
@@ -48,8 +48,8 @@ $PSNativeCommandUseErrorActionPreference = $false
 Initialize-BenchmarkConsole
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-if (-not $Manifest) { $Manifest = Join-Path $root "workloads\whisper\manifest.research.json" }
-if (-not $EvalSet) { $EvalSet = Join-Path $root "workloads\eval\eval.jsonl" }
+if (-not $Manifest) { $Manifest = Join-Path $root "src\workloads\whisper\manifest.research.json" }
+if (-not $EvalSet) { $EvalSet = Join-Path $root "src\workloads\eval\eval.jsonl" }
 if (-not $BuildPlatform) {
     $BuildPlatform = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq "Arm64") { "ARM64" } else { "x64" }
 }
@@ -60,7 +60,7 @@ $exe = Join-Path $root "build\$BuildPlatform\$Configuration\NpuInferenceBench.ex
 $platform = Get-BenchmarkPlatform
 
 # Self-contained bootstrap: build the app for this host's backends and fetch any
-# missing workloads/eval/audio so the benchmark runs from a fresh checkout. Idempotent
+# missing src/workloads/eval/audio so the benchmark runs from a fresh checkout. Idempotent
 # (present artifacts are skipped) and opt-out via -SkipBootstrap.
 if (-not $SkipBootstrap) {
     Initialize-BenchmarkEnvironment -Root $root -Exe $exe -Manifest $Manifest -EvalSet $EvalSet `

@@ -99,7 +99,7 @@ $libOut = Join-Path $Output "lib"
 $msbuildOut = Join-Path $Output "msbuild"
 New-Item -ItemType Directory -Force -Path $includeOut, $libOut, $msbuildOut | Out-Null
 
-# Public headers only — never ship runner/runtime EP internals.
+# Public headers only — never ship src/runner/runtime EP internals.
 $publicHeaders = @(
     "onnx_runtime_hal.hpp"
     "npu_inference_bench\runtime\device.hpp"
@@ -114,7 +114,7 @@ $publicHeaders = @(
     "npu_inference_bench\execution_diagnostics.hpp"
     "npu_inference_bench\precision_policy.hpp"
 )
-$srcInclude = Join-Path $root "runner\include"
+$srcInclude = Join-Path $root "src\runner\include"
 foreach ($rel in $publicHeaders) {
     $src = Join-Path $srcInclude $rel
     $dst = Join-Path $includeOut $rel
@@ -137,11 +137,11 @@ $flavorProps = @"
 </Project>
 "@
 Set-Content -Path (Join-Path $msbuildOut "OnnxRuntimeHal.Flavor.props") -Value $flavorProps -Encoding utf8
-Copy-Item -LiteralPath (Join-Path $root "msbuild\OnnxRuntimeHal.props") `
+Copy-Item -LiteralPath (Join-Path $root "eng\msbuild\OnnxRuntimeHal.props") `
     -Destination (Join-Path $msbuildOut "OnnxRuntimeHal.props") -Force
 
 # Optional: stage runtime-pack helpers for apps that need ORT DLLs beside the exe.
-Copy-Item -LiteralPath (Join-Path $root "msbuild\runtime-pack.targets") `
+Copy-Item -LiteralPath (Join-Path $root "eng\msbuild\runtime-pack.targets") `
     -Destination (Join-Path $msbuildOut "runtime-pack.targets") -Force
 
 $readme = @"

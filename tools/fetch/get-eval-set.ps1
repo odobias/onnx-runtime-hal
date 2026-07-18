@@ -3,7 +3,7 @@
 # Falls back to the single jfk.wav clip (with a known reference) if the download
 # fails, so the benchmark harness always has something to run.
 #
-#   .\get-eval-set.ps1              # up to 20 utterances -> workloads/eval/eval.jsonl
+#   .\get-eval-set.ps1              # up to 20 utterances -> src/workloads/eval/eval.jsonl
 #   .\get-eval-set.ps1 -Count 5
 
 [CmdletBinding()]
@@ -17,7 +17,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$evalDir = Join-Path $root "workloads\eval"
+$evalDir = Join-Path $root "src\workloads\eval"
 New-Item -ItemType Directory -Force -Path $evalDir | Out-Null
 
 $venv = Join-Path $root ".venv"
@@ -56,12 +56,12 @@ $ok = ($LASTEXITCODE -eq 0)
 
 if (-not $ok) {
     Write-Host "Dataset build failed; falling back to jfk.wav clip." -ForegroundColor Yellow
-    $jfk = Join-Path $root "workloads\audio\jfk.wav"
+    $jfk = Join-Path $root "src\workloads\audio\jfk.wav"
     if (-not (Test-Path $jfk)) { & (Join-Path $PSScriptRoot "get-audio.ps1") }
     $ref = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
-    $rec = [ordered]@{ id = "jfk"; audio = "workloads/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
+    $rec = [ordered]@{ id = "jfk"; audio = "src/workloads/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
     ($rec | ConvertTo-Json -Compress) | Set-Content -Path $evalPath -Encoding UTF8
-    Write-Host "Wrote 1 utterance (jfk) to workloads\eval\eval.jsonl" -ForegroundColor Green
+    Write-Host "Wrote 1 utterance (jfk) to src\workloads\eval\eval.jsonl" -ForegroundColor Green
 }
 
 if ($priorBaselines.Count -gt 0 -and (Test-Path -LiteralPath $evalPath)) {

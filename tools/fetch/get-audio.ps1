@@ -10,7 +10,7 @@ chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$audioDir = Join-Path $root "workloads\audio"
+$audioDir = Join-Path $root "src\workloads\audio"
 New-Item -ItemType Directory -Force -Path $audioDir | Out-Null
 $dest = Join-Path $audioDir "jfk.wav"
 

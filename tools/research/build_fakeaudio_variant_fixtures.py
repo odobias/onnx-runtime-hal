@@ -4,7 +4,7 @@ Hexagon HTP gap the AMD/Intel toolkits could not cover).
 
 Run tools/research/export_fakeaudio_variants.py first (it emits the generic
 variant ONNX models), then this script. It produces four fixture dirs under
-workloads/classifiers/fixtures/:
+src/workloads/classifiers/fixtures/:
   fakeaudio-fp16safe     -> model.fp16-safe.onnx        (raw PCM input, whole-graph drop-in)
   fakeaudio-bb-fp32      -> model.backbone-fp32.onnx    (mel input; Qualcomm HTP runs this as-is)
   fakeaudio-bb-int8      -> model.backbone-int8.onnx    (mel input from the CPU front-end)

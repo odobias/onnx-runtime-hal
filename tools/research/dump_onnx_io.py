@@ -7,7 +7,7 @@ C++ dynamic (KV-cache) backend feeds exactly the right names. Read-only.
 import sys
 import onnxruntime as ort
 
-model_dir = sys.argv[1] if len(sys.argv) > 1 else "workloads/whisper/models/dynamic-onnx"
+model_dir = sys.argv[1] if len(sys.argv) > 1 else "src/workloads/whisper/models/dynamic-onnx"
 
 for f in ("encoder_model.onnx", "decoder_model.onnx", "decoder_with_past_model.onnx"):
     path = f"{model_dir}/{f}"
