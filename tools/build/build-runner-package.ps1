@@ -31,7 +31,7 @@ if (-not $Architecture) {
     ) { "ARM64" } else { "x64" }
 }
 if (-not $Output) {
-    $Output = Join-Path $root "dist\npu-inference-bench-$Architecture"
+    $Output = Join-Path $root "artifacts\dist\npu-inference-bench-$Architecture"
 }
 $Output = [IO.Path]::GetFullPath($Output)
 $catalog = Get-Content (Join-Path $root "eng\packaging\runner-catalog.json") `
@@ -149,7 +149,7 @@ function Invoke-RunnerBuild([object]$Definition, [int]$MaxCpuCount = 0) {
 
 function Invoke-RunnerBuildsParallel([object[]]$Definitions, [int]$Limit) {
     $buildScript = Join-Path $root "tools\build\build.ps1"
-    $logDir = Join-Path $root "build\logs\runner-package"
+    $logDir = Join-Path $root "artifacts\build\logs\runner-package"
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     # Avoid N concurrent /m:auto builds melting the host.
     $innerCpu = [Math]::Max(1, [int][Math]::Floor([Environment]::ProcessorCount / $Limit))
@@ -319,19 +319,19 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
     $catalog = Get-Content -LiteralPath $catalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $copied = [System.Collections.Generic.List[string]]::new()
 
-    # Prefer src/workloads/classifiers; migrate from legacy models/deepfake when needed.
+    # Prefer artifacts/workloads/classifiers; migrate from legacy models/deepfake when needed.
     $migrate = Join-Path $Root "tools\fetch\migrate-classifier-layout.ps1"
     if (Test-Path -LiteralPath $migrate) {
         & $migrate
     }
 
     if ($catalog.require_eval_wavs) {
-        $evalDir = Join-Path $Root "workloads\eval"
+        $evalDir = Join-Path $Root "artifacts\workloads\eval"
         $wavs = @(Get-ChildItem -LiteralPath $evalDir -Filter "ls_*.wav" -File -ErrorAction SilentlyContinue)
         if ($wavs.Count -lt 1) {
-            throw "Redistributable eval WAVs missing under src/workloads/eval (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
+            throw "Redistributable eval WAVs missing under artifacts/workloads/eval (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
         }
-        $evalJsonl = Join-Path $evalDir "eval.jsonl"
+        $evalJsonl = Join-Path $Root "src\workloads\eval\eval.jsonl"
         if (-not (Test-Path -LiteralPath $evalJsonl)) {
             throw "Redistributable eval manifest missing: $evalJsonl"
         }
@@ -389,16 +389,16 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
     }
 
     $totalBytes = 0L
-    $workloadsDir = Join-Path $Output "workloads"
+    $workloadsDir = Join-Path $Output "artifacts\workloads"
     if (Test-Path -LiteralPath $workloadsDir) {
         $totalBytes = @(Get-ChildItem -LiteralPath $workloadsDir -Recurse -File -ErrorAction SilentlyContinue |
             Measure-Object -Property Length -Sum).Sum
     }
 
-    Write-Host ("Redistributable assets: {0} variant group(s) under src/workloads/" -f $variants.Count) `
+    Write-Host ("Redistributable assets: {0} variant group(s) under artifacts/workloads/" -f $variants.Count) `
         -ForegroundColor Cyan
     return [ordered]@{
-        catalog = "packaging/redistributable-assets.json"
+        catalog = "eng/packaging/redistributable-assets.json"
         portable_manifest = "benchmark/manifests/portable.json"
         model_variants = @($variants)
         copied_paths = @($copied)
@@ -443,7 +443,7 @@ if (-not $SkipBuild -and $buildable.Count) {
 
 foreach ($definition in $buildable) {
     $id = [string]$definition.id
-    $source = Join-Path $root "build\$Architecture$([string]$definition.platform_suffix)\$Configuration"
+    $source = Join-Path $root "artifacts\build\$Architecture$([string]$definition.platform_suffix)\$Configuration"
     if (-not (Test-Path -LiteralPath (Join-Path $source "NpuInferenceBench.exe"))) {
         $skipped.Add([ordered]@{ id = $id; reason = "build output is missing: $source" })
         continue

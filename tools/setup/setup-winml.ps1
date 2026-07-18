@@ -22,7 +22,7 @@ if (-not $Platform) {
 }
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$thirdParty = Join-Path $root "third_party"
+$thirdParty = Join-Path $root "artifacts\third_party"
 $nuget = Join-Path $thirdParty ".nuget\nuget.exe"
 if (-not (Test-Path $nuget)) {
     New-Item -ItemType Directory -Force -Path (Split-Path $nuget) | Out-Null

@@ -1,4 +1,4 @@
-"""Ensure classifier models exist under src/workloads/classifiers/, auto-downloading
+"""Ensure classifier models exist under artifacts/workloads/classifiers/, auto-downloading
 missing ones from the private Hugging Face mirror (remote keys stay deepfake/*).
 
 Python twin of tools/fetch/get-classifier-models.ps1.
@@ -8,7 +8,7 @@ import shutil
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CLASSIFIERS_DIR = os.path.join(ROOT, "workloads", "classifiers")
+CLASSIFIERS_DIR = os.path.join(ROOT, "artifacts", "workloads", "classifiers")
 LEGACY_DIR = os.path.join(ROOT, "models", "deepfake")
 DEFAULT_REPO = os.environ.get("NPU_INFERENCE_BENCH_MODELS_REPO", "odobias/npu-hal-over-9000")
 
@@ -42,7 +42,7 @@ def _copytree(src, dst):
 
 
 def _migrate_legacy(models):
-    """Copy from models/deepfake when src/workloads/classifiers is missing."""
+    """Copy from models/deepfake when artifacts/workloads/classifiers is missing."""
     for m in models:
         spec = _SPECS[m]
         if os.path.exists(spec["sentinel"]) or not os.path.exists(spec["legacy"]):
@@ -126,4 +126,4 @@ def ensure_deepfake_models(models=("tsc", "fakeaudio"), repo=None):
             f"[models] {', '.join(still)} still missing after download from {repo} "
             f"(does the repo contain the deepfake/* subtree?)."
         )
-    print(f"[models] ready under src/workloads/classifiers: {', '.join(missing)}")
+    print(f"[models] ready under artifacts/workloads/classifiers: {', '.join(missing)}")

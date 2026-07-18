@@ -9,7 +9,7 @@ directory. Each runner loads only the files colocated with that executable.
 Packages are architecture-specific:
 
 ```text
-dist/npu-inference-bench-ARM64/
+artifacts/dist/npu-inference-bench-ARM64/
   runner-package.json
   run-benchmark.ps1
   benchmark/
@@ -72,18 +72,18 @@ Or build one architecture at a time:
 `build-all-runner-packages.ps1` gates third-party staging first, then launches
 every runner build across the requested architectures in one parallel pool:
 
-1. Stage SDKs into non-overlapping roots (`third_party/onnxruntime-directml-x64`,
-   `third_party/onnxruntime-directml-ARM64`, WinML per-platform bins, OVEP, QNN).
+1. Stage SDKs into non-overlapping roots (`artifacts/third_party/onnxruntime-directml-x64`,
+   `artifacts/third_party/onnxruntime-directml-ARM64`, WinML per-platform bins, OVEP, QNN).
 2. Build all `build.ps1` runner variants concurrently (`-ThrottleLimit`, default
    auto). Unique `OutDir`/`IntDir` per `PlatformOutTag` make this safe.
-3. Assemble each `dist/npu-inference-bench-<arch>/` package (`-SkipBuild`).
+3. Assemble each `artifacts/dist/npu-inference-bench-<arch>/` package (`-SkipBuild`).
 
 Use `-SkipSdkStage` when those roots are already populated. Vendor ORT ABIs
 still cannot share one process, so there is no single Visual Studio "Build All"
 configuration — only a parallel matrix of isolated builds. Missing SDKs do not
 invalidate the package; they produce entries in `skipped`. A build failure for
 an SDK that was detected is fatal. A summary is written to
-`dist/runner-packages-summary.json`.
+`artifacts/dist/runner-packages-summary.json`.
 
 ### Redistributable model assets
 

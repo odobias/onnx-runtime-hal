@@ -12,7 +12,7 @@ Provenance (2026-07-09, via Glean + git clone of internal repos):
     transcript_tsc/tasks/validate_model.py::run_benchmark_checks) -- clean
     samples must score < 0.1, scam samples > 0.9 (checked both bare and with
     random-string prefix/suffix noise added).
-  - Tokenizer: src/workloads/classifiers/tsc/{vocab.json,merges.txt} is a byte-level BPE
+  - Tokenizer: artifacts/workloads/classifiers/tsc/{vocab.json,merges.txt} is a byte-level BPE
     vocab of size 50265 with special tokens <s>=0, <pad>=1, </s>=2, <unk>=3,
     <mask>=50264 -- an exact match for roberta-base's tokenizer, confirming
     (despite the "DistilBERT" branding in internal docs) this model's

@@ -84,13 +84,13 @@ helpers; those headers are **not** part of the redistributable package.
 
 ```powershell
 .\tools\build\package-onnx-runtime-hal.ps1 -Flavor ort -Configuration Release
-# -> dist/onnx-runtime-hal-<arch>-ort/
+# -> artifacts/dist/onnx-runtime-hal-<arch>-ort/
 ```
 
 Layout:
 
 ```text
-dist/onnx-runtime-hal-<arch>-<flavor>/
+artifacts/dist/onnx-runtime-hal-<arch>-<flavor>/
   include/onnx_runtime_hal.hpp
   include/npu_inference_bench/runtime/...
   lib/OnnxRuntimeHal.lib
@@ -120,12 +120,12 @@ ONNX Runtime DLL trees in one output directory is unsupported.
 The benchmark executable is also a reference consumer of the public API:
 
 ```powershell
-.\build\ARM64\Release\NpuInferenceBench.exe run-onnx `
-  .\src\workloads\classifiers\tsc\model.onnx `
+.\artifacts\build\ARM64\Release\NpuInferenceBench.exe run-onnx `
+  .\artifacts\workloads\classifiers\tsc\model.onnx `
   .\src\tests\runtime-hal-tsc-inputs.json `
   --device cpu `
   --strict-device `
-  --output-dir .\build\onnx-output
+  --output-dir .\artifacts\scratch\onnx-output
 ```
 
 The input manifest contains named binary tensors:

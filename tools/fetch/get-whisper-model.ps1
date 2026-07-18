@@ -33,7 +33,7 @@ $py = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $py) { $py = (Get-Command py -ErrorAction SilentlyContinue).Source }
 if (-not $py) { Write-Host "Python not found. Install it (winget install Python.Python.3.12) or run bootstrap.ps1." -ForegroundColor Red; exit 1 }
 
-$venv = Join-Path $root ".venv"
+$venv = Join-Path $root "artifacts/venv"
 $vpy = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path $vpy)) {
     Write-Host "Creating venv at $venv" -ForegroundColor Cyan

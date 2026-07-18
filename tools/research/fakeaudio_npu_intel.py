@@ -26,7 +26,7 @@ full-fp32 CPU to max|dp| ~1e-4, 0 flips, ~30 ms (~85% of it on the NPU).
 
 Prereq: run export_fakeaudio_variants.py first (produces model.frontend-fp32 +
 model.backbone-fp32). Usage:
-    .venv\\Scripts\\python.exe scripts\\experiments\\fakeaudio_npu_intel.py
+    artifacts/venv\\Scripts\\python.exe scripts\\experiments\\fakeaudio_npu_intel.py
     optional: --full-npu (show the whole graph runs on NPU but mispredicts)
               --bf16     (show the NPU rejects bf16)
 """

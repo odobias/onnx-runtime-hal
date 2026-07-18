@@ -1,5 +1,5 @@
 ﻿# Fetches a C++ ONNX Runtime SDK (headers + import lib + runtime DLLs) from the
-# public NuGet feed into third_party/onnxruntime/, which is where backend.ort.props
+# public NuGet feed into artifacts/third_party/onnxruntime/, which is where backend.ort.props
 # auto-detects it (OrtDir). This is what lets the ORT-based C++ backends (and the
 # deepfake classifier harness) build on a box that only has the *Python* onnxruntime
 # wheel -- the wheel ships onnxruntime.dll but NO C++ headers or import lib.
@@ -26,7 +26,7 @@ chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-if (-not $OutDir) { $OutDir = Join-Path (Join-Path $root "third_party") "onnxruntime" }
+if (-not $OutDir) { $OutDir = Join-Path (Join-Path $root "artifacts\third_party") "onnxruntime" }
 
 $pkgLower = $Package.ToLowerInvariant()
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("ortsdk_" + [guid]::NewGuid().ToString("N"))

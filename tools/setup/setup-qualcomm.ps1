@@ -36,7 +36,7 @@ if (-not $Platform) {
 $nugetRid = if ($Platform -eq "ARM64") { "win-arm64" } else { "win-x64" }
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$thirdParty = Join-Path $root "third_party"
+$thirdParty = Join-Path $root "artifacts\third_party"
 $ortDir = Join-Path $thirdParty "onnxruntime"
 $qnnDir = Join-Path $thirdParty "qnn-ep"
 New-Item -ItemType Directory -Force -Path $thirdParty | Out-Null

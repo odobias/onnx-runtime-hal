@@ -6,9 +6,12 @@ We disable the datasets Audio auto-decoder and decode the raw flac ourselves via
 soundfile, which avoids the torchcodec/ffmpeg dependency dance that recent
 `datasets` versions otherwise trigger.
 
-Output layout (repo-relative paths written into the jsonl):
-    src/workloads/eval/<id>.wav
-    src/workloads/eval/eval.jsonl   ->  {"id","audio","ref","duration_s"} per line
+Writes WAVs under --outdir (normally artifacts/workloads/eval/). Also writes a
+temporary eval.jsonl beside those WAVs; tools/fetch/get-eval-set.ps1 promotes
+the tracked manifest to src/workloads/eval/eval.jsonl.
+
+Audio paths recorded in the jsonl are repo-relative:
+    artifacts/workloads/eval/<id>.wav
 """
 import argparse
 import io
@@ -45,7 +48,7 @@ def load_audio(entry) -> tuple[np.ndarray, int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--outdir", required=True, help="src/workloads/eval directory")
+    ap.add_argument("--outdir", required=True, help="artifacts/workloads/eval directory")
     ap.add_argument("--count", type=int, default=20, help="max utterances")
     args = ap.parse_args()
 
@@ -78,7 +81,7 @@ def main() -> int:
             to_wav_int16(wav_path, samples, sr)
             rec = {
                 "id": cid,
-                "audio": f"src/workloads/eval/{cid}.wav",
+                "audio": f"artifacts/workloads/eval/{cid}.wav",
                 "ref": str(row["text"]).strip(),
                 "duration_s": round(len(samples) / sr, 2),
             }

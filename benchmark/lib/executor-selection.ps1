@@ -116,7 +116,7 @@ function Invoke-BenchmarkExecutorSelection {
     $outDir = Join-Path $Root "results\executor-selection"
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     $reportPath = Join-Path $outDir "$selectionId.json"
-    $workDir = Join-Path $Root "build\cache\executor-selection\$selectionId"
+    $workDir = Join-Path $Root "artifacts\build\cache\executor-selection\$selectionId"
     New-Item -ItemType Directory -Force -Path $workDir | Out-Null
 
     $requested = if ($Only -contains "all") { @("whisper", "tsc", "fakeaudio") } else { @($Only) }

@@ -22,9 +22,9 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $destination = if ($Destination) {
     $Destination
 } else {
-    Join-Path $root "third_party\onnxruntime-directml"
+    Join-Path $root "artifacts\third_party\onnxruntime-directml"
 }
-$work = Join-Path $root "build\downloads\onnxruntime-directml"
+$work = Join-Path $root "artifacts\build\downloads\onnxruntime-directml"
 $packageId = "microsoft.ml.onnxruntime.directml"
 $indexUrl = "https://api.nuget.org/v3-flatcontainer/$packageId/index.json"
 

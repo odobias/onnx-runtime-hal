@@ -1,5 +1,5 @@
 ﻿# Exports whisper-tiny(.en) to the STOCK optimum "with-past" ONNX (encoder +
-# decoder + decoder_with_past) into src/workloads/whisper/models/dynamic-onnx. This is the model
+# decoder + decoder_with_past) into artifacts/workloads/whisper/models/dynamic-onnx. This is the model
 # the onnx-dynamic backend runs: a real KV cache (encoder cross-attention K/V
 # computed once, decoder self-attention K/V grow per token), which is faster than
 # the static no-KV recompute on CPU/GPU but is NOT NPU-compilable (dynamic shapes).
@@ -29,7 +29,7 @@ if (Test-Path (Join-Path $outDir "decoder_with_past_model.onnx")) {
     return
 }
 
-$venv = Join-Path $root ".venv"
+$venv = Join-Path $root "artifacts/venv"
 $vpy = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path $vpy)) {
     $py = (Get-Command python -ErrorAction SilentlyContinue).Source
@@ -49,7 +49,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "Export FAILED." -ForegroundColor Red
     if ((& $vpy --version) -match "3\.1[4-9]") {
         Write-Host ("  Hint: on Python 3.14+, huggingface/optimum has a known descriptor bug. In " +
-            ".venv\Lib\site-packages\optimum\exporters\base.py, change " +
+            "artifacts/venv\Lib\site-packages\optimum\exporters\base.py, change " +
             "`"self.NORMALIZED_CONFIG_CLASS(self._config)`" to " +
             "`"type(self).NORMALIZED_CONFIG_CLASS(self._config)`". Or use Python <=3.13.") -ForegroundColor Yellow
     }

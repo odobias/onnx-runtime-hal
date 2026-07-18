@@ -1,50 +1,36 @@
-﻿# Build output (root only — do not swallow tools/build/*.ps1)
+﻿# Everything under artifacts/ is generated/local-only, except the folder contract.
+/artifacts/**
+!/artifacts/README.md
+!/artifacts/scratch/
+!/artifacts/scratch/.gitkeep
+
+# Legacy roots (pre-artifacts/ consolidation). Keep ignoring if present locally.
 /build/
 /dist/
+/third_party/
+/cache/
+/.venv/
+/.venv-ovep/
+/.venv-quark*/
+/models/
 bin/
 obj/
 
-# Downloaded / linked SDKs (large; fetched by tools/setup/)
-third_party/
-
-# Python virtual env (created by tools/fetch/get-whisper-model.ps1)
-.venv/
-.venv-ovep/
-.venv-quark*/
+# Python
 __pycache__/
 
-# Workload payloads (fetched/exported by tools; never committed)
-src/workloads/whisper/models/
-src/workloads/whisper/manifest*.json
-src/workloads/classifiers/tsc/
-src/workloads/classifiers/fakeaudio/
-src/workloads/classifiers/audio-samples/
-src/workloads/classifiers/fixtures/
-# Eval WAVs stay local/fetched; bake baselines into the tracked manifest.
-src/workloads/eval/*
-!src/workloads/eval/eval.jsonl
-src/workloads/audio/
-# Legacy/non-runtime cache only (do not use as suite asset root).
-# Classifier runtime lives under src/workloads/classifiers/.
-/models/
+# Workload binary noise if someone regenerates beside source trees
 *.wav
 *.blob
 *_openvino_model/
 *-ov/
-
-# Compiled-model cache
-cache/
 original-info-signature.txt
 original-model-signature.txt
 
-# Ephemeral research/sweep outputs (benchmark/research, tools/research).
-# Canonical CSV ledgers under results/ledgers/ remain tracked.
-/results/local/**
-!/results/local/.gitkeep
 # Rolling local state; completed runs publish results/run-attempts/<snapshot>.jsonl.
 results/ledgers/attempts.jsonl
 
-# Transient build/benchmark logs (e.g. build_ovep.log, bench_intel_whisper.log)
+# Transient build/benchmark logs
 *.log
 
 # Visual Studio

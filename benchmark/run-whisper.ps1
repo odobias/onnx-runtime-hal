@@ -38,18 +38,18 @@ Initialize-BenchmarkConsole
 $root = Split-Path $PSScriptRoot -Parent
 if (-not $Model) {
     switch ($Backend) {
-        "amd" { $Model = Join-Path $root "src\workloads\whisper\models\vendor\amd" }
-        "intel-onnx" { $Model = Join-Path $root "src\workloads\whisper\models\dynamic-onnx" }
-        "onnx-static" { $Model = Join-Path $root "src\workloads\whisper\models\static-onnx" }
-        "onnx-dynamic" { $Model = Join-Path $root "src\workloads\whisper\models\dynamic-onnx" }
-        "qualcomm" { $Model = Join-Path $root "src\workloads\whisper\models\static-onnx" }
-        default { $Model = Join-Path $root "src\workloads\whisper\models\ov-ir\fp16" }
+        "amd" { $Model = Join-Path $root "artifacts\workloads\whisper\models\vendor\amd" }
+        "intel-onnx" { $Model = Join-Path $root "artifacts\workloads\whisper\models\dynamic-onnx" }
+        "onnx-static" { $Model = Join-Path $root "artifacts\workloads\whisper\models\static-onnx" }
+        "onnx-dynamic" { $Model = Join-Path $root "artifacts\workloads\whisper\models\dynamic-onnx" }
+        "qualcomm" { $Model = Join-Path $root "artifacts\workloads\whisper\models\static-onnx" }
+        default { $Model = Join-Path $root "artifacts\workloads\whisper\models\ov-ir\fp16" }
     }
 }
-if (-not $Audio) { $Audio = Join-Path $root "src\workloads\audio\jfk.wav" }
+if (-not $Audio) { $Audio = Join-Path $root "artifacts\workloads\audio\jfk.wav" }
 if (-not $Results) { $Results = Join-Path $root "results\ledgers\asr.csv" }
 
-$exe = Join-Path $root "build\$Platform\$Configuration\NpuInferenceBench.exe"
+$exe = Join-Path $root "artifacts\build\$Platform\$Configuration\NpuInferenceBench.exe"
 if (-not (Test-Path $exe)) { Write-Host "Not built: $exe  (run .\tools\build\build.ps1 or bootstrap.ps1)" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Model)) { Write-Host "Model not found: $Model  (run .\tools\fetch\get-whisper-model.ps1)" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path $Audio)) { Write-Host "Audio not found: $Audio  (run .\tools\fetch\get-audio.ps1)" -ForegroundColor Red; exit 1 }
@@ -60,7 +60,7 @@ if (-not $NoCache) {
     # to incompatible blobs, so a shared cache dir would silently cross-contaminate.
     # Benchmark orchestrators may provide a more specific cache path and clear it
     # before this call to guarantee a real cold -> hot measurement pair.
-    if (-not $CacheDir) { $CacheDir = Join-Path $root "build\cache\$Backend\$Device" }
+    if (-not $CacheDir) { $CacheDir = Join-Path $root "artifacts\build\cache\$Backend\$Device" }
     $extraArgs += @("--cache", $CacheDir)
 }
 if ($Threads -gt 0) { $extraArgs += @("--threads", "$Threads") }

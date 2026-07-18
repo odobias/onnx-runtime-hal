@@ -17,7 +17,8 @@
     <OnnxRuntimeHalIncludeDir Condition="'$(OnnxRuntimeHalIncludeDir)'=='' and Exists('$(OnnxRuntimeHalRoot)include\onnx_runtime_hal.hpp')">$(OnnxRuntimeHalRoot)include\</OnnxRuntimeHalIncludeDir>
     <OnnxRuntimeHalIncludeDir Condition="'$(OnnxRuntimeHalIncludeDir)'==''">$(OnnxRuntimeHalRoot)src\runner\include\</OnnxRuntimeHalIncludeDir>
     <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'=='' and Exists('$(OnnxRuntimeHalRoot)lib\OnnxRuntimeHal.lib')">$(OnnxRuntimeHalRoot)lib\</OnnxRuntimeHalLibDir>
-    <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'==''">$(OnnxRuntimeHalRoot)build\$(PlatformOutTag)\$(Configuration)\</OnnxRuntimeHalLibDir>
+    <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'=='' and '$(ArtifactsRoot)'!=''">$(ArtifactsRoot)build\$(PlatformOutTag)\$(Configuration)\</OnnxRuntimeHalLibDir>
+    <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'==''">$(OnnxRuntimeHalRoot)artifacts\build\$(PlatformOutTag)\$(Configuration)\</OnnxRuntimeHalLibDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>

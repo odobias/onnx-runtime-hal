@@ -22,7 +22,7 @@ Emits into models/whisper-tiny-en-statickv/:
   crosskv_init.onnx, decoder_step.onnx   (encoder reused from the static-onnx pkg)
 Then runs a CPU (ORT) greedy decode on jfk.wav and prints transcription + WER.
 
-  .venv\\Scripts\\python.exe scripts\\experiments\\export_static_kv.py
+  artifacts/venv\\Scripts\\python.exe scripts\\experiments\\export_static_kv.py
 """
 import json
 import os

@@ -3,7 +3,7 @@
      ORT distribution/output tree from the bundled QNN, DirectML and OVEP builds. -->
 <Project>
   <PropertyGroup>
-    <WinMLDir Condition="'$(WinMLDir)'==''">$(NpuInferenceBenchRoot)third_party\windows-ml</WinMLDir>
+    <WinMLDir Condition="'$(WinMLDir)'==''">$(NpuInferenceBenchRoot)artifacts\third_party\windows-ml</WinMLDir>
     <OrtInclude>$(WinMLDir)\include</OrtInclude>
     <OrtLibDir>$(WinMLDir)\lib\$(Platform)</OrtLibDir>
     <OrtBinDir>$(WinMLDir)\bin\$(Platform)</OrtBinDir>

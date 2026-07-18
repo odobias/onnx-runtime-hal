@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Builds OnnxRuntimeHal.lib for one ORT flavor and copies the public C++ headers,
-  import lib, and MSBuild props into dist/onnx-runtime-hal-<arch>-<flavor>/.
+  import lib, and MSBuild props into artifacts/dist/onnx-runtime-hal-<arch>-<flavor>/.
 
   Consumers include <onnx_runtime_hal.hpp>, import the flavor props + 
   OnnxRuntimeHal.props, and link with the same MSVC toolset /MD CRT.
@@ -43,7 +43,7 @@ $platformTag = switch ($Flavor) {
 }
 
 if (-not $Output) {
-    $Output = Join-Path $root "dist\onnx-runtime-hal-$Architecture-$Flavor"
+    $Output = Join-Path $root "artifacts\dist\onnx-runtime-hal-$Architecture-$Flavor"
 }
 $Output = [IO.Path]::GetFullPath($Output)
 
@@ -86,7 +86,7 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw "OnnxRuntimeHal build failed" }
 }
 
-$libPath = Join-Path $root "build\$platformTag\$Configuration\OnnxRuntimeHal.lib"
+$libPath = Join-Path $root "artifacts\build\$platformTag\$Configuration\OnnxRuntimeHal.lib"
 if (-not (Test-Path -LiteralPath $libPath)) {
     throw "Missing library: $libPath (build the matching flavor first)"
 }

@@ -28,7 +28,7 @@ param(
     [string[]]$Variant = @(),
     [string]$Configuration = "Release",
     [ValidateSet("x64", "ARM64")][string]$BuildPlatform = "",
-    # Skip the self-contained bootstrap (build + fetch src/workloads/eval/audio). Use when
+    # Skip the self-contained bootstrap (build + fetch artifacts/workloads/eval/audio). Use when
     # you have already prepared the environment and want the sweep to start faster.
     [switch]$SkipBootstrap,
     # Reuse any persisted compiled-model cache under cache/<variant>-<device> instead
@@ -48,19 +48,19 @@ $PSNativeCommandUseErrorActionPreference = $false
 Initialize-BenchmarkConsole
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-if (-not $Manifest) { $Manifest = Join-Path $root "src\workloads\whisper\manifest.research.json" }
+if (-not $Manifest) { $Manifest = Join-Path $root "artifacts\workloads\whisper\manifest.research.json" }
 if (-not $EvalSet) { $EvalSet = Join-Path $root "src\workloads\eval\eval.jsonl" }
 if (-not $BuildPlatform) {
     $BuildPlatform = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq "Arm64") { "ARM64" } else { "x64" }
 }
-$exe = Join-Path $root "build\$BuildPlatform\$Configuration\NpuInferenceBench.exe"
+$exe = Join-Path $root "artifacts\build\$BuildPlatform\$Configuration\NpuInferenceBench.exe"
 
 # Detect the host once, up front: bootstrap needs it to pick build flags + models,
 # and the sweep reuses it for the vendor filter and the hardware banner.
 $platform = Get-BenchmarkPlatform
 
 # Self-contained bootstrap: build the app for this host's backends and fetch any
-# missing src/workloads/eval/audio so the benchmark runs from a fresh checkout. Idempotent
+# missing artifacts/workloads/eval/audio so the benchmark runs from a fresh checkout. Idempotent
 # (present artifacts are skipped) and opt-out via -SkipBootstrap.
 if (-not $SkipBootstrap) {
     Initialize-BenchmarkEnvironment -Root $root -Exe $exe -Manifest $Manifest -EvalSet $EvalSet `
@@ -84,10 +84,10 @@ if ($MaxClips -gt 0 -and $clips.Count -gt $MaxClips) { $clips = $clips[0..($MaxC
 Write-Host ("Manifest: {0} variant(s) | Eval: {1} clip(s) | Runs: {2}" -f `
         $manifestObj.variants.Count, $clips.Count, $Runs) -ForegroundColor Cyan
 
-$reportsDir = Join-Path $root "results\local"
+$reportsDir = Join-Path $root "artifacts\scratch"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 if (-not $Results) { $Results = Join-Path $reportsDir "benchmark-results.csv" }
-$cacheRoot = Join-Path $root "cache"
+$cacheRoot = Join-Path $root "artifacts\cache"
 
 # Autodetect the host NPU vendor (one brand per machine) and skip variants that
 # target a different vendor's NPU. -NpuVendor all disables the filter; -NpuVendor
@@ -285,7 +285,7 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("")
 foreach ($line in (Get-BenchmarkHardwareMarkdown $hardware)) { [void]$md.AppendLine($line) }
 [void]$md.AppendLine("")
-[void]$md.AppendLine("_Full machine-readable inventory: ``results/local/host-info.json``._")
+[void]$md.AppendLine("_Full machine-readable inventory: ``artifacts/scratch/host-info.json``._")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("| Variant | Prec | Backend | Device | Status | Size MB | Cold s | Hot s | Mean ms | xRT | tok/s | Conf | WER % | CER % |")
 [void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")

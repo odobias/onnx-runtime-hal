@@ -1,12 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- Qualcomm backend: ONNX Runtime 1.24+ Plugin QNN EP (Snapdragon Hexagon).
-     setup-qualcomm.ps1 stages third_party/onnxruntime + third_party/qnn-ep. -->
+     setup-qualcomm.ps1 stages artifacts/third_party/onnxruntime + artifacts/third_party/qnn-ep. -->
 <Project>
   <PropertyGroup>
     <OrtDir Condition="'$(OrtDir)'=='' and '$(ORT_DIR)'!=''">$(ORT_DIR)</OrtDir>
-    <OrtDir Condition="'$(OrtDir)'==''">$(NpuInferenceBenchRoot)third_party\onnxruntime</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'==''">$(NpuInferenceBenchRoot)artifacts\third_party\onnxruntime</OrtDir>
     <QnnEpDir Condition="'$(QnnEpDir)'=='' and '$(QNN_EP_DIR)'!=''">$(QNN_EP_DIR)</QnnEpDir>
-    <QnnEpDir Condition="'$(QnnEpDir)'==''">$(NpuInferenceBenchRoot)third_party\qnn-ep</QnnEpDir>
+    <QnnEpDir Condition="'$(QnnEpDir)'==''">$(NpuInferenceBenchRoot)artifacts\third_party\qnn-ep</QnnEpDir>
     <OrtInclude Condition="'$(OrtInclude)'==''">$(OrtDir)\include</OrtInclude>
     <OrtLibDir Condition="'$(OrtLibDir)'==''">$(OrtDir)\lib</OrtLibDir>
     <OrtBinDir Condition="'$(OrtBinDir)'==''">$(OrtDir)\bin</OrtBinDir>

@@ -1,7 +1,7 @@
 ﻿# Benchmark library module. Dot-source benchmark/lib/harness.ps1 instead of loading this directly.
 
 function Get-BenchmarkOvepExe([string]$Root, [string]$Configuration = "Release") {
-    return (Join-Path $Root "build\x64-ovep\$Configuration\NpuInferenceBench.exe")
+    return (Join-Path $Root "artifacts\build\x64-ovep\$Configuration\NpuInferenceBench.exe")
 }
 
 # Choose the exe to run a variant with. On an Intel host the neutral self-selecting
@@ -52,7 +52,7 @@ function Add-BenchmarkUnifiedAutoVariant {
         [Parameter(Mandatory)] [string]$Manifest,
         [Parameter(Mandatory)] [string]$Models
     )
-    $modelRel = "src/workloads/whisper/models/static-onnx"
+    $modelRel = "artifacts/workloads/whisper/models/static-onnx"
     $modelDir = Join-Path $Models "whisper\en-static-onnx"
     if (-not (Test-Path $Manifest) -or -not (Test-Path $modelDir)) { return $false }
 
@@ -75,7 +75,7 @@ function Add-BenchmarkUnifiedAutoVariant {
 }
 
 # Ensure everything a sweep needs exists, building the app and fetching
-# src/workloads/eval/audio on demand so `benchmark-quant.ps1` works from a fresh checkout.
+# artifacts/workloads/eval/audio on demand so `benchmark-quant.ps1` works from a fresh checkout.
 # Idempotent: every step is skipped when its output is already present. This
 # assumes the toolchain + vendor SDK are installed (that is bootstrap.ps1's job);
 # if the build can't run it says exactly that. Model fetches for the neutral
@@ -124,7 +124,7 @@ function Initialize-BenchmarkEnvironment {
         $ovepExe = Get-BenchmarkOvepExe $Root $Configuration
         if (-not (Test-Path $ovepExe)) {
             try {
-                $ortLib = Join-Path $Root "third_party\onnxruntime-openvino\lib\onnxruntime.lib"
+                $ortLib = Join-Path $Root "artifacts\third_party\onnxruntime-openvino\lib\onnxruntime.lib"
                 if (-not (Test-Path $ortLib)) {
                     Write-Host "  - assemble ORT + OpenVINO EP distro (setup-ovep.ps1)" -ForegroundColor DarkCyan
                     Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "setup-ovep.ps1") | Out-Null

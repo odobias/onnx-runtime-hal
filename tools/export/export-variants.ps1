@@ -29,7 +29,7 @@ New-Item -ItemType Directory -Force -Path $variants | Out-Null
 $manifestPath = Join-Path $models "manifest.json"
 
 # Resolve venv python (shared with get-model.ps1).
-$venv = Join-Path $root ".venv"
+$venv = Join-Path $root "artifacts/venv"
 $vpy = Join-Path $venv "Scripts\python.exe"
 if (-not (Test-Path $vpy)) {
     $py = (Get-Command python -ErrorAction SilentlyContinue).Source
@@ -71,7 +71,7 @@ foreach ($fmt in $Formats) {
             if ((& $vpy --version) -match "3\.1[4-9]") {
                 Write-Host ("  Hint: on Python 3.14+, huggingface/optimum has a known bug (`"NormalizedConfig." + `
                         "__init__() got multiple values for argument 'allow_new'`", huggingface/optimum#2409, " + `
-                        "abandoned/never merged). Workaround: in .venv\Lib\site-packages\optimum\exporters\base.py, " + `
+                        "abandoned/never merged). Workaround: in artifacts/venv\Lib\site-packages\optimum\exporters\base.py, " + `
                         "change `"self.NORMALIZED_CONFIG_CLASS(self._config)`" to " + `
                         "`"self.__class__.NORMALIZED_CONFIG_CLASS(self._config)`". Or use Python <=3.13.") -ForegroundColor Yellow
             }
@@ -85,7 +85,7 @@ foreach ($fmt in $Formats) {
         backend    = "intel"
         precision  = $fmt
         method     = $methodOf[$fmt]
-        model_dir  = "src/workloads/whisper/models/ov-ir/$fmt"   # repo-relative for portability
+        model_dir  = "artifacts/workloads/whisper/models/ov-ir/$fmt"   # repo-relative for portability
         devices    = $Devices
         size_mb    = $sizeMb
     }

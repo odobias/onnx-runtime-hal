@@ -35,7 +35,7 @@ classifiers can now be replayed through the C++ app to get true on-NPU numbers,
 without re-implementing the (non-trivial, already-validated) preprocessing in C++:
 
 1. `dump_fixtures.py` snapshots the validators' exact feeds **and** the CPU
-   reference probability to `src\workloads\classifiers\fixtures\<model>\` (gitignored):
+   reference probability to `artifacts\workloads\classifiers\fixtures\<model>\` (gitignored):
    `model.tsv` / `samples.tsv` / `inputs.tsv` + raw `data\*.bin` tensors.
 2. `NpuInferenceBench.App --classify <fixture_dir> [device] [runs]` loads those
    tensors, builds an ORT session on the requested EP (NPU→GPU→CPU fallback, or
@@ -47,15 +47,15 @@ without re-implementing the (non-trivial, already-validated) preprocessing in C+
 
 ```powershell
 # Build the ORT flavour of the app (also fetches the C++ ORT SDK if missing):
-.\tools\setup\get-ort-sdk.ps1                       # DirectML SDK -> third_party\onnxruntime
+.\tools\setup\get-ort-sdk.ps1                       # DirectML SDK -> artifacts\third_party\onnxruntime
 .\tools\build\build.ps1 -EnableOrt -DisableIntel
 
 # Snapshot fixtures once (needs the Python venv + models), then replay in C++:
-.venv\Scripts\python.exe tools\fixtures\generate.py
+artifacts/venv\Scripts\python.exe tools\fixtures\generate.py
 $exe = "build\x64\Release\NpuInferenceBench.exe"
-& $exe --classify src\workloads\classifiers\fixtures\tsc       cpu 20 --results results\ledgers\classifiers.csv
-& $exe --classify src\workloads\classifiers\fixtures\tsc       gpu 20 --results results\ledgers\classifiers.csv
-& $exe --classify src\workloads\classifiers\fixtures\fakeaudio npu 20 --provider VitisAIExecutionProvider --results results\ledgers\classifiers.csv
+& $exe --classify artifacts\workloads\classifiers\fixtures\tsc       cpu 20 --results results\ledgers\classifiers.csv
+& $exe --classify artifacts\workloads\classifiers\fixtures\tsc       gpu 20 --results results\ledgers\classifiers.csv
+& $exe --classify artifacts\workloads\classifiers\fixtures\fakeaudio npu 20 --provider VitisAIExecutionProvider --results results\ledgers\classifiers.csv
 ```
 
 Measured on this x64 box (CPU + DirectML GPU), matching the Python results
@@ -79,13 +79,13 @@ build. fp32 graphs also need vendor quantization/compile to actually land on an 
 
 ```powershell
 # from repo root, with the project venv
-.venv\Scripts\python.exe -m pip install -r tools\research\requirements.txt
-.venv\Scripts\python.exe -m pip install onnxruntime-directml
-.venv\Scripts\python.exe tools\research\benchmark_deepfake_onnx.py
+artifacts/venv\Scripts\python.exe -m pip install -r tools\research\requirements.txt
+artifacts/venv\Scripts\python.exe -m pip install onnxruntime-directml
+artifacts/venv\Scripts\python.exe tools\research\benchmark_deepfake_onnx.py
 ```
 
 Models come from `tools\fetch\get-classifier-models.ps1` (gitignored under
-`src\workloads\classifiers\`). The FakeAudio sample clips are gitignored too; if they're
+`artifacts\workloads\classifiers\`). The FakeAudio sample clips are gitignored too; if they're
 absent that model falls back to synthetic latency-only and reports blank
 accuracy.
 

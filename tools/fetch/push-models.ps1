@@ -29,7 +29,7 @@ $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 
 $hf = (Get-Command hf -ErrorAction SilentlyContinue).Source
 if (-not $hf) {
-    $venvHf = Join-Path $root ".venv\Scripts\hf.exe"
+    $venvHf = Join-Path $root "artifacts/venv\Scripts\hf.exe"
     if (Test-Path $venvHf) { $hf = $venvHf }
 }
 if (-not $hf) { Write-Host "hf CLI not found. Install with: pip install -U 'huggingface_hub[cli]'" -ForegroundColor Red; exit 1 }

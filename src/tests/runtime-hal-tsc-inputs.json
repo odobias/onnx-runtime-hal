@@ -4,13 +4,13 @@
       "name": "input_ids",
       "dtype": "int64",
       "shape": [1, 512],
-      "file": "../src/workloads/classifiers/fixtures/tsc/data/scam_0__input_ids.bin"
+      "file": "../../artifacts/workloads/classifiers/fixtures/tsc/data/scam_0__input_ids.bin"
     },
     {
       "name": "attention_mask",
       "dtype": "int64",
       "shape": [1, 512],
-      "file": "../src/workloads/classifiers/fixtures/tsc/data/scam_0__attention_mask.bin"
+      "file": "../../artifacts/workloads/classifiers/fixtures/tsc/data/scam_0__attention_mask.bin"
     }
   ],
   "outputs": ["output"]

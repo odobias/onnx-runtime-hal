@@ -15,8 +15,8 @@ Two independent views, because "on the NPU" means different things per runtime:
      real per-node provider, listing every op that executed on CPUExecutionProvider.
 
 Run with the OVEP venv:
-    .venv-ovep\\Scripts\\python.exe scripts\\experiments\\research_npu_cpu_offload.py
-(Native-only query still works in the plain .venv.)
+    artifacts/venv-ovep\\Scripts\\python.exe scripts\\experiments\\research_npu_cpu_offload.py
+(Native-only query still works in the plain artifacts/venv.)
 """
 import collections
 import glob
@@ -32,7 +32,7 @@ import onnxruntime as ort
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 # NB: validate_tsc / validate_fakeaudio pull in tokenizers + librosa, which live in
-# .venv but NOT .venv-ovep. Import them lazily so the OVEP profiling path (cached
+# artifacts/venv but NOT artifacts/venv-ovep. Import them lazily so the OVEP profiling path (cached
 # feeds only) runs without those deps.
 
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -151,7 +151,7 @@ FEED_CACHE = os.path.join(tempfile.gettempdir(), "npu_offload_feeds.npz")
 
 
 def build_feeds_and_cache():
-    """(.venv) build real feeds with the full ML stack and cache them so the OVEP
+    """(artifacts/venv) build real feeds with the full ML stack and cache them so the OVEP
     venv -- which lacks tokenizers/librosa -- can reload them for ORT profiling."""
     import validate_tsc_onnx as tsc
     import validate_fakeaudio_onnx as fa
@@ -188,7 +188,7 @@ def main():
 
     if has_ovep:
         if not os.path.exists(FEED_CACHE):
-            print(f"no feed cache at {FEED_CACHE}; run this first in .venv to build it.")
+            print(f"no feed cache at {FEED_CACHE}; run this first in artifacts/venv to build it.")
             return 1
         tsc_feed, bb_feed = load_cached_feeds()
     else:
@@ -196,16 +196,16 @@ def main():
 
     bb_in = next(iter(bb_feed))
 
-    # A. native query (best in .venv / OpenVINO 2026.2.1; also runs under OVEP's 2025.4.1)
+    # A. native query (best in artifacts/venv / OpenVINO 2026.2.1; also runs under OVEP's 2025.4.1)
     query_native("tsc (full)", TSC, {k: list(v.shape) for k, v in tsc_feed.items()})
     query_native("fakeaudio backbone (surgered)", FA_BB_NPU, {bb_in: list(bb_feed[bb_in].shape)})
 
-    # B. ORT OpenVINO-EP profiling (only where the EP exists, i.e. .venv-ovep)
+    # B. ORT OpenVINO-EP profiling (only where the EP exists, i.e. artifacts/venv-ovep)
     if has_ovep:
         profile_providers("tsc", TSC, tsc_feed)
         profile_providers("fakeaudio-backbone", FA_BB_NPU, bb_feed)
     else:
-        print("\n[B] OpenVINO EP not in this venv -> re-run with .venv-ovep for the ORT profile.")
+        print("\n[B] OpenVINO EP not in this venv -> re-run with artifacts/venv-ovep for the ORT profile.")
     return 0
 
 

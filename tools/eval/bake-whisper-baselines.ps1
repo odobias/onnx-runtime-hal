@@ -40,12 +40,12 @@ $platform = switch ($Runtime) {
         }
     }
 }
-$exe = Join-Path $root "build\$platform\Release\NpuInferenceBench.exe"
+$exe = Join-Path $root "artifacts\build\$platform\Release\NpuInferenceBench.exe"
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "Benchmark executable missing: $exe"
 }
 
-$modelDir = Join-Path $root "src\workloads\whisper\models\static-onnx"
+$modelDir = Join-Path $root "artifacts\workloads\whisper\models\static-onnx"
 if (-not (Test-Path -LiteralPath (Join-Path $modelDir "encoder_model.onnx"))) {
     throw "Whisper static model missing: $modelDir"
 }
@@ -58,7 +58,7 @@ if (-not $evalRows.Count) { throw "eval.jsonl is empty" }
 $clipSpecs = foreach ($eval in $evalRows) {
     $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
     if (-not (Test-Path -LiteralPath $clipPath)) {
-        $clipPath = Join-Path $root "src\workloads\eval\$($eval.id).wav"
+        $clipPath = Join-Path $root "artifacts\workloads\eval\$($eval.id).wav"
     }
     if (-not (Test-Path -LiteralPath $clipPath)) {
         throw "Eval audio missing for $($eval.id)"
@@ -70,7 +70,7 @@ $clipSpecs = foreach ($eval in $evalRows) {
     }
 }
 
-$cache = Join-Path $root "build\cache\baseline-bake\$platform\$Device"
+$cache = Join-Path $root "artifacts\build\cache\baseline-bake\$platform\$Device"
 New-Item -ItemType Directory -Force -Path $cache | Out-Null
 $jsonOutput = Join-Path $cache "batch-result.json"
 Remove-Item -LiteralPath $jsonOutput -Force -ErrorAction SilentlyContinue
@@ -111,7 +111,7 @@ $source = [ordered]@{
             [string]$native.payload.clips[0].device
         } else { "" }
     )
-    model = "src/workloads/whisper/models/static-onnx"
+    model = "artifacts/workloads/whisper/models/static-onnx"
     baked_at_utc = [DateTime]::UtcNow.ToString("o")
     contract = "whisper-eval-v1"
 }
@@ -120,7 +120,7 @@ $updated = foreach ($eval in $evalRows) {
     $id = [string]$eval.id
     $clip = $byId[$id]
     if (-not $clip) { throw "Bake result missing clip '$id'" }
-    $audioRel = "src/workloads/eval/$id.wav"
+    $audioRel = "artifacts/workloads/eval/$id.wav"
     if (-not (Test-Path -LiteralPath (Join-Path $root ($audioRel -replace '/', '\')))) {
         $audioRel = [string]$eval.audio
     }
