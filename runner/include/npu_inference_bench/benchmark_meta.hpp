@@ -45,10 +45,10 @@ inline std::string infer_precision(const std::string& package) {
     std::string p = package;
     std::transform(p.begin(), p.end(), p.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (p.find("int4") != std::string::npos) return "int4";
-    if (p.find("int8") != std::string::npos) return "int8";
-    if (p.find("fp16") != std::string::npos || p.find("-f16") != std::string::npos) return "fp16";
-    if (p.find("fp32-static") != std::string::npos || p.find("static") != std::string::npos)
+    if (p.contains("int4")) return "int4";
+    if (p.contains("int8")) return "int8";
+    if (p.contains("fp16") || p.contains("-f16")) return "fp16";
+    if (p.contains("fp32-static") || p.contains("static"))
         return "fp32-static";
     return "fp32";
 }
@@ -141,9 +141,9 @@ inline Row resolve(const std::string& model_dir,
     }();
 
     if (out.model_format.empty()) {
-        if (backend_lc.find("openvino genai") != std::string::npos ||
-            out.model_package.find("-ov-") != std::string::npos ||
-            out.model_package.find("en-ov") != std::string::npos) {
+        if (backend_lc.contains("openvino genai") ||
+            out.model_package.contains("-ov-") ||
+            out.model_package.contains("en-ov")) {
             out.model_format = "ov-ir";
         } else {
             out.model_format = "onnx";
@@ -155,12 +155,12 @@ inline Row resolve(const std::string& model_dir,
     }
 
     if (out.runtime.empty() || out.runtime == engine.backend_name()) {
-        if (backend_lc.find("qnn") != std::string::npos) out.runtime = "onnxruntime-qnn";
-        else if (backend_lc.find("vitisai") != std::string::npos || backend_lc.find("ryzen") != std::string::npos)
+        if (backend_lc.contains("qnn")) out.runtime = "onnxruntime-qnn";
+        else if (backend_lc.contains("vitisai") || backend_lc.contains("ryzen"))
             out.runtime = "onnxruntime-vitisai";
-        else if (backend_lc.find("openvino genai") != std::string::npos) out.runtime = "openvino-genai";
-        else if (backend_lc.find("openvino") != std::string::npos) out.runtime = "openvino";
-        else if (backend_lc.find("onnx runtime") != std::string::npos) out.runtime = "onnxruntime";
+        else if (backend_lc.contains("openvino genai")) out.runtime = "openvino-genai";
+        else if (backend_lc.contains("openvino")) out.runtime = "openvino";
+        else if (backend_lc.contains("onnx runtime")) out.runtime = "onnxruntime";
     }
 
     return out;

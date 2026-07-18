@@ -5,8 +5,7 @@
 
 #include "npu_inference_bench/runtime/device.hpp"
 
-namespace npu_inference_bench {
-namespace runtime {
+namespace npu_inference_bench::runtime {
 
 struct ProviderAttempt {
     std::string provider;
@@ -32,7 +31,9 @@ struct ExecutionDiagnostics {
     std::string operation_assignment_source;
 };
 
-}  // namespace runtime
+}  // namespace npu_inference_bench::runtime
+
+namespace npu_inference_bench {
 
 // Compatibility aliases for existing workload / benchmark code.
 using runtime::ExecutionDiagnostics;

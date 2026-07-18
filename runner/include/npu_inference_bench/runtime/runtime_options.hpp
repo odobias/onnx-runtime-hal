@@ -5,8 +5,7 @@
 
 #include "npu_inference_bench/runtime/device.hpp"
 
-namespace npu_inference_bench {
-namespace runtime {
+namespace npu_inference_bench::runtime {
 
 struct RuntimeOptions {
     Device device = Device::NPU;
@@ -37,5 +36,4 @@ struct RuntimeOptions {
     bool profile_execution = true;
 };
 
-}  // namespace runtime
-}  // namespace npu_inference_bench
+}  // namespace npu_inference_bench::runtime

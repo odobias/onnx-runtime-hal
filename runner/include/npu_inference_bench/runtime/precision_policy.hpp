@@ -6,13 +6,12 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <format>
 #include <string>
 
-namespace npu_inference_bench {
-namespace runtime {
-namespace precision_policy {
+namespace npu_inference_bench::runtime::precision_policy {
 
-inline std::string lower(std::string value) {
+[[nodiscard]] inline std::string lower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
@@ -20,7 +19,7 @@ inline std::string lower(std::string value) {
 
 // Resolve the provider-neutral precision policy string.
 // Env fallback: NPU_INFERENCE_BENCH_PRECISION (legacy name kept for existing runs).
-inline std::string resolve(const RuntimeOptions& options, Device default_device) {
+[[nodiscard]] inline std::string resolve(const RuntimeOptions& options, Device default_device) {
     std::string precision = options.precision_policy;
     if (precision.empty()) {
         const char* environment = std::getenv("NPU_INFERENCE_BENCH_PRECISION");
@@ -37,23 +36,20 @@ inline std::string resolve(const RuntimeOptions& options, Device default_device)
         precision != "f16" && precision != "bf16") {
         throw RuntimeError(
             RuntimeErrorCode::InvalidArgument,
-            "unsupported inference precision policy: " + precision +
-            " (expected f32, f16, bf16, or preferred)");
+            std::format(
+                "unsupported inference precision policy: {} (expected f32, f16, bf16, or preferred)",
+                precision));
     }
     return precision;
 }
 
-inline std::string resolve(const RuntimeOptions& options) {
+[[nodiscard]] inline std::string resolve(const RuntimeOptions& options) {
     return resolve(options, options.device);
 }
 
-}  // namespace precision_policy
-}  // namespace runtime
+}  // namespace npu_inference_bench::runtime::precision_policy
 
-// Compatibility: historical includes used npu_inference_bench::precision_policy.
-namespace precision_policy {
+namespace npu_inference_bench::precision_policy {
 using runtime::precision_policy::lower;
 using runtime::precision_policy::resolve;
-}  // namespace precision_policy
-
-}  // namespace npu_inference_bench
+}  // namespace npu_inference_bench::precision_policy

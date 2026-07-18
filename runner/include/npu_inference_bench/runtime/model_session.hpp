@@ -9,8 +9,7 @@
 #include "npu_inference_bench/runtime/runtime_options.hpp"
 #include "npu_inference_bench/runtime/tensor.hpp"
 
-namespace npu_inference_bench {
-namespace runtime {
+namespace npu_inference_bench::runtime {
 
 namespace detail {
 class OrtSessionAccess;
@@ -31,23 +30,23 @@ public:
     ModelSession(const ModelSession&) = delete;
     ModelSession& operator=(const ModelSession&) = delete;
 
-    const std::vector<TensorDescriptor>& inputs() const;
-    const std::vector<TensorDescriptor>& outputs() const;
-    std::vector<Tensor> run(const std::vector<TensorView>& inputs,
-                            const std::vector<std::string>& output_names = {});
+    [[nodiscard]] const std::vector<TensorDescriptor>& inputs() const;
+    [[nodiscard]] const std::vector<TensorDescriptor>& outputs() const;
+    [[nodiscard]] std::vector<Tensor> run(const std::vector<TensorView>& inputs,
+                                          const std::vector<std::string>& output_names = {});
 
-    const ExecutionDiagnostics& diagnostics() const;
+    [[nodiscard]] const ExecutionDiagnostics& diagnostics() const;
     void finalize_profiling();
-    const std::string& runtime_name() const;
-    const std::string& runtime_version() const;
-    double load_seconds() const;
+    [[nodiscard]] const std::string& runtime_name() const;
+    [[nodiscard]] const std::string& runtime_version() const;
+    [[nodiscard]] double load_seconds() const;
 
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 
     explicit ModelSession(std::unique_ptr<Impl> impl);
-    void* native_handle() noexcept;
+    [[nodiscard]] void* native_handle() noexcept;
 
     friend class RuntimeContext;
     friend class detail::OrtSessionAccess;
@@ -61,5 +60,4 @@ struct LoadedModelSet {
     void finalize_profiling();
 };
 
-}  // namespace runtime
-}  // namespace npu_inference_bench
+}  // namespace npu_inference_bench::runtime

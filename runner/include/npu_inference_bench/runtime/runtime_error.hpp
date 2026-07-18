@@ -4,8 +4,7 @@
 #include <string>
 #include <utility>
 
-namespace npu_inference_bench {
-namespace runtime {
+namespace npu_inference_bench::runtime {
 
 enum class RuntimeErrorCode {
     InvalidArgument,
@@ -22,13 +21,12 @@ public:
     RuntimeError(RuntimeErrorCode code, std::string message, std::string provider = {})
         : std::runtime_error(std::move(message)), code_(code), provider_(std::move(provider)) {}
 
-    RuntimeErrorCode code() const noexcept { return code_; }
-    const std::string& provider() const noexcept { return provider_; }
+    [[nodiscard]] RuntimeErrorCode code() const noexcept { return code_; }
+    [[nodiscard]] const std::string& provider() const noexcept { return provider_; }
 
 private:
     RuntimeErrorCode code_;
     std::string provider_;
 };
 
-}  // namespace runtime
-}  // namespace npu_inference_bench
+}  // namespace npu_inference_bench::runtime

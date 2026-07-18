@@ -1,12 +1,14 @@
 ﻿# Reusable ONNX Runtime HAL
 
-`OnnxRuntimeHal` is a Windows-first **C++17 static library** for loading and
+`OnnxRuntimeHal` is a Windows-first **C++23 static library** for loading and
 running arbitrary ONNX models through this repository's CPU, DirectML,
 OpenVINO, VitisAI, QNN, and Windows ML execution-provider policies.
 
 It is a normal C++ ABI library for the **same MSVC toolset and CRT** (`/MD` or
-`/MDd`) that built the `.lib`. There is no C wrapper and no ABI stability claim
-across compiler versions — link it like any other internal static library.
+`/MDd`) that built the `.lib`. Build with VS 2022 / MSVC 19.4x+ using
+`LanguageStandard=stdcpp23` (maps to `/std:c++23preview`). There is no C
+wrapper and no ABI stability claim across compiler versions — link it like any
+other internal static library.
 
 The library owns:
 

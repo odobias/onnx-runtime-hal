@@ -21,7 +21,7 @@ an internal workload adapter rather than the product architecture.
 
 ## Reusable ONNX runtime
 
-The benchmark consumes a workload-neutral `OnnxRuntimeHal` **C++17 static
+The benchmark consumes a workload-neutral `OnnxRuntimeHal` **C++23 static
 library** (same-compiler ABI — include `onnx_runtime_hal.hpp`, link
 `OnnxRuntimeHal.lib`). It exposes logical CPU/GPU/NPU selection, explicit
 providers, strict requested-device enforcement, vendor caching, named tensor
@@ -190,7 +190,8 @@ build/ dist/ third_party/    local artifacts only (gitignored)
 
 ## Build
 
-The project targets Windows x64 and ARM64 using C++17 and MSBuild.
+The project targets Windows x64 and ARM64 using C++23 (`/std:c++23preview` via
+MSBuild `stdcpp23`) and MSBuild with VS 2022 (MSVC 19.4x+).
 
 ```powershell
 # Dependency-free build; all runtime backends are stubs.

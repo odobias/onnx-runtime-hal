@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Public build contract for consumers of the Windows-first C++ OnnxRuntimeHal.
-     Same compiler / CRT (/MD) / C++17 as the library build. No C API.
+     Same compiler / CRT (/MD) / C++23 as the library build. No C API.
 
      Usage (repo checkout):
        Import matching backend.*.props, then this file.
@@ -22,7 +22,8 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(OnnxRuntimeHalIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard Condition="'$(LanguageStandard)'==''">stdcpp17</LanguageStandard>
+      <LanguageStandard Condition="'$(LanguageStandard)'==''">stdcpp23</LanguageStandard>
+      <ConformanceMode Condition="'$(ConformanceMode)'==''">true</ConformanceMode>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(OnnxRuntimeHalLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

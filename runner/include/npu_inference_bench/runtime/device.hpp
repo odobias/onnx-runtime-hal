@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include <utility>
 
 namespace npu_inference_bench {
 
@@ -11,13 +11,14 @@ enum class Device {
     CPU,
 };
 
-inline const char* to_string(Device device) {
+[[nodiscard]] inline const char* to_string(Device device) {
+    using enum Device;
     switch (device) {
-        case Device::NPU: return "NPU";
-        case Device::GPU: return "GPU";
-        case Device::CPU:
-        default:          return "CPU";
+        case NPU: return "NPU";
+        case GPU: return "GPU";
+        case CPU: return "CPU";
     }
+    std::unreachable();
 }
 
 namespace runtime {
@@ -32,23 +33,25 @@ enum class ResolvedDevice {
     CPU,
 };
 
-inline const char* to_string(ResolvedDevice device) {
+[[nodiscard]] inline const char* to_string(ResolvedDevice device) {
+    using enum ResolvedDevice;
     switch (device) {
-        case ResolvedDevice::NPU: return "NPU";
-        case ResolvedDevice::GPU: return "GPU";
-        case ResolvedDevice::CPU: return "CPU";
-        case ResolvedDevice::Unknown:
-        default:                  return "Unknown";
+        case NPU: return "NPU";
+        case GPU: return "GPU";
+        case CPU: return "CPU";
+        case Unknown: return "Unknown";
     }
+    std::unreachable();
 }
 
-inline ResolvedDevice requested_device_class(Device device) {
+[[nodiscard]] inline ResolvedDevice requested_device_class(Device device) {
+    using enum Device;
     switch (device) {
-        case Device::NPU: return ResolvedDevice::NPU;
-        case Device::GPU: return ResolvedDevice::GPU;
-        case Device::CPU:
-        default:          return ResolvedDevice::CPU;
+        case NPU: return ResolvedDevice::NPU;
+        case GPU: return ResolvedDevice::GPU;
+        case CPU: return ResolvedDevice::CPU;
     }
+    std::unreachable();
 }
 
 }  // namespace runtime
