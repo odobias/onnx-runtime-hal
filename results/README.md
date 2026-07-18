@@ -1,7 +1,15 @@
 ﻿# Benchmark results
 
-The result directory separates raw benchmark ledgers from derived research
-reports.
+The result directory separates suite-of-record evidence from derived research
+reports and ephemeral local outputs:
+
+| Path | Role |
+|------|------|
+| `accuracy-runs/`, `run-attempts/`, `host-snapshots/`, `model-compilation/`, `ledgers/` | Published evidence (commit selectively) |
+| `reports/` | Historical human reports (not suite-of-record) |
+| `local/` | Ephemeral research/sweep outputs (gitignored) |
+
+See [`LAYOUT.md`](../LAYOUT.md) for the repo-wide source vs artifact contract.
 
 ## Authoritative ledgers
 
@@ -184,18 +192,19 @@ non-`preferred` requests are rejected rather than silently mislabeled.
 
 ## Historical reports
 
-Other Markdown, CSV, and Canvas files in this directory are snapshots or derived
-research reports. They are useful evidence, but they are not substitutes for the
-portable suite ledger and may describe older model exports or runtime versions.
+Snapshots and derived research reports live under `reports/`. They are useful
+context, but they are not substitutes for the portable suite ledger and may
+describe older model exports or runtime versions.
 
 Current hardware snapshots:
 
-- `amd-directml-2026-07-13.md`: audited Radeon 890M DirectML results for both
-  Whisper variants, TSC, and FakeAudio, including CPU-offload node counts.
+- `reports/amd-directml-2026-07-13.md`: audited Radeon 890M DirectML results for
+  both Whisper variants, TSC, and FakeAudio, including CPU-offload node counts.
 
-Quantization sweeps under `benchmark/research/` are explicitly research-only.
-Neutral ONNX portability findings remain in `onnx-portability.md` and
-`cpp-onnx-npu-findings.md`.
+Quantization sweeps under `benchmark/research/` are explicitly research-only and
+write ephemeral outputs to `local/` (gitignored). Neutral ONNX portability
+findings remain in `reports/onnx-portability.md` and
+`reports/cpp-onnx-npu-findings.md`.
 
 ### Classifier snapshot curation
 

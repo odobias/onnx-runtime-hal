@@ -69,8 +69,8 @@ import validate_fakeaudio_onnx as fakeaudio  # noqa: E402
 import validate_tsc_onnx as tsc  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-RESULTS_CSV = os.path.join(ROOT, "results", "deepfake-benchmark.csv")
-RESULTS_MD = os.path.join(ROOT, "results", "deepfake-benchmark.md")
+RESULTS_CSV = os.path.join(ROOT, "results", "reports", "deepfake-benchmark.csv")
+RESULTS_MD = os.path.join(ROOT, "results", "reports", "deepfake-benchmark.md")
 
 CSV_COLUMNS = [
     "timestamp_utc", "model", "model_path", "execution_provider", "input_kind",

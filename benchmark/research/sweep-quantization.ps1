@@ -84,7 +84,7 @@ if ($MaxClips -gt 0 -and $clips.Count -gt $MaxClips) { $clips = $clips[0..($MaxC
 Write-Host ("Manifest: {0} variant(s) | Eval: {1} clip(s) | Runs: {2}" -f `
         $manifestObj.variants.Count, $clips.Count, $Runs) -ForegroundColor Cyan
 
-$reportsDir = Join-Path $root "results"
+$reportsDir = Join-Path $root "results\local"
 New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 if (-not $Results) { $Results = Join-Path $reportsDir "benchmark-results.csv" }
 $cacheRoot = Join-Path $root "cache"
@@ -285,7 +285,7 @@ $md = New-Object System.Text.StringBuilder
 [void]$md.AppendLine("")
 foreach ($line in (Get-BenchmarkHardwareMarkdown $hardware)) { [void]$md.AppendLine($line) }
 [void]$md.AppendLine("")
-[void]$md.AppendLine("_Full machine-readable inventory: ``results/host-info.json``._")
+[void]$md.AppendLine("_Full machine-readable inventory: ``results/local/host-info.json``._")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("| Variant | Prec | Backend | Device | Status | Size MB | Cold s | Hot s | Mean ms | xRT | tok/s | Conf | WER % | CER % |")
 [void]$md.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")

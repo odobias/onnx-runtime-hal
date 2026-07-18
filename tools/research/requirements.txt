@@ -4,7 +4,7 @@
 # IMPORTANT: onnxruntime is intentionally NOT pinned here, because there is no
 # single wheel that carries every execution provider, and the vendor NPU builds
 # are mutually exclusive within one process/env (see README.md + the repo's
-# results/single-binary-cross-vendor.md). Install exactly ONE onnxruntime
+# results/reports/single-binary-cross-vendor.md). Install exactly ONE onnxruntime
 # flavour per environment, matching the platform you want to benchmark:
 #
 #   x64  CPU + DirectML (GPU)     pip install onnxruntime-directml
