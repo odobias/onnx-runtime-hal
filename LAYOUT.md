@@ -8,7 +8,8 @@ artifacts in separate places. If a path is not listed under **Source** or
 
 | Path | Role |
 |------|------|
-| `runner/` | C++ benchmark app, runtime HAL, public headers |
+| `runner/` | C++ benchmark app; public HAL headers under `runner/include/` |
+| `projects/OnnxRuntimeHal/` | Reusable C++ static library (`OnnxRuntimeHal.lib`) |
 | `workloads/` | Workload adapters (C++) and tracked `eval/eval.jsonl` |
 | `projects/` | MSBuild `.vcxproj` files (no `.cpp` here) |
 | `msbuild/` | Shared props/targets |
@@ -41,8 +42,8 @@ See [`results/README.md`](results/README.md) for write contracts and validity ru
 | Path | Role |
 |------|------|
 | `build/` | MSBuild output trees |
-| `dist/` | Assembled redistributable packages |
-| `third_party/` | Downloaded vendor SDKs / ORT drops |
+| `dist/npu-inference-bench-*` | Assembled benchmark redistributables |
+| `dist/onnx-runtime-hal-*` | Packaged reusable `OnnxRuntimeHal` (`include/` + `lib/`) || `third_party/` | Downloaded vendor SDKs / ORT drops |
 | `cache/` | Provider compilation cache |
 | `.venv*`, `__pycache__/` | Python toolchains |
 | `workloads/whisper/models/` | Fetched/exported Whisper payloads |

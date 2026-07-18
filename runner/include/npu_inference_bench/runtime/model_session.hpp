@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "npu_inference_bench/execution_diagnostics.hpp"
+#include "npu_inference_bench/runtime/execution_diagnostics.hpp"
 #include "npu_inference_bench/runtime/runtime_options.hpp"
 #include "npu_inference_bench/runtime/tensor.hpp"
 

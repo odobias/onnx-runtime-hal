@@ -1,8 +1,12 @@
 ﻿# Reusable ONNX Runtime HAL
 
-`OnnxRuntimeHal` is a Windows-first C++17 static library for loading and running
-arbitrary ONNX models through the repository's CPU, DirectML, OpenVINO, VitisAI,
-QNN, and Windows ML execution-provider policies.
+`OnnxRuntimeHal` is a Windows-first **C++17 static library** for loading and
+running arbitrary ONNX models through this repository's CPU, DirectML,
+OpenVINO, VitisAI, QNN, and Windows ML execution-provider policies.
+
+It is a normal C++ ABI library for the **same MSVC toolset and CRT** (`/MD` or
+`/MDd`) that built the `.lib`. There is no C wrapper and no ABI stability claim
+across compiler versions — link it like any other internal static library.
 
 The library owns:
 
@@ -16,12 +20,45 @@ The library owns:
 It does not own Whisper decoding, audio preprocessing, classifier fixtures,
 accuracy scoring, benchmark timing policy, or result ledgers.
 
-## C++ API
+## Public C++ API
 
-Public headers are under
-`runner/include/npu_inference_bench/runtime/`. A consumer creates a
-`runtime::RuntimeContext`, loads one or more `runtime::ModelSpec` objects, and
-runs named `runtime::TensorView` inputs through a `runtime::ModelSession`.
+Include the umbrella header:
+
+```cpp
+#include <onnx_runtime_hal.hpp>
+
+using namespace onnx_runtime_hal;
+
+RuntimeOptions options;
+options.device = Device::NPU;
+options.require_requested_device = true;
+
+RuntimeContext context(options);
+ModelSession session = context.load_one(ModelSpec{
+    .model_path = model_path,
+});
+
+std::vector<Tensor> outputs = session.run(inputs);
+const ExecutionDiagnostics& diag = session.diagnostics();
+```
+
+Equivalent types also live under `npu_inference_bench::runtime` (and
+`npu_inference_bench::Device`). Prefer `onnx_runtime_hal` in new external code.
+
+Public headers (shipped by the package):
+
+| Header | Role |
+|--------|------|
+| `onnx_runtime_hal.hpp` | Umbrella + `onnx_runtime_hal` aliases |
+| `npu_inference_bench/runtime/runtime_context.hpp` | `RuntimeContext` |
+| `npu_inference_bench/runtime/model_session.hpp` | `ModelSession`, `ModelSpec` |
+| `npu_inference_bench/runtime/tensor.hpp` | Named tensor I/O |
+| `npu_inference_bench/runtime/runtime_options.hpp` | Load / provider options |
+| `npu_inference_bench/runtime/runtime_error.hpp` | Errors |
+| `npu_inference_bench/runtime/device.hpp` | `Device`, `ResolvedDevice` |
+| `npu_inference_bench/runtime/execution_diagnostics.hpp` | Provider / offload diagnostics |
+| `npu_inference_bench/runtime/precision_policy.hpp` | Precision policy helpers |
+| `npu_inference_bench/runtime/detail/ort_session_access.hpp` | Advanced: borrow `Ort::Session&` |
 
 Loading multiple models in one call resolves the provider once and constructs
 every session on that provider. This keeps encoder/decoder model sets coherent.
@@ -30,9 +67,55 @@ Use `RuntimeOptions::require_requested_device = true` when a request must fail
 instead of silently demoting from NPU to GPU/CPU. For Windows ML policy
 providers, profiling must be enabled so the concrete provider can be verified.
 
-## Generic CLI
+### Advanced ORT session access
 
-The benchmark executable is also a reference consumer:
+Whisper-style custom decode loops may need the underlying `Ort::Session`. Prefer
+`ModelSession::run()` when possible. When not, include
+`npu_inference_bench/runtime/detail/ort_session_access.hpp` and use
+`runtime::detail::OrtSessionAccess::get(session)` — same-compiler C++ only, and
+only when the library was built with `NPU_INFERENCE_BENCH_ORT`.
+
+In-repo Whisper backends still include private `runner/runtime/ort_ep.hpp`
+helpers; those headers are **not** part of the redistributable package.
+
+## Package an install tree
+
+```powershell
+.\tools\build\package-onnx-runtime-hal.ps1 -Flavor ort -Configuration Release
+# -> dist/onnx-runtime-hal-<arch>-ort/
+```
+
+Layout:
+
+```text
+dist/onnx-runtime-hal-<arch>-<flavor>/
+  include/onnx_runtime_hal.hpp
+  include/npu_inference_bench/runtime/...
+  lib/OnnxRuntimeHal.lib
+  msbuild/OnnxRuntimeHal.Flavor.props
+  msbuild/OnnxRuntimeHal.props
+  msbuild/runtime-pack.targets
+  README.md
+```
+
+## Consume from another C++ project
+
+```xml
+<Import Project="...\onnx-runtime-hal-x64-ort\msbuild\OnnxRuntimeHal.Flavor.props" />
+<!-- Import the same ORT/backend SDK props used when the .lib was built. -->
+<Import Project="...\onnx-runtime-hal-x64-ort\msbuild\OnnxRuntimeHal.props" />
+```
+
+Then `#include <onnx_runtime_hal.hpp>` and link. Stage ORT / vendor DLLs beside
+the executable (see `msbuild/runtime-pack.targets` or your own packager).
+
+The consumer must use the **same flavor** that built `OnnxRuntimeHal.lib`
+(bundled ORT, Windows ML, OpenVINO EP, AMD, or Qualcomm). Mixing incompatible
+ONNX Runtime DLL trees in one output directory is unsupported.
+
+## Generic CLI (reference consumer)
+
+The benchmark executable is also a reference consumer of the public API:
 
 ```powershell
 .\build\ARM64\Release\NpuInferenceBench.exe run-onnx `
@@ -59,20 +142,7 @@ The input manifest contains named binary tensors:
 }
 ```
 
-Input files are resolved relative to the manifest. Omitting `outputs` returns
-every model output. Output tensors are written as raw binary files, while stdout
-receives one JSON result containing shapes, types, files, runtime versions,
-provider resolution, fallback, load/inference timing, and offload counts.
+## Build inside this repo
 
-## Build and runtime packs
-
-`projects/OnnxRuntimeHal/OnnxRuntimeHal.vcxproj` produces
-`OnnxRuntimeHal.lib`. Consumers can import:
-
-- `msbuild/OnnxRuntimeHal.props` for headers and static-library linkage;
-- `msbuild/runtime-pack.targets` for runtime DLL staging.
-
-The consumer must use the same backend properties and runtime flavor that built
-the library. Bundled, Windows ML, OpenVINO EP, AMD, and Qualcomm DLL trees are
-intentionally isolated; combining their incompatible ONNX Runtime binaries in
-one output directory is unsupported.
+`projects/OnnxRuntimeHal/OnnxRuntimeHal.vcxproj` produces `OnnxRuntimeHal.lib`
+under `build/<PlatformOutTag>/<Configuration>/`.
