@@ -67,9 +67,9 @@ inline std::string openvino_device_type(const runtime::RuntimeOptions& options,
 #ifdef NPU_INFERENCE_BENCH_WINML
 inline Device winml_token_device(const std::string& provider, Device fallback) {
     const std::string p = lower(provider);
-    if (p.find("prefer_cpu") != std::string::npos) return Device::CPU;
-    if (p.find("prefer_gpu") != std::string::npos) return Device::GPU;
-    if (p.find("prefer_npu") != std::string::npos) return Device::NPU;
+    if (p.contains("prefer_cpu")) return Device::CPU;
+    if (p.contains("prefer_gpu")) return Device::GPU;
+    if (p.contains("prefer_npu")) return Device::NPU;
     return fallback;
 }
 #endif
@@ -81,7 +81,7 @@ inline std::string inference_precision_policy(const runtime::RuntimeOptions& opt
     const std::string p = lower(provider);
 #ifdef NPU_INFERENCE_BENCH_WINML
     const Device winml_device = winml_token_device(provider, options.device);
-    if (p.rfind("windowsml:", 0) == 0 && winml_device != Device::CPU) {
+    if (p.starts_with("windowsml:") && winml_device != Device::CPU) {
         // The policy selector owns accelerator precision. Use "preferred" by
         // default; an explicit f32/f16/bf16 request remains explicit and is
         // rejected below because Windows ML cannot guarantee it provider-wide.
@@ -90,17 +90,17 @@ inline std::string inference_precision_policy(const runtime::RuntimeOptions& opt
 #endif
     Device actual_device = options.device;
 #ifdef NPU_INFERENCE_BENCH_WINML
-    if (p.rfind("windowsml:", 0) == 0) actual_device = winml_device;
+    if (p.starts_with("windowsml:")) actual_device = winml_device;
 #endif
-    if (p.find("cpu") != std::string::npos) {
+    if (p.contains("cpu")) {
         actual_device = Device::CPU;
-    } else if (p.find("dml") != std::string::npos ||
-               p.find("directml") != std::string::npos) {
+    } else if (p.contains("dml") ||
+               p.contains("directml")) {
         actual_device = Device::GPU;
-    } else if (p.rfind("openvino", 0) == 0) {
+    } else if (p.starts_with("openvino")) {
         const std::string device = lower(openvino_device_type(options, provider));
-        actual_device = device.rfind("cpu", 0) == 0 ? Device::CPU
-                      : device.rfind("gpu", 0) == 0 ? Device::GPU
+        actual_device = device.starts_with("cpu") ? Device::CPU
+                      : device.starts_with("gpu") ? Device::GPU
                                                     : Device::NPU;
     }
     return precision_policy::resolve(options, actual_device);
@@ -110,9 +110,9 @@ inline void validate_inference_precision(const runtime::RuntimeOptions& options,
                                          const std::string& provider) {
     const std::string precision = inference_precision_policy(options, provider);
     const std::string p = lower(provider);
-    if (p.find("openvino") != std::string::npos) return;
-    if (p.find("cpu") != std::string::npos || p.find("dml") != std::string::npos ||
-        p.find("directml") != std::string::npos) {
+    if (p.contains("openvino")) return;
+    if (p.contains("cpu") || p.contains("dml") ||
+        p.contains("directml")) {
         if (precision == "f32" || precision == "preferred") return;
         throw runtime::RuntimeError(
             runtime::RuntimeErrorCode::InvalidArgument,
@@ -134,18 +134,18 @@ inline std::string resolved_inference_precision(const runtime::RuntimeOptions& o
 }
 
 inline bool is_qnn(const std::string& provider) {
-    return lower(provider).find("qnn") != std::string::npos;
+    return lower(provider).contains("qnn");
 }
 
 inline runtime::ResolvedDevice resolved_device_for_provider(const std::string& provider) {
     const std::string p = lower(provider);
-    if (p.rfind("windowsml:", 0) == 0) return runtime::ResolvedDevice::Unknown;
+    if (p.starts_with("windowsml:")) return runtime::ResolvedDevice::Unknown;
     if (p == "cpuexecutionprovider" || p == "openvino:cpu")
         return runtime::ResolvedDevice::CPU;
-    if (p.find("dml") != std::string::npos || p.find("directml") != std::string::npos ||
+    if (p.contains("dml") || p.contains("directml") ||
         p == "openvino:gpu")
         return runtime::ResolvedDevice::GPU;
-    if (p.find("qnn") != std::string::npos || p.find("vitis") != std::string::npos ||
+    if (p.contains("qnn") || p.contains("vitis") ||
         p == "openvino:npu")
         return runtime::ResolvedDevice::NPU;
     return runtime::ResolvedDevice::Unknown;
@@ -207,10 +207,10 @@ inline std::string runtime_for(const std::string& provider) {
     return "windows-ml";
 #else
     const std::string p = lower(provider);
-    if (p.find("openvino") != std::string::npos) return "onnxruntime-openvino";
-    if (p.find("qnn") != std::string::npos) return "onnxruntime-qnn";
-    if (p.find("vitis") != std::string::npos) return "onnxruntime-vitisai";
-    if (p.find("dml") != std::string::npos || p.find("directml") != std::string::npos)
+    if (p.contains("openvino")) return "onnxruntime-openvino";
+    if (p.contains("qnn")) return "onnxruntime-qnn";
+    if (p.contains("vitis")) return "onnxruntime-vitisai";
+    if (p.contains("dml") || p.contains("directml"))
         return "onnxruntime-directml";
     return "onnxruntime";
 #endif
@@ -290,7 +290,7 @@ inline BOOL CALLBACK register_provider(WinMLEpHandle handle, const WinMLEpInfo* 
         // Duplicate registration is harmless; a real incompatibility is retained
         // for the session-policy failure message.
         const std::string message = e.what();
-        if (lower(message).find("already") == std::string::npos) {
+        if (!lower(message).contains("already")) {
             ctx->errors += std::string(info->name) + " register failed (" + message + "); ";
         }
     }
@@ -391,12 +391,12 @@ inline std::unordered_map<std::string, std::string> winml_catalog_provider_optio
     Device selected_device, const fs::path& model_dir,
     const std::string& cache_key) {
     const std::string selected_ep = lower(ep_name);
-    if (selected_ep.find("vitis") != std::string::npos) {
+    if (selected_ep.contains("vitis")) {
         return vitis_provider_options(options, model_dir, cache_key);
     }
     std::unordered_map<std::string, std::string> provider_options;
     if (selected_device == Device::NPU &&
-        selected_ep.find("qnn") != std::string::npos) {
+        selected_ep.contains("qnn")) {
         // Match the direct QNN pack's session policy. Without this, WinML
         // leaves HTP clocks at a platform default that can vary substantially
         // between AC/DC power overlays.
@@ -413,7 +413,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
     const std::string p = lower(provider);
 
 #ifdef NPU_INFERENCE_BENCH_WINML
-    if (p.rfind("windowsml:", 0) == 0 || p == "windowsml" || p == "winml") {
+    if (p.starts_with("windowsml:") || p == "windowsml" || p == "winml") {
         const Device selected_device = winml_token_device(provider, options.device);
         const OrtExecutionProviderDevicePolicy policy =
             selected_device == Device::NPU ? OrtExecutionProviderDevicePolicy_PREFER_NPU
@@ -444,8 +444,8 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
                 std::stable_sort(
                     compatible.begin(), compatible.end(),
                     [](Ort::ConstEpDevice a, Ort::ConstEpDevice b) {
-                        const bool a_dml = lower(a.EpName()).find("dml") != std::string::npos;
-                        const bool b_dml = lower(b.EpName()).find("dml") != std::string::npos;
+                        const bool a_dml = lower(a.EpName()).contains("dml");
+                        const bool b_dml = lower(b.EpName()).contains("dml");
                         return !a_dml && b_dml;
                     });
                 compatible.resize(1);
@@ -456,8 +456,8 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
                 std::stable_sort(
                     compatible.begin(), compatible.end(),
                     [](Ort::ConstEpDevice a, Ort::ConstEpDevice b) {
-                        const bool a_dml = lower(a.EpName()).find("dml") != std::string::npos;
-                        const bool b_dml = lower(b.EpName()).find("dml") != std::string::npos;
+                        const bool a_dml = lower(a.EpName()).contains("dml");
+                        const bool b_dml = lower(b.EpName()).contains("dml");
                         return a_dml && !b_dml;
                     });
                 compatible.resize(1);
@@ -511,7 +511,7 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
 
     // Intel native path: OpenVINO EP. Accepts "openvino", "openvinoexecutionprovider",
     // or an "openvino:<DEVICE>" token; device_type comes from the suffix when present.
-    if (p.rfind("openvino", 0) == 0) {
+    if (p.starts_with("openvino")) {
         const std::string device_type = openvino_device_type(options, provider);
         std::unordered_map<std::string, std::string> ov_opts{{"device_type", device_type}};
         if (!options.cache_dir.empty()) ov_opts["cache_dir"] = options.cache_dir;

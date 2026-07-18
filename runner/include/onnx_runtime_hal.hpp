@@ -1,7 +1,7 @@
 #pragma once
 
 // Public C++ umbrella for OnnxRuntimeHal.
-// Same-compiler, C++17 ABI — link OnnxRuntimeHal.lib built with the matching
+// Same-compiler, C++23 ABI — link OnnxRuntimeHal.lib built with the matching
 // ORT flavor props. No C API; use these types directly.
 
 #include "npu_inference_bench/runtime/device.hpp"

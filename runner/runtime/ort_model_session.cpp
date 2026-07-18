@@ -157,8 +157,8 @@ ResolvedDevice resolved_device_for_selection(const RuntimeOptions& options,
     if (resolved != ResolvedDevice::Unknown) return resolved;
     const std::string selected = ort_common::lower(provider);
     if (selected == "openvino" ||
-        selected.rfind("openvino:", 0) == 0 ||
-        selected.rfind("windowsml:", 0) == 0) {
+        selected.starts_with("openvino:") ||
+        selected.starts_with("windowsml:")) {
         return requested_device_class(options.device);
     }
     return ResolvedDevice::Unknown;
@@ -334,8 +334,8 @@ void ModelSession::finalize_profiling() {
                 impl_->diagnostics.resolved_provider = actual_provider;
                 const bool selection_owns_device =
                     selected_provider == "openvino" ||
-                    selected_provider.rfind("openvino:", 0) == 0 ||
-                    selected_provider.rfind("windowsml:", 0) == 0;
+                    selected_provider.starts_with("openvino:") ||
+                    selected_provider.starts_with("windowsml:");
                 if (!selection_owns_device) {
                     const ResolvedDevice profiled_device =
                         ort_common::resolved_device_for_provider(actual_provider);
@@ -353,8 +353,7 @@ void ModelSession::finalize_profiling() {
                 impl_->diagnostics.resolved_device != requested_device_class(impl_->options.device);
         }
         if (!impl_->options.cache_dir.empty() &&
-            ort_common::lower(impl_->diagnostics.resolved_provider).find("vitis") !=
-                std::string::npos) {
+            ort_common::lower(impl_->diagnostics.resolved_provider).contains("vitis")) {
             const auto assignment = ort_common::parse_vitis_operation_assignment(
                 fs::path(impl_->options.cache_dir), {impl_->cache_key});
             if (assignment.measured) {
@@ -603,7 +602,7 @@ LoadedModelSet RuntimeContext::load(const std::vector<ModelSpec>& models) {
 #if ORT_API_VERSION >= 24
                 if (impl_->options.device == Device::NPU &&
                     !state->diagnostics.fallback_occurred &&
-                    ort_common::lower(provider).find("vitis") == std::string::npos) {
+                    !ort_common::lower(provider).contains("vitis")) {
                     const auto assignment =
                         ort_common::query_ort_operation_assignment(*state->session);
                     if (assignment.measured) {

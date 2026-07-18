@@ -5,8 +5,7 @@
 
 #include "npu_inference_bench/runtime/model_session.hpp"
 
-namespace npu_inference_bench {
-namespace runtime {
+namespace npu_inference_bench::runtime {
 
 // Owns one ORT environment and resolves a provider once for every model in a
 // model set. Multi-graph workloads therefore cannot accidentally split their
@@ -20,16 +19,15 @@ public:
     RuntimeContext(const RuntimeContext&) = delete;
     RuntimeContext& operator=(const RuntimeContext&) = delete;
 
-    LoadedModelSet load(const std::vector<ModelSpec>& models);
-    ModelSession load_one(const ModelSpec& model);
+    [[nodiscard]] LoadedModelSet load(const std::vector<ModelSpec>& models);
+    [[nodiscard]] ModelSession load_one(const ModelSpec& model);
 
-    const RuntimeOptions& options() const;
-    static Device probe_best_device();
+    [[nodiscard]] const RuntimeOptions& options() const;
+    [[nodiscard]] static Device probe_best_device();
 
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace runtime
-}  // namespace npu_inference_bench
+}  // namespace npu_inference_bench::runtime

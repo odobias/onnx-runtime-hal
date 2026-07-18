@@ -147,7 +147,8 @@ Copy-Item -LiteralPath (Join-Path $root "msbuild\runtime-pack.targets") `
 $readme = @"
 # OnnxRuntimeHal ($Architecture / $Flavor / $Configuration)
 
-Same-compiler C++17 static library. Include ``onnx_runtime_hal.hpp``, link
+Same-compiler C++23 static library (``LanguageStandard=stdcpp23`` /
+``/std:c++23preview``). Include ``onnx_runtime_hal.hpp``, link
 ``lib\OnnxRuntimeHal.lib``, and import the MSBuild props below with the **same**
 MSVC toolset and ``/MD`` (or ``/MDd``) CRT used to build this package.
 
