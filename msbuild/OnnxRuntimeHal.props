@@ -1,15 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Public build contract for consumers of the Windows-first static runtime HAL.
-     Import the matching backend.*.props before this file so the consumer links
-     the same ONNX Runtime flavor used to build OnnxRuntimeHal.lib. -->
+<!-- Public build contract for consumers of the Windows-first C++ OnnxRuntimeHal.
+     Same compiler / CRT (/MD) / C++17 as the library build. No C API.
+
+     Usage (repo checkout):
+       Import matching backend.*.props, then this file.
+       OnnxRuntimeHalRoot defaults to the benchmark repo root.
+
+     Usage (installed package from tools/build/package-onnx-runtime-hal.ps1):
+       Set OnnxRuntimeHalRoot to the package root (contains include/, lib/, msbuild/).
+       Import $(OnnxRuntimeHalRoot)msbuild\OnnxRuntimeHal.Flavor.props then this file.
+-->
 <Project>
   <PropertyGroup>
     <OnnxRuntimeHalRoot Condition="'$(OnnxRuntimeHalRoot)'==''">$(NpuInferenceBenchRoot)</OnnxRuntimeHalRoot>
+    <!-- Installed packages place headers under include/; the monorepo uses runner/include/. -->
+    <OnnxRuntimeHalIncludeDir Condition="'$(OnnxRuntimeHalIncludeDir)'=='' and Exists('$(OnnxRuntimeHalRoot)include\onnx_runtime_hal.hpp')">$(OnnxRuntimeHalRoot)include\</OnnxRuntimeHalIncludeDir>
+    <OnnxRuntimeHalIncludeDir Condition="'$(OnnxRuntimeHalIncludeDir)'==''">$(OnnxRuntimeHalRoot)runner\include\</OnnxRuntimeHalIncludeDir>
+    <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'=='' and Exists('$(OnnxRuntimeHalRoot)lib\OnnxRuntimeHal.lib')">$(OnnxRuntimeHalRoot)lib\</OnnxRuntimeHalLibDir>
     <OnnxRuntimeHalLibDir Condition="'$(OnnxRuntimeHalLibDir)'==''">$(OnnxRuntimeHalRoot)build\$(PlatformOutTag)\$(Configuration)\</OnnxRuntimeHalLibDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(OnnxRuntimeHalRoot)runner\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OnnxRuntimeHalIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard Condition="'$(LanguageStandard)'==''">stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(OnnxRuntimeHalLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

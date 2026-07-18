@@ -4,11 +4,11 @@
 // (QNN) / any-DX12 GPU (DirectML) / CPU from ONE binary: the engine walks a
 // device fallback chain and keeps the first EP that actually builds a session.
 // This header is the single source of truth for that EP selection so the two
-// engines can't drift apart. All functions are inline (header-only, included by
-// multiple TUs).
+// engines can't drift apart. Still header-only for in-repo Whisper workloads;
+// external library consumers should use RuntimeContext / ModelSession instead.
 #pragma once
 
-#include "npu_inference_bench/precision_policy.hpp"
+#include "npu_inference_bench/runtime/precision_policy.hpp"
 #include "npu_inference_bench/runtime/runtime_options.hpp"
 
 #ifdef NPU_INFERENCE_BENCH_ORT

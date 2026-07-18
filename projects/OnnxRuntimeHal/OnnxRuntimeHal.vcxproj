@@ -43,17 +43,21 @@
 
   <ItemGroup>
     <ClCompile Include="$(NpuInferenceBenchRoot)runner\runtime\ort_model_session.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)runner\runtime\ort_offload.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\onnx_runtime_hal.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\device.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\execution_diagnostics.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\precision_policy.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\runtime_options.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\runtime_error.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\tensor.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\model_session.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\runtime_context.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\detail\ort_session_access.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_ep.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_offload.hpp" />
-    <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_session_access.hpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

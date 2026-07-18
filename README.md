@@ -21,13 +21,21 @@ an internal workload adapter rather than the product architecture.
 
 ## Reusable ONNX runtime
 
-The benchmark now consumes a workload-neutral `OnnxRuntimeHal` static library.
-It exposes logical CPU/GPU/NPU selection, explicit providers, strict
-requested-device enforcement, vendor caching, named tensor I/O, and provider
-offload diagnostics without depending on Whisper or benchmark ledgers.
+The benchmark consumes a workload-neutral `OnnxRuntimeHal` **C++17 static
+library** (same-compiler ABI — include `onnx_runtime_hal.hpp`, link
+`OnnxRuntimeHal.lib`). It exposes logical CPU/GPU/NPU selection, explicit
+providers, strict requested-device enforcement, vendor caching, named tensor
+I/O, and provider offload diagnostics without depending on Whisper or
+benchmark ledgers.
+
+```powershell
+.\tools\build\package-onnx-runtime-hal.ps1 -Flavor ort
+# -> dist/onnx-runtime-hal-<arch>-ort/{include,lib,msbuild}
+```
 
 `NpuInferenceBench run-onnx` is a generic tensor-manifest reference consumer.
-See `docs/onnx-runtime-hal.md` for the C++ and CLI contracts.
+See [`docs/onnx-runtime-hal.md`](docs/onnx-runtime-hal.md) for the C++ consumer
+contract and MSBuild props.
 
 ## Run the portable suite
 

@@ -72,7 +72,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\whisper.hpp" />
-    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\execution_diagnostics.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\execution_diagnostics.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\precision_policy.hpp" />
+    <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\runtime\detail\ort_session_access.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\classifier.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\audio.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\include\npu_inference_bench\metrics.hpp" />
@@ -80,7 +82,6 @@
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\backend_registry.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_ep.hpp" />
     <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_offload.hpp" />
-    <ClInclude Include="$(NpuInferenceBenchRoot)runner\runtime\ort_session_access.hpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
