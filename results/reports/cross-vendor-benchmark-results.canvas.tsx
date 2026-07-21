@@ -243,6 +243,7 @@ function PowerLatencyBar({
   const batteryColor = "#a9c6ec";
   const markerColor = theme.category.yellow;
   const track = {
+    position: "relative" as const,
     height: 10,
     background: theme.fill.tertiary,
     borderRadius: 999,
@@ -253,48 +254,77 @@ function PowerLatencyBar({
     totalPct: number,
     children: any,
     markerPct: number | null = null
-  ) => (
-    <div style={track}>
+  ) => {
+    const clipped = totalPct > 100 + 1e-9;
+    return (
       <div
         style={{
-          position: "relative",
-          height: "100%",
-          width: `${Math.min(100, Math.max(totalPct, 2))}%`,
-          minWidth: 4,
+          ...track,
+          overflow: clipped ? "visible" : "hidden",
+          paddingRight: clipped ? 14 : 0,
         }}
+        title={clipped ? "exceeds p95 axis" : undefined}
       >
         <div
           style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "row",
-            borderRadius: 999,
-            overflow: "hidden",
+            position: "relative",
+            height: "100%",
+            width: `${Math.min(100, Math.max(totalPct, 2))}%`,
+            minWidth: 4,
           }}
         >
-          {children}
-        </div>
-        {markerPct != null && (
           <div
-            title="battery"
             style={{
               position: "absolute",
-              top: -3,
-              bottom: -3,
-              left: `${Math.min(100, Math.max(0, markerPct))}%`,
-              width: 2,
-              marginLeft: -1,
-              background: markerColor,
-              borderRadius: 1,
-              zIndex: 2,
+              inset: 0,
+              display: "flex",
+              flexDirection: "row",
+              borderRadius: 999,
+              overflow: "hidden",
+            }}
+          >
+            {children}
+          </div>
+          {markerPct != null && (
+            <div
+              title="battery"
+              style={{
+                position: "absolute",
+                top: -3,
+                bottom: -3,
+                left: `${Math.min(100, Math.max(0, markerPct))}%`,
+                width: 2,
+                marginLeft: -1,
+                background: markerColor,
+                borderRadius: 1,
+                zIndex: 2,
+                pointerEvents: "none",
+              }}
+            />
+          )}
+        </div>
+        {clipped && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              right: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: theme.category.yellow,
+              fontSize: 14,
+              fontWeight: 700,
+              lineHeight: 1,
+              letterSpacing: -2,
               pointerEvents: "none",
             }}
-          />
+          >
+            ››
+          </span>
         )}
       </div>
-    </div>
-  );
+    );
+  };
   const seg = (widthPct: number, color: string, opacity = 1) => (
     <div
       style={{
@@ -708,32 +738,12 @@ function LatestComparison() {
                 >
                   {qualityText}
                 </Text>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 8,
-                    alignItems: "center",
-                    minWidth: 0,
-                  }}
-                >
-                  <PowerLatencyBar
-                    batteryMs={row.batteryMs}
-                    acMs={row.acMs}
-                    maxLatency={maxLatency}
-                    theme={theme}
-                  />
-                  {Math.max(row.batteryMs ?? 0, row.acMs ?? 0) >
-                  maxLatency + 1e-9 ? (
-                    <Text
-                      size="small"
-                      tone="secondary"
-                      style={{ color: theme.category.yellow }}
-                    >
-                      p95+
-                    </Text>
-                  ) : null}
-                </div>
+                <PowerLatencyBar
+                  batteryMs={row.batteryMs}
+                  acMs={row.acMs}
+                  maxLatency={maxLatency}
+                  theme={theme}
+                />
                 <div
                   style={{
                     display: "grid",
