@@ -414,7 +414,7 @@ function LatestComparison() {
           the tip overhang is a lighter or deeper blue for battery vs AC.
           Click a cohort chip to sort by that part.
         </Text>
-        <Row gap=12>
+        <Row gap={12}>
           <Text size="small" tone="secondary">mid blue = overlap</Text>
           <Text size="small" tone="secondary">lighter = battery slower</Text>
           <Text size="small" tone="secondary">deeper = AC slower</Text>
@@ -561,7 +561,7 @@ function LatestComparison() {
                     overflow: "hidden" as const,
                     minWidth: 0,
                   };
-                  const valueWrap = (totalPct: number, children: any) => (
+                  const valueWrap = (totalPct: number, children: ReturnType<typeof seg> | ReturnType<typeof seg>[]) => (
                     <div style={{ minWidth: 0 }}>
                       <div style={track}>
                         <div
@@ -620,10 +620,10 @@ function LatestComparison() {
                   const overlapShare = (lo / hi) * 100;
                   return valueWrap(
                     totalPct,
-                    <>
-                      {seg(overlapShare, overlapColor)}
-                      {seg(100 - overlapShare, tipColor)}
-                    </>
+                    [
+                      seg(overlapShare, overlapColor),
+                      seg(100 - overlapShare, tipColor),
+                    ]
                   );
                 })()}
                 <div
