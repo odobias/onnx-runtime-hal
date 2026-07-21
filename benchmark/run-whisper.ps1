@@ -16,7 +16,7 @@
 param(
     [string]$Model = "",
     [string]$Audio = "",
-    [ValidateSet("auto", "intel", "intel-onnx", "onnx-static", "onnx-dynamic", "amd", "qualcomm")][string]$Backend = "intel",
+    [ValidateSet("auto", "intel", "intel-onnx", "onnx-static", "onnx-dynamic", "onnx-sherpa", "amd", "qualcomm")][string]$Backend = "intel",
     [ValidateSet("npu", "gpu", "cpu")][string]$Device = "npu",
     [int]$Runs = 5,
     [int]$Threads = 0,
@@ -42,6 +42,7 @@ if (-not $Model) {
         "intel-onnx" { $Model = Join-Path $root "artifacts\workloads\whisper\models\dynamic-onnx" }
         "onnx-static" { $Model = Join-Path $root "artifacts\workloads\whisper\models\static-onnx" }
         "onnx-dynamic" { $Model = Join-Path $root "artifacts\workloads\whisper\models\dynamic-onnx" }
+        "onnx-sherpa" { $Model = Join-Path $root "artifacts\workloads\whisper\models\sherpa-export" }
         "qualcomm" { $Model = Join-Path $root "artifacts\workloads\whisper\models\static-onnx" }
         default { $Model = Join-Path $root "artifacts\workloads\whisper\models\ov-ir\fp16" }
     }

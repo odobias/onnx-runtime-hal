@@ -36,6 +36,30 @@
       "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
     },
     {
+      "id": "whisper-tiny-sherpa",
+      "kind": "asr",
+      "backend": "onnx-sherpa",
+      "path": "artifacts/workloads/whisper/models/sherpa-export",
+      "executionProfiles": [
+        {
+          "id": "sherpa-export-kv",
+          "devices": ["gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        },
+        {
+          "id": "sherpa-export-kv-npu-best-effort",
+          "devices": ["npu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1",
+          "accuracyEligible": false,
+          "default": false
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
       "id": "tsc",
       "kind": "classifier",
       "backend": "onnx-fixture",

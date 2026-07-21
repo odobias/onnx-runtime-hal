@@ -55,6 +55,20 @@ inline std::string lower(std::string s) {
     return s;
 }
 
+// Map AvastClient model_host EP tokens (ep_config.cpp) onto the ORT provider
+// names used by this header. Pass-through for already-normalized ORT names.
+inline std::string normalize_provider_token(std::string provider) {
+    const std::string p = lower(provider);
+    if (p.empty()) return provider;
+    if (p == "cpu") return "CPUExecutionProvider";
+    if (p == "directml" || p == "dml") return "DmlExecutionProvider";
+    // Product OpenVINO default: AUTO prefers NPU then CPU (see ep_config.cpp).
+    if (p == "openvino") return "openvino:AUTO:NPU,CPU";
+    if (p == "qnnnpu" || p == "qnncpu") return p;
+    if (p == "qnn") return "QNNExecutionProvider";
+    return provider;
+}
+
 inline std::string openvino_device_type(const runtime::RuntimeOptions& options,
                                         const std::string& provider) {
     const auto colon = provider.find(':');
@@ -140,13 +154,14 @@ inline bool is_qnn(const std::string& provider) {
 inline runtime::ResolvedDevice resolved_device_for_provider(const std::string& provider) {
     const std::string p = lower(provider);
     if (p.starts_with("windowsml:")) return runtime::ResolvedDevice::Unknown;
+    if (p == "qnncpu") return runtime::ResolvedDevice::CPU;
     if (p == "cpuexecutionprovider" || p == "openvino:cpu")
         return runtime::ResolvedDevice::CPU;
     if (p.contains("dml") || p.contains("directml") ||
         p == "openvino:gpu")
         return runtime::ResolvedDevice::GPU;
-    if (p.contains("qnn") || p.contains("vitis") ||
-        p == "openvino:npu")
+    if (p == "qnnnpu" || p.contains("qnn") || p.contains("vitis") ||
+        p == "openvino:npu" || p.contains("openvino:auto"))
         return runtime::ResolvedDevice::NPU;
     return runtime::ResolvedDevice::Unknown;
 }
@@ -221,8 +236,17 @@ inline std::string runtime_for(const std::string& provider) {
 // then CPU, and GPU walks down to CPU, so one binary always produces a result on
 // whatever hardware/drivers are actually present.
 inline std::vector<std::string> fallback_chain(const runtime::RuntimeOptions& options) {
-    if (!options.device_override.empty()) return {options.device_override};
-    if (!options.provider_order.empty()) return options.provider_order;
+    if (!options.device_override.empty()) {
+        return {normalize_provider_token(options.device_override)};
+    }
+    if (!options.provider_order.empty()) {
+        std::vector<std::string> order;
+        order.reserve(options.provider_order.size());
+        for (const auto& p : options.provider_order) {
+            order.push_back(normalize_provider_token(p));
+        }
+        return order;
+    }
     std::vector<std::string> chain;
     const auto add = [&](Device d) {
         for (auto& p : providers_for(d)) chain.push_back(p);
@@ -537,15 +561,22 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
         return;  // CPU EP is the default ORT fallback.
     }
 
-    if (p == "qnn" || p == "qnnexecutionprovider") {
+    // Product tokens qnnnpu/qnncpu (AvastClient ep_config) plus ORT QNN names.
+    if (p == "qnn" || p == "qnnexecutionprovider" || p == "qnnnpu" || p == "qnncpu") {
         validate_inference_precision(options, provider);
 #ifdef NPU_INFERENCE_BENCH_QUALCOMM
         register_qnn_library(env);
         const Ort::ConstEpDevice qnn_device = find_qnn_device(env);  // throws if absent
         std::vector<Ort::ConstEpDevice> selected{qnn_device};
+        Device qnn_device_class = options.device;
+        if (p == "qnnnpu") qnn_device_class = Device::NPU;
+        if (p == "qnncpu") qnn_device_class = Device::CPU;
         std::unordered_map<std::string, std::string> opts{
-            {"backend_path", qnn_backend_path(options.device)}};
-        if (options.device == Device::NPU) opts.emplace("htp_performance_mode", "burst");
+            {"backend_path", qnn_backend_path(qnn_device_class)}};
+        if (qnn_device_class == Device::NPU) {
+            opts.emplace("htp_performance_mode", "burst");
+            opts.emplace("enable_htp_fp16_precision", "1");
+        }
         Ort::KeyValuePairs ep_options(opts);
         so.AppendExecutionProvider_V2(env, selected, ep_options);
         return;
@@ -564,6 +595,9 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
     if (p == "dml" || p == "directml" || p == "dmlexecutionprovider") {
         validate_inference_precision(options, provider);
 #ifdef NPU_INFERENCE_BENCH_ORT_HAS_DML
+        // Match AvastClient ep_config DirectML setup (sequential + no mem pattern).
+        so.DisableMemPattern();
+        so.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
         Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_DML(so, 0));
         return;
 #else
@@ -575,7 +609,8 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
     throw std::runtime_error(
         "unsupported ONNX Runtime provider override: " + provider +
         " (supported: OpenVINOExecutionProvider[:NPU|GPU|CPU], CPUExecutionProvider, "
-        "QNNExecutionProvider, DmlExecutionProvider, VitisAIExecutionProvider)");
+        "QNNExecutionProvider / qnnnpu / qnncpu, DmlExecutionProvider / directml, "
+        "VitisAIExecutionProvider)");
 }
 
 }  // namespace ort_common

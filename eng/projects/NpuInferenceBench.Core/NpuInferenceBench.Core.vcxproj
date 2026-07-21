@@ -52,6 +52,7 @@
       <Optimization Condition="'$(Configuration)'=='Debug'">Disabled</Optimization>
       <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreadedDLL</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
 
@@ -61,6 +62,17 @@
     <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\backends\intel\intel_onnx_engine.cpp" />
     <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\backends\ort_static\ort_static_engine.cpp" />
     <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\backends\ort_dynamic\ort_dynamic_engine.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\backends\ort_sherpa\ort_sherpa_engine.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\Base64.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\BpeTokenizer.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\FeatureExtractor.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\Fft.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\GreedyDecoder.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\LanguageDetector.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\MelFilters.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\Metadata.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\Resampler.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\sherpa_export\Session.cpp" />
     <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\backends\amd\amd_ryzenai_engine.cpp" />
     <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\whisper\backends\qualcomm\qualcomm_qnn_engine.cpp" />
     <ClCompile Include="$(NpuInferenceBenchRoot)src\workloads\classifiers\ort_classifier.cpp" />

@@ -142,7 +142,7 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0]
                   << " run whisper <model_dir> <audio.wav> [backend] [device] [runs]"
                      " [--cache <dir>] [--ref \"text\"] [--threads N] [--provider <ort-ep>] [--json] [--results <csv>]\n"
-                  << "  backend: auto | intel | intel-onnx | onnx-static | onnx-dynamic | amd | qualcomm   (default auto)\n"
+                  << "  backend: auto | intel | intel-onnx | onnx-static | onnx-dynamic | onnx-sherpa | amd | qualcomm   (default auto)\n"
                   << "  device : npu | gpu | cpu                 (default npu)\n"
                   << "  runs   : timed iterations                (default 5)\n"
                   << "  --cache <dir>: persist compiled model; loads twice (cold/hot)\n"

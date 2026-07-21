@@ -30,6 +30,11 @@ std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
 bool available();
 }  // namespace ort_dynamic
 
+namespace ort_sherpa {
+std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
+bool available();
+}  // namespace ort_sherpa
+
 namespace amd {
 std::unique_ptr<IWhisperEngine> create(const EngineOptions& options);
 bool available();

@@ -18,6 +18,9 @@ bool parse_backend(const std::string& s, npu_inference_bench::Backend& out) {
     if (v == "onnx-dynamic" || v == "onnx-dyn" || v == "ort-dynamic") {
         out = npu_inference_bench::Backend::OnnxRuntimeDynamic; return true;
     }
+    if (v == "onnx-sherpa" || v == "ort-sherpa" || v == "sherpa") {
+        out = npu_inference_bench::Backend::OnnxRuntimeSherpa; return true;
+    }
     if (v == "amd")   { out = npu_inference_bench::Backend::AmdRyzenAI; return true; }
     if (v == "qualcomm" || v == "qnn") { out = npu_inference_bench::Backend::QualcommQNN; return true; }
     return false;
