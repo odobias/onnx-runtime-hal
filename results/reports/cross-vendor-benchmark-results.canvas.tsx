@@ -337,7 +337,7 @@ function LatestComparison() {
     color: theme.text.secondary,
   };
 
-  const gridColumns = "minmax(280px, 34%) minmax(110px, 12%) 1fr 72px";
+  const gridColumns = "minmax(280px, 34%) minmax(110px, 12%) 1fr 108px";
 
   return (
     <Stack gap={16}>
@@ -450,7 +450,7 @@ function LatestComparison() {
             </Text>
           </div>
           <Text size="small" tone="tertiary" style={{ textAlign: "right" }}>
-            ms
+            batt / ac
           </Text>
         </div>
 
@@ -615,14 +615,51 @@ function LatestComparison() {
                     </div>
                   );
                 })()}
-                <Text
-                  size="small"
-                  weight="semibold"
-                  style={{ textAlign: "right", lineHeight: 1.35 }}
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 2,
+                    justifyItems: "end",
+                    lineHeight: 1.25,
+                  }}
                 >
-                  {`${row.batteryMs == null ? "—" : format(row.batteryMs)}
-${row.acMs == null ? "—" : format(row.acMs)}`}
-                </Text>
+                  <Text
+                    size="small"
+                    weight="semibold"
+                    style={{
+                      color:
+                        row.batteryMs == null
+                          ? theme.text.tertiary
+                          : theme.category.yellow,
+                      display: "inline-flex",
+                      gap: 6,
+                      alignItems: "baseline",
+                    }}
+                  >
+                    <Text as="span" size="small" tone="tertiary">
+                      batt
+                    </Text>
+                    {row.batteryMs == null ? "—" : format(row.batteryMs)}
+                  </Text>
+                  <Text
+                    size="small"
+                    weight="semibold"
+                    style={{
+                      color:
+                        row.acMs == null
+                          ? theme.text.tertiary
+                          : theme.category.green,
+                      display: "inline-flex",
+                      gap: 6,
+                      alignItems: "baseline",
+                    }}
+                  >
+                    <Text as="span" size="small" tone="tertiary">
+                      ac
+                    </Text>
+                    {row.acMs == null ? "—" : format(row.acMs)}
+                  </Text>
+                </div>
               </div>
             </div>
           );
