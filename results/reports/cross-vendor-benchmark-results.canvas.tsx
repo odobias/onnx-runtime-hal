@@ -410,12 +410,12 @@ function LatestComparison() {
           {isClassifier ? "accuracy" : "WER"}
         </H2>
         <Text size="small" tone="secondary">
-          One row per cohort. One bar: grey overlap is min(battery, AC);
+          One row per cohort. One bar: blue overlap is min(battery, AC);
           the tip overhang is colored by the slower mode (yellow = battery, green = AC).
           Click a cohort chip to sort by that part.
         </Text>
         <Row gap={12}>
-          <Text size="small" tone="secondary">grey = overlap</Text>
+          <Text size="small" tone="secondary">blue = overlap</Text>
           <Text size="small" tone="secondary">yellow tip = battery slower</Text>
           <Text size="small" tone="secondary">green tip = AC slower</Text>
         </Row>
@@ -557,12 +557,29 @@ function LatestComparison() {
                   const track = {
                     height: 10,
                     background: theme.fill.tertiary,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "row" as const,
+                    borderRadius: 999,
+                    overflow: "hidden" as const,
                     minWidth: 0,
                   };
+                  const valueWrap = (totalPct: number, children: any) => (
+                    <div style={{ minWidth: 0 }}>
+                      <div style={track}>
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${Math.max(totalPct, 2)}%`,
+                            display: "flex",
+                            flexDirection: "row",
+                            borderRadius: 999,
+                            overflow: "hidden",
+                            minWidth: 4,
+                          }}
+                        >
+                          {children}
+                        </div>
+                      </div>
+                    </div>
+                  );
                   const seg = (widthPct: number, color: string) => (
                     <div
                       style={{
@@ -574,7 +591,11 @@ function LatestComparison() {
                     />
                   );
                   if (batt == null && ac == null) {
-                    return <div style={{ minWidth: 0 }}><div style={track} /></div>;
+                    return (
+                      <div style={{ minWidth: 0 }}>
+                        <div style={track} />
+                      </div>
+                    );
                   }
                   if (batt == null || ac == null) {
                     const value = (batt ?? ac) as number;
@@ -582,37 +603,27 @@ function LatestComparison() {
                       batt != null
                         ? theme.category.yellow
                         : theme.category.green;
-                    return (
-                      <div style={{ minWidth: 0 }}>
-                        <div style={track}>
-                          {seg(Math.max(2, (value / maxMs) * 100), color)}
-                        </div>
-                      </div>
+                    return valueWrap(
+                      (value / maxMs) * 100,
+                      seg(100, color)
                     );
                   }
                   const lo = Math.min(batt, ac);
                   const hi = Math.max(batt, ac);
-                  const basePct = (lo / maxMs) * 100;
-                  const deltaPct = ((hi - lo) / maxMs) * 100;
-                  const overlapColor = theme.category.gray;
+                  const totalPct = (hi / maxMs) * 100;
+                  const overlapColor = theme.category.blue;
                   const tipColor =
                     batt > ac ? theme.category.yellow : theme.category.green;
-                  if (deltaPct < 1e-9) {
-                    return (
-                      <div style={{ minWidth: 0 }}>
-                        <div style={track}>
-                          {seg(Math.max(2, basePct), overlapColor)}
-                        </div>
-                      </div>
-                    );
+                  if (hi - lo < 1e-9) {
+                    return valueWrap(totalPct, seg(100, overlapColor));
                   }
-                  return (
-                    <div style={{ minWidth: 0 }}>
-                      <div style={track}>
-                        {seg(basePct, overlapColor)}
-                        {seg(Math.max(deltaPct, 0.8), tipColor)}
-                      </div>
-                    </div>
+                  const overlapShare = (lo / hi) * 100;
+                  return valueWrap(
+                    totalPct,
+                    <>
+                      {seg(overlapShare, overlapColor)}
+                      {seg(100 - overlapShare, tipColor)}
+                    </>
                   );
                 })()}
                 <div
