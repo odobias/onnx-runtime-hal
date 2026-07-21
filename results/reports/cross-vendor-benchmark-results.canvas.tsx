@@ -410,12 +410,14 @@ function LatestComparison() {
           {isClassifier ? "accuracy" : "WER"}
         </H2>
         <Text size="small" tone="secondary">
-          One row per cohort. Yellow = battery latency, green = AC latency.
+          One row per cohort. One bar: faster power mode is the base color;
+          the tip is the extra latency of the slower mode (yellow = battery, green = AC).
           Click a cohort chip to sort by that part.
         </Text>
         <Row gap={12}>
-          <Text size="small" tone="secondary">battery</Text>
-          <Text size="small" tone="secondary">AC</Text>
+          <Text size="small" tone="secondary">yellow = battery</Text>
+          <Text size="small" tone="secondary">green = AC</Text>
+          <Text size="small" tone="secondary">tip = slower-mode extra</Text>
         </Row>
 
         <div
@@ -541,61 +543,86 @@ function LatestComparison() {
                 >
                   {qualityText}
                 </Text>
-                <div style={{ display: "grid", gap: 3, minWidth: 0 }}>
-                  {(
-                    [
-                      ["battery", row.batteryMs, theme.category.yellow],
-                      ["AC", row.acMs, theme.category.green],
-                    ] as const
-                  ).map(([label, value, color]) => (
+                {(() => {
+                  const maxMs = Math.max(
+                    ...sorted.flatMap((item) =>
+                      [item.batteryMs, item.acMs].filter(
+                        (ms): ms is number => ms != null
+                      )
+                    ),
+                    1
+                  );
+                  const batt = row.batteryMs;
+                  const ac = row.acMs;
+                  const track = {
+                    height: 10,
+                    background: theme.fill.tertiary,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "row" as const,
+                    minWidth: 0,
+                  };
+                  const seg = (widthPct: number, color: string) => (
                     <div
-                      key={label}
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "54px 1fr",
-                        gap: 8,
-                        alignItems: "center",
+                        height: "100%",
+                        width: `${widthPct}%`,
+                        background: color,
+                        flex: "0 0 auto",
                       }}
-                    >
-                      <Text size="small" tone="tertiary">
-                        {label}
-                      </Text>
-                      <div
-                        style={{
-                          height: 8,
-                          background: theme.fill.tertiary,
-                          borderRadius: 3,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width:
-                              value == null
-                                ? "0%"
-                                : `${Math.max(
-                                    2,
-                                    (value /
-                                      Math.max(
-                                        ...sorted.flatMap((item) =>
-                                          [item.batteryMs, item.acMs].filter(
-                                            (ms): ms is number => ms != null
-                                          )
-                                        ),
-                                        1
-                                      )) *
-                                      100
-                                  )}%`,
-                            background: color,
-                            borderRadius: 3,
-                            opacity: value == null ? 0.25 : 1,
-                          }}
-                        />
+                    />
+                  );
+                  if (batt == null && ac == null) {
+                    return <div style={{ minWidth: 0 }}><div style={track} /></div>;
+                  }
+                  if (batt == null || ac == null) {
+                    const value = (batt ?? ac) as number;
+                    const color =
+                      batt != null
+                        ? theme.category.yellow
+                        : theme.category.green;
+                    return (
+                      <div style={{ minWidth: 0 }}>
+                        <div style={track}>
+                          {seg(Math.max(2, (value / maxMs) * 100), color)}
+                        </div>
+                      </div>
+                    );
+                  }
+                  const lo = Math.min(batt, ac);
+                  const hi = Math.max(batt, ac);
+                  const basePct = (lo / maxMs) * 100;
+                  const deltaPct = ((hi - lo) / maxMs) * 100;
+                  const baseColor =
+                    batt <= ac ? theme.category.yellow : theme.category.green;
+                  const tipColor =
+                    batt > ac ? theme.category.yellow : theme.category.green;
+                  if (deltaPct < 1e-9) {
+                    return (
+                      <div style={{ minWidth: 0 }}>
+                        <div style={track}>
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${Math.max(2, basePct)}%`,
+                              background: `linear-gradient(90deg, ${theme.category.yellow} 0 50%, ${theme.category.green} 50% 100%)`,
+                              flex: "0 0 auto",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ minWidth: 0 }}>
+                      <div style={track}>
+                        {seg(basePct, baseColor)}
+                        {seg(Math.max(deltaPct, 0.8), tipColor)}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
                 <Text
                   size="small"
                   weight="semibold"
