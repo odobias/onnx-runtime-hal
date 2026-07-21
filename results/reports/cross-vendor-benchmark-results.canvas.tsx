@@ -558,7 +558,7 @@ function LatestComparison() {
             </Text>
           </div>
           <Text size="small" tone="tertiary" style={{ textAlign: "right" }}>
-            batt / ac · Δ
+            batt / ac
           </Text>
         </div>
 
@@ -703,24 +703,66 @@ function LatestComparison() {
                     lineHeight: 1.25,
                   }}
                 >
-                  <Text
-                    size="small"
-                    weight="semibold"
-                    style={{
-                      color:
-                        row.batteryMs == null
-                          ? theme.text.tertiary
-                          : "#a9c6ec",
-                      display: "inline-flex",
-                      gap: 6,
-                      alignItems: "baseline",
-                    }}
-                  >
-                    <Text as="span" size="small" tone="tertiary">
-                      batt
-                    </Text>
-                    {row.batteryMs == null ? "—" : format(row.batteryMs)}
-                  </Text>
+                  {(() => {
+                    const pct = battDeltaPct(row.batteryMs, row.acMs);
+                    const anomalous = pct != null && pct < -1e-9;
+                    if (row.batteryMs == null) {
+                      return (
+                        <Text
+                          size="small"
+                          weight="semibold"
+                          style={{
+                            color: theme.text.tertiary,
+                            display: "inline-flex",
+                            gap: 6,
+                            alignItems: "baseline",
+                          }}
+                        >
+                          <Text as="span" size="small" tone="tertiary">
+                            batt
+                          </Text>
+                          —
+                        </Text>
+                      );
+                    }
+                    if (anomalous) {
+                      return (
+                        <Text
+                          size="small"
+                          weight="semibold"
+                          title={`battery ${format(row.batteryMs)} ms (faster than AC)`}
+                          style={{
+                            color: theme.category.yellow,
+                            display: "inline-flex",
+                            gap: 6,
+                            alignItems: "baseline",
+                          }}
+                        >
+                          <Text as="span" size="small" tone="tertiary">
+                            batt
+                          </Text>
+                          {`${format(pct as number, 0)}% vs AC`}
+                        </Text>
+                      );
+                    }
+                    return (
+                      <Text
+                        size="small"
+                        weight="semibold"
+                        style={{
+                          color: "#a9c6ec",
+                          display: "inline-flex",
+                          gap: 6,
+                          alignItems: "baseline",
+                        }}
+                      >
+                        <Text as="span" size="small" tone="tertiary">
+                          batt
+                        </Text>
+                        {format(row.batteryMs)}
+                      </Text>
+                    );
+                  })()}
                   <Text
                     size="small"
                     weight="semibold"
@@ -741,18 +783,13 @@ function LatestComparison() {
                   </Text>
                   {(() => {
                     const pct = battDeltaPct(row.batteryMs, row.acMs);
-                    if (pct == null) return null;
-                    const anomalous = pct < -1e-9;
+                    if (pct == null || pct < -1e-9) return null;
                     const sign = pct > 0 ? "+" : "";
                     return (
                       <Text
                         size="small"
                         weight="semibold"
-                        style={{
-                          color: anomalous
-                            ? theme.category.yellow
-                            : theme.text.secondary,
-                        }}
+                        style={{ color: theme.text.secondary }}
                       >
                         {`batt ${sign}${format(pct, 0)}% vs AC`}
                       </Text>
