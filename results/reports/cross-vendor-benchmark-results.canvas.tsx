@@ -1,5 +1,4 @@
-﻿import {
-  BarChart,
+import {
   Callout,
   Card,
   CardBody,
@@ -17,309 +16,578 @@
   useHostTheme,
 } from "cursor/canvas";
 
-const coverageRows = [
-  ["Qualcomm · bundled", "3 / 3", "4 / 4", "4 / 4", "11 / 11", "QNN · DirectML · CPU"],
-  ["Qualcomm · Windows ML", "3 / 3", "4 / 4", "4 / 4", "11 / 11", "QNN · DirectML · CPU"],
-  ["Intel · bundled", "3 / 3", "4 / 4", "4 / 4", "11 / 11", "OpenVINO NPU; DirectML covers FakeAudio GPU"],
-  ["Intel · Windows ML", "3 / 3", "4 / 4", "4 / 4", "11 / 11", "OpenVINO · DirectML · CPU"],
-  ["AMD · bundled", "3 / 3", "4 / 4", "4 / 4", "11 / 11", "VitisAI · DirectML · CPU"],
-  ["AMD · Windows ML", "3 / 3", "4 / 4", "4 / 4", "11 / 11", "VitisAI · DirectML · CPU"],
-];
+type ResultRow = {
+  workload: string;
+  executor: string;
+  executorVendor: string;
+  siliconVendor: string;
+  device: string;
+  provider: string;
+  target: string;
+  arch: string;
+  latencyMs: number;
+  accuracyPct: number | null;
+  werPct: number | null;
+  modelSha: string;
+  date: string;
+};
 
-const bundledNpuRows = [
-  ["Qualcomm", "Whisper static", "QNN", "538.30 ms", "WER 8.58%", "unknown", "missing", "battery"],
-  ["Intel", "Whisper static", "OpenVINO", "745.59 ms", "WER 9.57%", "2.70%", "397 NPU / 11 CPU", "battery"],
-  ["AMD", "Whisper static", "VitisAI", "944.96 ms", "WER 10.23%", "7.84%", "376 NPU / 32 CPU", "AC"],
-  ["Qualcomm", "TSC", "QNN", "18.52 ms", "93.33% · Δp 0.047311", "unknown", "missing", "battery"],
-  ["Intel", "TSC", "OpenVINO", "9.49 ms", "93.33% · Δp 0.006655", "0%", "245 NPU / 0 CPU", "battery"],
-  ["AMD", "TSC", "VitisAI", "33.83 ms", "93.33% · Δp 0.056795", "5.31%", "232 NPU / 13 CPU", "AC"],
-  ["Qualcomm", "FakeAudio split", "QNN", "110.65 ms", "60% · Δp 0.000839", "unknown", "missing", "battery"],
-  ["Intel", "FakeAudio split", "OpenVINO", "27.40 ms", "60% · Δp 0.000068", "0%", "584 NPU / 0 CPU", "battery"],
-  ["AMD", "FakeAudio split", "VitisAI", "48.71 ms", "60% · Δp 0.011589", "1.03%", "578 NPU / 6 CPU", "AC"],
-];
+const data: {
+  pairedClassifiers: ResultRow[];
+  asrLatency: ResultRow[];
+  asrAccuracy: ResultRow[];
+} = {"pairedClassifiers":[{"workload":"fakeaudio","executor":"ORT + VitisAI","executorVendor":"AMD","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"bundled","arch":"x64","latencyMs":62.238,"accuracyPct":60.0,"werPct":null,"modelSha":"e4623e7e","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"winml","arch":"x64","latencyMs":82.617,"accuracyPct":60.0,"werPct":null,"modelSha":"e4623e7e","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"winml","arch":"arm64","latencyMs":110.402,"accuracyPct":60.0,"werPct":null,"modelSha":"e4623e7e","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ORT + QNN","executorVendor":"Qualcomm","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"bundled","arch":"arm64","latencyMs":116.6,"accuracyPct":60.0,"werPct":null,"modelSha":"e4623e7e","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"winml","arch":"x64","latencyMs":23.069,"accuracyPct":60.0,"werPct":null,"modelSha":"464a53e6","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":23.154,"accuracyPct":60.0,"werPct":null,"modelSha":"464a53e6","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"winml","arch":"arm64","latencyMs":70.02,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":70.781,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":72.399,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":73.528,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"bundled","arch":"arm64","latencyMs":74.964,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":76.476,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":87.153,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":101.308,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":115.152,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":126.114,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"winml","arch":"arm64","latencyMs":158.894,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"fakeaudio","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"bundled","arch":"arm64","latencyMs":1080.86,"accuracyPct":60.0,"werPct":null,"modelSha":"549143bc","date":"2026-07-16"},{"workload":"tsc","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":8.153,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"winml","arch":"x64","latencyMs":8.813,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ORT + QNN","executorVendor":"Qualcomm","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"bundled","arch":"arm64","latencyMs":20.114,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"winml","arch":"arm64","latencyMs":20.381,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ORT + VitisAI","executorVendor":"AMD","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"bundled","arch":"x64","latencyMs":33.804,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":38.955,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":40.183,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"winml","arch":"x64","latencyMs":44.572,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":60.147,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":66.143,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"winml","arch":"arm64","latencyMs":91.458,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"bundled","arch":"arm64","latencyMs":111.795,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":112.377,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":149.345,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":197.453,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":243.904,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"winml","arch":"arm64","latencyMs":329.023,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"},{"workload":"tsc","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"bundled","arch":"arm64","latencyMs":1560.0,"accuracyPct":93.333333,"werPct":null,"modelSha":"90f2ed1b","date":"2026-07-16"}],"asrLatency":[{"workload":"whisper-tiny-dynamic","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"bundled","arch":"arm64","latencyMs":2067.296,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"winml","arch":"arm64","latencyMs":526.763,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"bundled","arch":"arm64","latencyMs":1483.516,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"winml","arch":"arm64","latencyMs":1423.974,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"bundled","arch":"arm64","latencyMs":12604.984,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"winml","arch":"arm64","latencyMs":2552.151,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"bundled","arch":"arm64","latencyMs":1283.427,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"winml","arch":"arm64","latencyMs":1252.788,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + QNN","executorVendor":"Qualcomm","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"bundled","arch":"arm64","latencyMs":360.002,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"winml","arch":"arm64","latencyMs":449.94,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + VitisAI","executorVendor":"AMD","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"bundled","arch":"x64","latencyMs":753.332,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":818.287,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":765.098,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":862.134,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":248.721,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"winml","arch":"x64","latencyMs":1088.666,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":772.803,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":688.362,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":1187.497,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":254.127,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":544.418,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":676.179,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":612.3,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":2337.49,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":1671.752,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"winml","arch":"x64","latencyMs":292.455,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":658.336,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":583.245,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":932.242,"accuracyPct":null,"werPct":null,"modelSha":"9da9f440","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":218.299,"accuracyPct":null,"werPct":null,"modelSha":"12534e24","date":"2026-07-16"}],"asrAccuracy":[{"workload":"whisper-tiny-static","executor":"ORT + QNN","executorVendor":"Qualcomm","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"bundled","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"bundled","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"bundled","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"bundled","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"bundled","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"NPU","provider":"QNN","target":"winml","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"winml","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"GPU","provider":"DirectML","target":"winml","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"winml","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Qualcomm","device":"CPU","provider":"CPU EP","target":"winml","arch":"arm64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + VitisAI","executorVendor":"AMD","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":10.231023102310232,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":9.570957095709572,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"NPU","provider":"VitisAI","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":10.231023102310232,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-dynamic","executor":"Windows ML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"winml","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"NPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":9.570957095709572,"modelSha":"dee360f3","date":"2026-07-16"},{"workload":"whisper-tiny-static","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"GPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-dynamic","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"GPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"CPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-dynamic","executor":"ORT + OpenVINO","executorVendor":"Intel","siliconVendor":"Intel","device":"CPU","provider":"OpenVINO","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-dynamic","executor":"ORT + DirectML","executorVendor":"Microsoft","siliconVendor":"AMD","device":"GPU","provider":"DirectML","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-15"},{"workload":"whisper-tiny-static","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"dee360f3","date":"2026-07-15"},{"workload":"whisper-tiny-dynamic","executor":"ONNX Runtime","executorVendor":"Microsoft","siliconVendor":"AMD","device":"CPU","provider":"CPU EP","target":"bundled","arch":"x64","latencyMs":0,"accuracyPct":null,"werPct":8.58085808580858,"modelSha":"cb0a9671","date":"2026-07-15"}]};
 
-const assignmentRows = [
-  ["Qualcomm", "bundled", "0 / 3", "QNN profiler only", "Whisper · TSC · FakeAudio"],
-  ["Qualcomm", "Windows ML", "0 / 3", "QNN profiler only", "Whisper · TSC · FakeAudio"],
-  ["Intel", "bundled", "3 / 3", "ORT EP graph assignment", "none"],
-  ["Intel", "Windows ML", "3 / 3", "ORT EP graph assignment", "none"],
-  ["AMD", "bundled", "3 / 3", "VitisAI cache context + gops", "none"],
-  ["AMD", "Windows ML", "0 / 3", "VitisAI profiler only", "Whisper · TSC · FakeAudio"],
-];
+const workloadNames = {
+  tsc: "TSC",
+  fakeaudio: "FakeAudio",
+  "whisper-tiny-static": "Whisper static",
+  "whisper-tiny-dynamic": "Whisper dynamic KV",
+} as const;
 
-const weaknessRows = [
-  ["High", "NPU assignment proof", "9 / 18 canonical NPU rows", "Qualcomm has none; AMD Windows ML has none", "Rerun those nine rows under the new trust gate"],
-  ["High", "Performance comparability", "Accuracy-quick uses one timed pass", "No controlled three-vendor latency cohort", "Run multi-run latency campaigns under matched power policy"],
-  ["High", "FakeAudio quality", "60% on only five fixtures", "Too weak to rank hardware or model quality", "Expand and stratify the labeled evaluation set"],
-  ["Medium", "Artifact equivalence", "FakeAudio has three model hashes", "Intel uses a patched backbone; GPU/CPU use whole graph", "Publish a single portable NPU backbone or keep rankings separate"],
-  ["Medium", "Environment control", "63 cells on battery; 3 AMD NPU cells on AC", "Thermals and power are not normalized", "Capture temperatures and fix AC/DC plus power-plan policy"],
-  ["Medium", "Runtime parity", "Bundled ORT versions vary by executor", "Intel spans 1.24.1/1.24.4; AMD 1.23.3/1.24.4", "Align runtime versions where provider packaging permits"],
-  ["Medium", "Whisper NPU breadth", "Only static no-KV is in the NPU matrix", "Dynamic KV is GPU/CPU-only; bounded KV is absent", "Add a portable bounded-KV profile or state the exclusion"],
-];
+const workloads = Object.keys(workloadNames) as Array<keyof typeof workloadNames>;
 
-function Caption({ children }: { children: string }) {
-  return <Text size="small" tone="tertiary" style={{ marginTop: 6 }}>{children}</Text>;
+function format(value: number, digits = 1) {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
-function Overview() {
+function configLabel(row: ResultRow) {
+  return `${row.siliconVendor} · ${row.provider} · ${row.device} · ${row.target}`;
+}
+
+function cohortKey(row: ResultRow) {
+  return [
+    row.workload,
+    row.siliconVendor,
+    row.provider,
+    row.device,
+    row.target,
+  ].join("|");
+}
+
+function hashHue(value: string, hues: string[]) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33 + value.charCodeAt(index)) >>> 0;
+  }
+  return hues[hash % hues.length];
+}
+
+type CohortPartKey = "silicon" | "provider" | "device" | "target";
+type SortKey = CohortPartKey | "quality" | "latency";
+
+function CohortParts({
+  siliconVendor,
+  provider,
+  device,
+  target,
+  activePart,
+  sortDir,
+  onSortPart,
+}: {
+  siliconVendor: string;
+  provider: string;
+  device: string;
+  target: string;
+  activePart?: CohortPartKey | null;
+  sortDir?: "asc" | "desc";
+  onSortPart: (part: CohortPartKey) => void;
+}) {
+  const theme = useHostTheme();
+  const siliconColors: Record<string, string> = {
+    Intel: theme.category.blue,
+    AMD: theme.category.orange,
+    Qualcomm: theme.category.purple,
+  };
+  const providerColors: Record<string, string> = {
+    OpenVINO: theme.category.cyan,
+    QNN: theme.category.pink,
+    VitisAI: theme.category.yellow,
+    DirectML: theme.category.blue,
+    "CPU EP": theme.category.gray,
+  };
+  const deviceColors: Record<string, string> = {
+    NPU: theme.category.green,
+    GPU: theme.category.orange,
+    CPU: theme.category.gray,
+  };
+  const targetColors: Record<string, string> = {
+    bundled: theme.category.cyan,
+    winml: theme.category.pink,
+  };
+  const fallback = [
+    theme.category.blue,
+    theme.category.purple,
+    theme.category.green,
+    theme.category.yellow,
+    theme.category.cyan,
+    theme.category.pink,
+    theme.category.orange,
+  ];
+  const parts: Array<{ key: CohortPartKey; value: string; color: string }> = [
+    {
+      key: "silicon",
+      value: siliconVendor,
+      color: siliconColors[siliconVendor] ?? hashHue(siliconVendor, fallback),
+    },
+    {
+      key: "provider",
+      value: provider,
+      color: providerColors[provider] ?? hashHue(provider, fallback),
+    },
+    {
+      key: "device",
+      value: device,
+      color: deviceColors[device] ?? hashHue(device, fallback),
+    },
+    {
+      key: "target",
+      value: target,
+      color: targetColors[target] ?? hashHue(target, fallback),
+    },
+  ];
+
   return (
-    <Stack gap={20}>
+    <span
+      style={{
+        display: "inline-flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 4,
+        lineHeight: 1.2,
+      }}
+    >
+      {parts.map((part, index) => {
+        const active = activePart === part.key;
+        return (
+          <span
+            key={part.key}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          >
+            {index > 0 && (
+              <Text as="span" size="small" tone="quaternary">
+                ·
+              </Text>
+            )}
+            <span
+              title={`Sort by ${part.key}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSortPart(part.key);
+              }}
+              style={{
+                color: part.color,
+                background: active ? theme.fill.secondary : theme.fill.tertiary,
+                padding: "1px 6px",
+                borderRadius: 4,
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                border: active
+                  ? `1px solid ${part.color}`
+                  : `1px solid transparent`,
+                fontSize: 12,
+                fontWeight: 600,
+                lineHeight: 1.25,
+              }}
+            >
+              {`${part.value}${active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}`}
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function LatestComparison() {
+  const theme = useHostTheme();
+  const [workload, setWorkload] = useCanvasState<keyof typeof workloadNames>(
+    "latest-complete-workload-v1",
+    "tsc"
+  );
+  const [sortKey, setSortKey] = useCanvasState<SortKey>(
+    "latest-complete-sort-key-v2",
+    "latency"
+  );
+  const [sortDir, setSortDir] = useCanvasState<"asc" | "desc">(
+    "latest-complete-sort-dir-v2",
+    "asc"
+  );
+  const isClassifier = workload === "tsc" || workload === "fakeaudio";
+
+  const latencyRows = (
+    isClassifier ? data.pairedClassifiers : data.asrLatency
+  ).filter((row) => row.workload === workload);
+
+  const accuracyByKey = new Map(
+    (isClassifier ? data.pairedClassifiers : data.asrAccuracy)
+      .filter((row) => row.workload === workload)
+      .map((row) => [cohortKey(row), row])
+  );
+
+  const combined = latencyRows.map((latency) => {
+    const accuracy = accuracyByKey.get(cohortKey(latency));
+    return {
+      label: configLabel(latency),
+      siliconVendor: latency.siliconVendor,
+      provider: latency.provider,
+      device: latency.device,
+      target: latency.target,
+      executor: latency.executor,
+      arch: latency.arch,
+      latencyMs: latency.latencyMs,
+      accuracyPct: isClassifier
+        ? latency.accuracyPct ?? accuracy?.accuracyPct ?? null
+        : accuracy?.accuracyPct ?? null,
+      werPct: isClassifier ? null : accuracy?.werPct ?? null,
+      latencyModel: latency.modelSha,
+      accuracyModel: accuracy?.modelSha ?? null,
+      exactModelPair: !!accuracy && latency.modelSha === accuracy.modelSha,
+    };
+  });
+
+  const maxLatency = Math.max(...combined.map((row) => row.latencyMs), 1);
+  const fastestMs = Math.min(
+    ...combined.map((row) => row.latencyMs),
+    Number.POSITIVE_INFINITY
+  );
+  const exactPairs = combined.filter((row) => row.exactModelPair).length;
+  const werValues = combined
+    .map((row) => row.werPct)
+    .filter((value): value is number => value != null);
+  const bestWer = werValues.length > 0 ? Math.min(...werValues) : null;
+  const accuracyValues = combined
+    .map((row) => row.accuracyPct)
+    .filter((value): value is number => value != null);
+  const bestAccuracy =
+    accuracyValues.length > 0 ? Math.max(...accuracyValues) : null;
+  const werRegressions = combined.filter(
+    (row) => row.werPct != null && bestWer != null && row.werPct > bestWer + 1e-9
+  ).length;
+
+  const qualityValue = (row: (typeof combined)[number]) =>
+    isClassifier ? row.accuracyPct : row.werPct;
+
+  const partValue = (
+    row: (typeof combined)[number],
+    key: CohortPartKey
+  ) => {
+    if (key === "silicon") return row.siliconVendor;
+    if (key === "provider") return row.provider;
+    if (key === "device") return row.device;
+    return row.target;
+  };
+
+  const sorted = [...combined].sort((left, right) => {
+    const direction = sortDir === "asc" ? 1 : -1;
+    if (
+      sortKey === "silicon" ||
+      sortKey === "provider" ||
+      sortKey === "device" ||
+      sortKey === "target"
+    ) {
+      const primary =
+        partValue(left, sortKey).localeCompare(partValue(right, sortKey)) *
+        direction;
+      if (primary !== 0) return primary;
+      return left.latencyMs - right.latencyMs;
+    }
+    if (sortKey === "quality") {
+      const leftValue = qualityValue(left);
+      const rightValue = qualityValue(right);
+      if (leftValue == null && rightValue == null) return 0;
+      if (leftValue == null) return 1;
+      if (rightValue == null) return -1;
+      return (leftValue - rightValue) * direction;
+    }
+    return (left.latencyMs - right.latencyMs) * direction;
+  });
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "quality" && isClassifier ? "desc" : "asc");
+  };
+
+  const sortMark = (key: SortKey) =>
+    sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+  const activeCohortPart =
+    sortKey === "silicon" ||
+    sortKey === "provider" ||
+    sortKey === "device" ||
+    sortKey === "target"
+      ? sortKey
+      : null;
+
+  const sortBucket = (row: (typeof combined)[number]) => {
+    if (
+      sortKey === "silicon" ||
+      sortKey === "provider" ||
+      sortKey === "device" ||
+      sortKey === "target"
+    ) {
+      return partValue(row, sortKey);
+    }
+    if (sortKey === "quality") {
+      const value = qualityValue(row);
+      if (value == null) return "—";
+      return isClassifier ? `${format(value)}%` : `${format(value, 2)}%`;
+    }
+    return null;
+  };
+
+  const headerStyle = {
+    cursor: "pointer",
+    userSelect: "none" as const,
+    color: theme.text.secondary,
+  };
+
+  const gridColumns = "minmax(220px, 30%) minmax(110px, 14%) 1fr 72px";
+
+  return (
+    <Stack gap={16}>
+      <Row gap={8} wrap>
+        {workloads.map((value) => (
+          <Pill
+            key={value}
+            active={workload === value}
+            onClick={() => setWorkload(value)}
+          >
+            {workloadNames[value]}
+          </Pill>
+        ))}
+      </Row>
+
       <Grid columns={4} gap={14}>
-        <Stat value="66 / 66" label="Eligible matrix cells valid" tone="success" />
-        <Stat value="83 / 86" label="Published records valid" tone="warning" />
-        <Stat value="9 / 18" label="Canonical NPU rows with op split" tone="danger" />
-        <Stat value="3" label="FakeAudio model hashes" tone="warning" />
-      </Grid>
-
-      <Callout title="Coverage is complete; evidence strength is not" tone="warning">
-        All six vendor-runtime sweeps cover their 11 eligible cells. That proves
-        executor coverage, not uniform NPU trust or performance comparability.
-        The newer CPU/NPU operation-assignment requirement is satisfied by all
-        Intel NPU rows and AMD bundled NPU rows, but not by Qualcomm or AMD
-        Windows ML rows retained from the historical ledger.
-      </Callout>
-
-      <Grid columns="1.25fr 1fr" gap={18}>
-        <Stack gap={8}>
-          <H2>Canonical accuracy coverage</H2>
-          <Text size="small" tone="secondary">
-            X-axis: vendor · Y-axis: valid eligible cells (% of 22)
-          </Text>
-          <BarChart
-            height={270}
-            categories={["Qualcomm", "Intel", "AMD"]}
-            series={[{
-              name: "Valid matrix coverage",
-              data: [100, 100, 100],
-              tone: "success",
-            }]}
-            valueSuffix="%"
-            showValues
-          />
-          <Caption>Source: frozen history plus two immutable Intel campaigns · 86 records, deduplicated to 66 latest valid cells · through 15 Jul 2026.</Caption>
-        </Stack>
-
-        <Card>
-          <CardHeader trailing={<Pill size="sm" active>Current</Pill>}>What changed</CardHeader>
-          <CardBody>
-            <Stack gap={12}>
-              <Text><Text weight="semibold">Intel timing:</Text> latest bundled Whisper mean is 745.59 ms, not the stale 1896.2 ms.</Text>
-              <Text><Text weight="semibold">AMD timing:</Text> latest bundled NPU means are 944.96, 33.83, and 48.71 ms.</Text>
-              <Text><Text weight="semibold">Power:</Text> AMD bundled NPU evidence was collected on AC; the other 63 canonical cells were on battery.</Text>
-              <Text><Text weight="semibold">Trust:</Text> operation splits now expose why profiler-node percentages should not be read as compute share.</Text>
-            </Stack>
-          </CardBody>
-        </Card>
-      </Grid>
-    </Stack>
-  );
-}
-
-function NpuTrust() {
-  return (
-    <Stack gap={18}>
-      <Grid columns="1.4fr 0.8fr" gap={18}>
-        <Stack gap={8}>
-          <H2>CPU operation offload on measured NPU paths</H2>
-          <Text size="small" tone="secondary">
-            X-axis: vendor, runtime, and workload · Y-axis: original graph operations assigned to CPU (%)
-          </Text>
-          <BarChart
-            horizontal
-            height={300}
-            categories={[
-              "Intel bundled · Whisper",
-              "Intel bundled · TSC",
-              "Intel bundled · FakeAudio",
-              "Intel WinML · Whisper",
-              "Intel WinML · TSC",
-              "Intel WinML · FakeAudio",
-              "AMD bundled · Whisper",
-              "AMD bundled · TSC",
-              "AMD bundled · FakeAudio",
-            ]}
-            series={[{
-              name: "CPU-assigned operation share",
-              data: [2.70, 0, 0, 0, 0, 0, 7.84, 5.31, 1.03],
-              tone: "warning",
-            }]}
-            valueSuffix="%"
-            showValues
-          />
-          <Caption>Lower is better. Intel uses ORT original graph nodes; AMD uses VitisAI context/gops rows. Qualcomm is omitted because no trustworthy operation split was recorded.</Caption>
-        </Stack>
-
-        <Stack gap={8}>
-          <H2>Operation-split coverage</H2>
-          <Text size="small" tone="secondary">
-            X-axis: vendor · Y-axis: canonical NPU rows with CPU/NPU operation split (count of 6)
-          </Text>
-          <BarChart
-            height={300}
-            categories={["Qualcomm", "Intel", "AMD"]}
-            series={[{
-              name: "Operation split recorded",
-              data: [0, 6, 3],
-              tone: "info",
-            }]}
-            showValues
-          />
-          <Caption>Six NPU cells per vendor: two runtimes × three NPU-eligible workloads.</Caption>
-        </Stack>
-      </Grid>
-
-      <Table
-        headers={["Vendor", "Runtime", "Rows with op split", "Evidence source", "Missing workloads"]}
-        rows={assignmentRows}
-        columnAlign={["left", "left", "right", "left", "left"]}
-        rowTone={["danger", "danger", "success", "success", "success", "danger"]}
-        striped
-      />
-
-      <Callout title="Legacy profiler-node share is secondary" tone="info">
-        The headline placement metric is now original operations assigned to
-        CPU. Profiler-node share remains useful for debugging runtime
-        partitions, but fusion makes it a poor proxy for offloaded work:
-        AMD's 84–93% CPU-node share corresponds to only 1–8% CPU operations.
-      </Callout>
-    </Stack>
-  );
-}
-
-function Coverage() {
-  return (
-    <Stack gap={18}>
-      <Stack gap={8}>
-        <H2>Complete portable-suite coverage</H2>
-        <Text size="small" tone="secondary">
-          X-axis: vendor · Y-axis: valid eligible cells by runtime target (count)
-        </Text>
-        <BarChart
-          height={280}
-          categories={["Qualcomm", "Intel", "AMD"]}
-          series={[
-            { name: "Bundled valid", data: [11, 11, 11], tone: "info" },
-            { name: "Windows ML valid", data: [11, 11, 11], tone: "success" },
-          ]}
-          showValues
+        <Stat
+          value={
+            Number.isFinite(fastestMs) ? `${format(fastestMs)} ms` : "—"
+          }
+          label="Fastest latest mean"
+          tone="success"
         />
-        <Caption>Each runtime target contains three NPU, four GPU, and four CPU cells. Dynamic-KV Whisper is intentionally excluded from NPU.</Caption>
+        <Stat
+          value={String(combined.length)}
+          label="Compared cohorts"
+          tone="info"
+        />
+        <Stat
+          value={`${exactPairs}/${combined.length}`}
+          label="Exact model pairs"
+          tone={exactPairs === combined.length ? "success" : "warning"}
+        />
+        <Stat
+          value={
+            isClassifier
+              ? bestAccuracy == null
+                ? "—"
+                : `${format(bestAccuracy)}%`
+              : bestWer == null
+                ? "—"
+                : `${format(bestWer, 2)}%`
+          }
+          label={isClassifier ? "Best accuracy" : "Best WER"}
+          tone={werRegressions > 0 ? "warning" : "success"}
+        />
+      </Grid>
+
+      {!isClassifier && exactPairs < combined.length && (
+        <Callout title="ASR model hashes still differ" tone="warning">
+          Rows are joined on silicon, provider, device, and target so latency
+          and quality sit together. When model SHAs differ, quality is still
+          shown from the matching accuracy cohort, but it is not an exact
+          artifact pair.
+        </Callout>
+      )}
+
+      {!isClassifier && werRegressions > 0 && (
+        <Callout title="WER regressions vs best in this workload" tone="danger">
+          {werRegressions} cohort
+          {werRegressions === 1 ? "" : "s"} raise WER above the best{" "}
+          {format(bestWer ?? 0, 2)}%. Those rows are marked in red; lower WER is
+          better.
+        </Callout>
+      )}
+
+      <Stack gap={6}>
+        <H2>
+          {workloadNames[workload]} latency and{" "}
+          {isClassifier ? "accuracy" : "WER"}
+        </H2>
+        <Text size="small" tone="secondary">
+          Click a cohort chip to sort by that part. Click Accuracy/WER or Latency
+          headers for those columns. Latency bar uses most of the row width.
+        </Text>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: gridColumns,
+            gap: 10,
+            alignItems: "center",
+            padding: "4px 0",
+            borderBottom: `1px solid ${theme.stroke.secondary}`,
+          }}
+        >
+          <CohortParts
+            siliconVendor="silicon"
+            provider="provider"
+            device="device"
+            target="target"
+            activePart={activeCohortPart}
+            sortDir={sortDir}
+            onSortPart={toggleSort}
+          />
+          <div style={headerStyle} onClick={() => toggleSort("quality")}>
+            <Text size="small" weight="semibold">
+              {`${isClassifier ? "Accuracy" : "WER"}${sortMark("quality")}`}
+            </Text>
+          </div>
+          <div style={headerStyle} onClick={() => toggleSort("latency")}>
+            <Text size="small" weight="semibold">
+              {`Latency${sortMark("latency")}`}
+            </Text>
+          </div>
+          <Text size="small" tone="tertiary" style={{ textAlign: "right" }}>
+            ms
+          </Text>
+        </div>
+
+        {sorted.map((row, index) => {
+          const widthPct = Math.max(2, (row.latencyMs / maxLatency) * 100);
+          const werDelta =
+            row.werPct != null && bestWer != null ? row.werPct - bestWer : null;
+          const accuracyDelta =
+            row.accuracyPct != null && bestAccuracy != null
+              ? row.accuracyPct - bestAccuracy
+              : null;
+          const qualityColor =
+            !isClassifier && werDelta != null && werDelta > 1e-9
+              ? theme.category.red
+              : isClassifier && accuracyDelta != null && accuracyDelta < -1e-9
+                ? theme.category.red
+                : theme.category.green;
+          const qualityText = isClassifier
+            ? row.accuracyPct == null
+              ? "—"
+              : accuracyDelta != null && accuracyDelta < -1e-9
+                ? `${format(row.accuracyPct)}% ${format(accuracyDelta)}pp`
+                : `${format(row.accuracyPct)}%`
+            : row.werPct == null
+              ? "—"
+              : werDelta != null && werDelta > 1e-9
+                ? `${format(row.werPct, 2)}% +${format(werDelta, 2)}pp`
+                : werDelta != null && werDelta < -1e-9
+                  ? `${format(row.werPct, 2)}% ${format(werDelta, 2)}pp`
+                  : `${format(row.werPct, 2)}% best`;
+          const bucket = sortBucket(row);
+          const previousBucket =
+            index > 0 ? sortBucket(sorted[index - 1]) : null;
+          const showGroupBreak =
+            bucket != null && index > 0 && bucket !== previousBucket;
+
+          return (
+            <div key={`${row.label}-${row.executor}`}>
+              {showGroupBreak && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    margin: "8px 0 4px",
+                  }}
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      height: 2,
+                      background: theme.stroke.secondary,
+                    }}
+                  />
+                  <Text size="small" tone="tertiary" weight="semibold">
+                    {bucket}
+                  </Text>
+                  <div
+                    style={{
+                      flex: 1,
+                      height: 2,
+                      background: theme.stroke.secondary,
+                    }}
+                  />
+                </div>
+              )}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: gridColumns,
+                  gap: 10,
+                  alignItems: "center",
+                  padding: "3px 0",
+                  borderBottom: `1px solid ${theme.stroke.tertiary}`,
+                  minHeight: 28,
+                }}
+              >
+                <CohortParts
+                  siliconVendor={row.siliconVendor}
+                  provider={row.provider}
+                  device={row.device}
+                  target={row.target}
+                  activePart={activeCohortPart}
+                  sortDir={sortDir}
+                  onSortPart={toggleSort}
+                />
+                <Text
+                  size="small"
+                  weight="semibold"
+                  style={{ color: qualityColor, lineHeight: 1.25 }}
+                >
+                  {qualityText}
+                </Text>
+                <div
+                  style={{
+                    height: 10,
+                    background: theme.fill.tertiary,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${widthPct}%`,
+                      background:
+                        !isClassifier && werDelta != null && werDelta > 1e-9
+                          ? theme.category.red
+                          : theme.accent.primary,
+                      borderRadius: 3,
+                    }}
+                  />
+                </div>
+                <Text
+                  size="small"
+                  weight="semibold"
+                  style={{ textAlign: "right", lineHeight: 1.25 }}
+                >
+                  {format(row.latencyMs)}
+                </Text>
+              </div>
+            </div>
+          );
+        })}
+
+        <Text size="small" tone="tertiary">
+          Source: latest complete latency rows joined to latest trust-gate-valid
+          accuracy rows on silicon, provider, device, and runtime target · run
+          dates 15–16 Jul 2026. Lower latency and lower WER are better.
+        </Text>
       </Stack>
-
-      <Table
-        headers={["Vendor / runtime", "NPU", "GPU", "CPU", "Valid", "Resolved paths"]}
-        rows={coverageRows}
-        columnAlign={["left", "right", "right", "right", "right", "left"]}
-        rowTone={["success", "success", "success", "success", "success", "success"]}
-        striped
-      />
-
-      <Grid columns={2} gap={16}>
-        <Callout title="Three retained invalid rows" tone="warning">
-          Historical Intel bundled NPU requests resolved to DirectML for
-          Whisper, TSC, and FakeAudio. They remain auditable in the ledger but
-          are superseded by valid forced-OpenVINO rows.
-        </Callout>
-        <Callout title="One valid Intel GPU cell uses DirectML" tone="info">
-          Whole-graph FakeAudio fails on forced OpenVINO GPU with
-          CL_INVALID_WORK_GROUP_SIZE. DirectML covers that eligible cell; the
-          matrix does not claim OVEP succeeded there.
-        </Callout>
-      </Grid>
-    </Stack>
-  );
-}
-
-function Timing() {
-  return (
-    <Stack gap={18}>
-      <Callout title="Orientation only, not a latency leaderboard" tone="warning">
-        These are accuracy-quick means from one timed pass per clip or fixture.
-        Runtime versions, architecture, AC/DC state, and thermal history differ.
-      </Callout>
-
-      <Grid columns={3} gap={16}>
-        <Stack gap={8}>
-          <H2>Whisper static NPU</H2>
-          <Text size="small" tone="secondary">X-axis: vendor · Y-axis: mean per clip (ms)</Text>
-          <BarChart
-            height={260}
-            categories={["Qualcomm", "Intel", "AMD"]}
-            series={[{ name: "Accuracy-quick mean", data: [538.30, 745.59, 944.96], tone: "info" }]}
-            valueSuffix=" ms"
-            showValues
-          />
-          <Caption>12 clips · same model and fixture hashes · WER 8.58%, 9.57%, and 10.23%.</Caption>
-        </Stack>
-        <Stack gap={8}>
-          <H2>TSC NPU</H2>
-          <Text size="small" tone="secondary">X-axis: vendor · Y-axis: mean per fixture (ms)</Text>
-          <BarChart
-            height={260}
-            categories={["Qualcomm", "Intel", "AMD"]}
-            series={[{ name: "Accuracy-quick mean", data: [18.52, 9.49, 33.83], tone: "success" }]}
-            valueSuffix=" ms"
-            showValues
-          />
-          <Caption>15 fixtures · identical model and fixture hashes · 93.33% task accuracy.</Caption>
-        </Stack>
-        <Stack gap={8}>
-          <H2>FakeAudio split NPU</H2>
-          <Text size="small" tone="secondary">X-axis: vendor · Y-axis: mean per fixture (ms)</Text>
-          <BarChart
-            height={260}
-            categories={["Qualcomm", "Intel", "AMD"]}
-            series={[{ name: "Accuracy-quick mean", data: [110.65, 27.40, 48.71], tone: "warning" }]}
-            valueSuffix=" ms"
-            showValues
-          />
-          <Caption>Five fixtures · 60% accuracy · Intel uses a different patched backbone; AMD uses a different fixture hash.</Caption>
-        </Stack>
-      </Grid>
-
-      <Table
-        headers={["Vendor", "Workload", "Provider", "Observed mean", "Quality", "CPU operation share", "Assigned operations", "Power"]}
-        rows={bundledNpuRows}
-        columnAlign={["left", "left", "left", "right", "right", "right", "right", "left"]}
-        rowTone={["warning", "warning", "warning", "warning", "success", "warning", "warning", "success", "warning"]}
-        striped
-        stickyHeader
-      />
-    </Stack>
-  );
-}
-
-function Weaknesses() {
-  return (
-    <Stack gap={18}>
-      <Callout title="The biggest weakness is grandfathered NPU evidence" tone="danger">
-        Nine canonical NPU rows predate the operation-assignment trust gate.
-        They remain valid because the schema is backward-compatible, even
-        though equivalent new rows would be rejected without an operation split.
-      </Callout>
-
-      <Table
-        headers={["Priority", "Weakness", "Evidence", "Why it matters", "Best next action"]}
-        rows={weaknessRows}
-        columnAlign={["left", "left", "left", "left", "left"]}
-        rowTone={["danger", "danger", "danger", "warning", "warning", "warning", "warning"]}
-        striped
-        stickyHeader
-      />
-
-      <Grid columns={2} gap={16}>
-        <Callout title="Coverage denominator is intentionally narrow" tone="warning">
-          The 66-cell matrix excludes NPU execution for dynamic-KV Whisper.
-          It also contains no portable bounded-KV profile. A complete matrix
-          therefore means complete coverage of the manifest, not complete
-          coverage of useful Whisper decoder architectures.
-        </Callout>
-        <Callout title="Accuracy quality is uneven" tone="warning">
-          TSC has 15 fixtures and Whisper has 12 clips, but FakeAudio has only
-          five fixtures and reaches 60% task accuracy on every NPU path.
-          Agreement with CPU reference does not make that classifier good.
-        </Callout>
-      </Grid>
     </Stack>
   );
 }
@@ -327,73 +595,356 @@ function Weaknesses() {
 function Method() {
   return (
     <Stack gap={18}>
-      <H2>Curation contract</H2>
+      <H2>Selection contract</H2>
+      <Grid columns={4} gap={14}>
+        <Stat value="213" label="Complete latency rows" tone="info" />
+        <Stat value="68" label="Latest latency cohorts" tone="success" />
+        <Stat value="171" label="Complete accuracy rows" tone="info" />
+        <Stat value="73" label="Latest accuracy cohorts" tone="success" />
+      </Grid>
+
+      <Callout title="“All columns filled in” is semantic, not literal" tone="info">
+        A row must have metrics, runtime and provider identity, model and fixture
+        provenance, execution profile, graph role, host snapshot, and a valid
+        trust gate. Nullable success fields such as error, plus optional
+        operation-assignment fields, may be empty. Requiring every physical CSV
+        cell would reject successful rows because successful runs have no error
+        text. Marvellous schema theatre.
+      </Callout>
+
       <Grid columns={2} gap={16}>
         <Card>
-          <CardHeader>Canonical matrix</CardHeader>
+          <CardHeader>Latency inclusion</CardHeader>
           <CardBody>
             <Stack gap={8}>
-              <Text>Read frozen `accuracy.jsonl` plus every `accuracy-runs/*.jsonl` file</Text>
-              <Text>Require `trust_gate.valid=true` and intended provider resolution</Text>
-              <Text>Select the latest valid row per vendor, runtime, device, and workload cell</Text>
-              <Text>Keep all 86 raw records visible for provenance and invalid-attempt auditing</Text>
+              <Text>Require measurement_purpose=latency and status=ok</Text>
+              <Text>Require explicit provider resolution and no fallback</Text>
+              <Text>Require runtime version, model SHA, profile, and provenance</Text>
+              <Text>Select latest host-snapshot timestamp per exact cohort</Text>
             </Stack>
           </CardBody>
         </Card>
-
         <Card>
-          <CardHeader>Interpretation limits</CardHeader>
+          <CardHeader>Accuracy inclusion</CardHeader>
           <CardBody>
             <Stack gap={8}>
-              <Text>Accuracy-quick timing is not explicit latency evidence</Text>
-              <Text>CPU operation assignment is the primary offload metric</Text>
-              <Text>Legacy profiler-node share is retained only as a partition diagnostic</Text>
-              <Text>ORT and VitisAI assignment sources have different reporting semantics</Text>
-              <Text>FakeAudio split profiles are not artifact-identical across all vendors</Text>
+              <Text>Require trust_gate.valid=true</Text>
+              <Text>Require model and fixture hashes plus host snapshot</Text>
+              <Text>Require workload-specific quality metrics</Text>
+              <Text>Select latest timestamp per exact cohort</Text>
             </Stack>
           </CardBody>
         </Card>
       </Grid>
 
-      <Callout title="Source precedence" tone="info">
-        Accuracy, provider placement, and operation assignment come from
-        `results/ledgers/accuracy.jsonl` plus immutable files under
-        `results/accuracy-runs/`. Explicit performance claims require
-        `measurement_purpose=latency` rows from the ASR and classifier CSV
-        ledgers and are not promoted into this leaderboard.
+      <Callout title="Strict pairing rule" tone="warning">
+        Latency and accuracy are merged only when workload, profile, graph role,
+        model SHA, runtime target, provider, device, silicon vendor, and hardware
+        all match. This yields 36 classifier pairs. Whisper remains separate
+        because its latest model hashes differ between latency and accuracy
+        evidence.
       </Callout>
+    </Stack>
+  );
+}
+
+type MatrixGroup = {
+  title: string;
+  cells: string[];
+};
+
+type WorkerCampaign = {
+  priority: "P0" | "P1" | "P2";
+  vendor: string;
+  campaign: string;
+  doneWhen: string;
+  defaultOpen: boolean;
+  groups: MatrixGroup[];
+};
+
+function CampaignCard({ item }: { item: WorkerCampaign }) {
+  const runCount = item.groups.reduce(
+    (total, group) => total + group.cells.length,
+    0
+  );
+  return (
+    <Card collapsible defaultOpen={item.defaultOpen}>
+      <CardHeader trailing={`${runCount} runs`}>
+        {`${item.priority} · ${item.vendor} · ${item.campaign}`}
+      </CardHeader>
+      <CardBody>
+        <Stack gap={14}>
+          {item.groups.map((group) => (
+            <Stack key={group.title} gap={6}>
+              <Text weight="semibold">{group.title}</Text>
+              <Stack gap={4}>
+                {group.cells.map((cell) => (
+                  <Text key={cell} size="small">
+                    {cell}
+                  </Text>
+                ))}
+              </Stack>
+            </Stack>
+          ))}
+          <Stack gap={4}>
+            <Text weight="semibold">Done when</Text>
+            <Text size="small">{item.doneWhen}</Text>
+          </Stack>
+        </Stack>
+      </CardBody>
+    </Card>
+  );
+}
+
+function MissingRuns() {
+  const campaigns: WorkerCampaign[] = [
+    {
+      priority: "P0",
+      vendor: "Qualcomm",
+      campaign: "ASR explicit latency",
+      defaultOpen: true,
+      doneWhen:
+        "Every listed cell publishes measurement_purpose=latency status=ok against the accuracy model SHA, with no fallback, and pairs the existing accuracy cohort.",
+      groups: [
+        {
+          title:
+            "whisper-tiny-static · model dee360f3 · profile static-onnx · graph whole",
+          cells: [
+            "bundled · QNN · NPU",
+            "bundled · DirectML · GPU",
+            "bundled · CPU EP · CPU",
+            "winml · QNN · NPU",
+            "winml · DirectML · GPU",
+            "winml · CPU EP · CPU",
+          ],
+        },
+        {
+          title:
+            "whisper-tiny-dynamic · model cb0a9671 · profile dynamic-kv-onnx · graph whole",
+          cells: [
+            "bundled · DirectML · GPU",
+            "bundled · CPU EP · CPU",
+            "winml · DirectML · GPU",
+            "winml · CPU EP · CPU",
+          ],
+        },
+      ],
+    },
+    {
+      priority: "P0",
+      vendor: "AMD",
+      campaign: "ASR explicit latency",
+      defaultOpen: true,
+      doneWhen:
+        "Every listed cell publishes measurement_purpose=latency status=ok against the accuracy model SHA, with no fallback, and pairs the existing accuracy cohort.",
+      groups: [
+        {
+          title:
+            "whisper-tiny-static · model dee360f3 · profile static-onnx · graph whole",
+          cells: [
+            "bundled · VitisAI · NPU",
+            "bundled · DirectML · GPU",
+            "bundled · CPU EP · CPU",
+            "winml · VitisAI · NPU",
+            "winml · DirectML · GPU",
+            "winml · CPU EP · CPU",
+          ],
+        },
+        {
+          title:
+            "whisper-tiny-dynamic · model cb0a9671 · profile dynamic-kv-onnx · graph whole",
+          cells: [
+            "bundled · DirectML · GPU",
+            "bundled · CPU EP · CPU",
+            "winml · DirectML · GPU",
+            "winml · CPU EP · CPU",
+          ],
+        },
+      ],
+    },
+    {
+      priority: "P0",
+      vendor: "Intel",
+      campaign: "ASR explicit latency",
+      defaultOpen: true,
+      doneWhen:
+        "Every listed cell publishes measurement_purpose=latency status=ok against the accuracy model SHA, with no fallback. This also closes the four accuracy-only OpenVINO CPU/GPU paths.",
+      groups: [
+        {
+          title:
+            "whisper-tiny-static · model dee360f3 · profile static-onnx · graph whole",
+          cells: [
+            "bundled · OpenVINO · NPU",
+            "bundled · OpenVINO · GPU",
+            "bundled · OpenVINO · CPU",
+            "bundled · DirectML · GPU",
+            "bundled · CPU EP · CPU",
+            "winml · OpenVINO · NPU",
+            "winml · DirectML · GPU",
+            "winml · CPU EP · CPU",
+          ],
+        },
+        {
+          title:
+            "whisper-tiny-dynamic · model cb0a9671 · profile dynamic-kv-onnx · graph whole",
+          cells: [
+            "bundled · OpenVINO · GPU",
+            "bundled · OpenVINO · CPU",
+            "bundled · DirectML · GPU",
+            "bundled · CPU EP · CPU",
+            "winml · DirectML · GPU",
+            "winml · CPU EP · CPU",
+          ],
+        },
+      ],
+    },
+    {
+      priority: "P1",
+      vendor: "Intel",
+      campaign: "Classifier explicit latency",
+      defaultOpen: true,
+      doneWhen:
+        "Each cell publishes measurement_purpose=latency status=ok and pairs the already-valid OpenVINO accuracy cohort on the same model SHA.",
+      groups: [
+        {
+          title: "tsc · model 90f2ed1b · profile whole-fp32 · graph whole",
+          cells: [
+            "bundled · OpenVINO · CPU",
+            "bundled · OpenVINO · GPU",
+          ],
+        },
+        {
+          title: "fakeaudio · model 549143bc · profile whole-fp32 · graph whole",
+          cells: ["bundled · OpenVINO · CPU"],
+        },
+      ],
+    },
+    {
+      priority: "P2",
+      vendor: "Qualcomm",
+      campaign: "FakeAudio diagnostic accuracy",
+      defaultOpen: false,
+      doneWhen:
+        "Optional only. Publish trust-gate-valid accuracy for the diagnostic whole-graph QNN NPU profile under both runtime targets, or drop the diagnostic latency rows from the comparison set.",
+      groups: [
+        {
+          title:
+            "fakeaudio · model 549143bc · profile npu-whole-diagnostic · graph whole",
+          cells: [
+            "bundled · QNN · NPU",
+            "winml · QNN · NPU",
+          ],
+        },
+      ],
+    },
+  ];
+
+  return (
+    <Stack gap={18}>
+      <Grid columns={4} gap={14}>
+        <Stat value="34" label="P0 ASR latency runs" tone="danger" />
+        <Stat value="3" label="P1 classifier latency runs" tone="warning" />
+        <Stat value="2" label="Optional diagnostic runs" tone="info" />
+        <Stat value="36 / 36" label="Canonical classifier pairs" tone="success" />
+      </Grid>
+
+      <Callout title="Primary gap: every ASR latency row has the wrong model SHA for pairing" tone="danger">
+        Existing explicit latency uses static model 9da9f440 and dynamic model
+        12534e24. Latest valid accuracy uses dee360f3 and cb0a9671. Workers
+        should rerun latency against the current accuracy artifacts, not merely
+        repeat the old packages with more samples.
+      </Callout>
+
+      <H2>Worker campaign backlog</H2>
+      <Text size="small" tone="secondary">
+        One card per worker campaign. Matrix cells are fully expanded so nothing
+        is truncated by the table layout that previously ate the useful text.
+      </Text>
+      <Stack gap={12}>
+        {campaigns.map((item) => (
+          <CampaignCard
+            key={`${item.priority}-${item.vendor}-${item.campaign}`}
+            item={item}
+          />
+        ))}
+      </Stack>
+
+      <Grid columns={2} gap={16}>
+        <Callout title="Seven accuracy cohorts lack explicit latency" tone="warning">
+          Four are already included in the P0 Intel ASR campaign: OpenVINO CPU
+          and GPU for static and dynamic Whisper. The remaining three are the
+          P1 classifier runs: TSC OpenVINO CPU/GPU and FakeAudio OpenVINO CPU.
+        </Callout>
+        <Callout title="Two latency cohorts lack accuracy" tone="info">
+          Both are Qualcomm FakeAudio whole-graph NPU diagnostics. They are not
+          part of the canonical split-NPU matrix, so schedule them only if the
+          diagnostic profile matters.
+        </Callout>
+      </Grid>
+
+      <Callout title="Do not schedule already-completed cleanup" tone="success">
+        The canonical classifier matrix is fully paired after normalizing
+        FakeAudio package variant names to the FakeAudio workload: 18 TSC and
+        18 FakeAudio cohorts. Latest runs are on battery, and current canonical
+        NPU latency rows contain operation-assignment evidence. Those old gaps
+        are closed; rerunning them would merely heat rooms and offend silicon.
+      </Callout>
+
+      <Text size="small" tone="tertiary">
+        Missing-run detection compares the union of latest complete latency and
+        trust-gate-valid accuracy cohorts by workload, profile, graph role,
+        runtime target, provider, device, silicon vendor, and hardware. Model
+        SHA differences are reported separately rather than silently joined.
+      </Text>
     </Stack>
   );
 }
 
 export default function CrossVendorBenchmarkResults() {
   const theme = useHostTheme();
-  const [tab, setTab] = useCanvasState("benchmark-tab-v7", "Overview");
+  const [tab, setTab] = useCanvasState(
+    "cross-vendor-latest-tab-v3",
+    "Latest comparison"
+  );
 
   return (
-    <Stack gap={18} style={{ padding: 24, background: theme.bg.editor, minHeight: "100%" }}>
+    <Stack
+      gap={18}
+      style={{
+        padding: 24,
+        background: theme.bg.editor,
+        minHeight: "100%",
+      }}
+    >
       <Stack gap={6}>
-        <H1>Three-vendor accelerator evidence</H1>
+        <H1>Cross-vendor benchmark results</H1>
         <Text tone="secondary">
-          Intel Lunar Lake · AMD XDNA2 · Qualcomm Hexagon · 86 published accuracy records through 15 Jul 2026
+          Latest complete latency and accuracy evidence · Intel, AMD, Qualcomm ·
+          selected 21 Jul 2026
         </Text>
       </Stack>
 
       <Row gap={8} wrap>
-        <Pill active={tab === "Overview"} onClick={() => setTab("Overview")}>Overview</Pill>
-        <Pill active={tab === "CPU op offload"} onClick={() => setTab("CPU op offload")}>CPU op offload</Pill>
-        <Pill active={tab === "Coverage"} onClick={() => setTab("Coverage")}>Coverage</Pill>
-        <Pill active={tab === "Observed timing"} onClick={() => setTab("Observed timing")}>Observed timing</Pill>
-        <Pill active={tab === "Weaknesses"} onClick={() => setTab("Weaknesses")}>Weaknesses</Pill>
-        <Pill active={tab === "Method"} onClick={() => setTab("Method")}>Method</Pill>
+        <Pill
+          active={tab === "Latest comparison"}
+          onClick={() => setTab("Latest comparison")}
+        >
+          Latest comparison
+        </Pill>
+        <Pill
+          active={tab === "Missing runs"}
+          onClick={() => setTab("Missing runs")}
+        >
+          Missing runs
+        </Pill>
+        <Pill active={tab === "Method"} onClick={() => setTab("Method")}>
+          Selection method
+        </Pill>
       </Row>
 
-      {tab === "Overview" && <Overview />}
-      {tab === "CPU op offload" && <NpuTrust />}
-      {tab === "Coverage" && <Coverage />}
-      {tab === "Observed timing" && <Timing />}
-      {tab === "Weaknesses" && <Weaknesses />}
+      {tab === "Latest comparison" && <LatestComparison />}
       {tab === "Method" && <Method />}
+      {tab === "Missing runs" && <MissingRuns />}
     </Stack>
   );
 }
