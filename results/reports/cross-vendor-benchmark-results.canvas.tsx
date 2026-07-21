@@ -410,14 +410,14 @@ function LatestComparison() {
           {isClassifier ? "accuracy" : "WER"}
         </H2>
         <Text size="small" tone="secondary">
-          One row per cohort. One bar: faster power mode is the base color;
-          the tip is the extra latency of the slower mode (yellow = battery, green = AC).
+          One row per cohort. One bar: grey overlap is min(battery, AC);
+          the tip overhang is colored by the slower mode (yellow = battery, green = AC).
           Click a cohort chip to sort by that part.
         </Text>
         <Row gap={12}>
-          <Text size="small" tone="secondary">yellow = battery</Text>
-          <Text size="small" tone="secondary">green = AC</Text>
-          <Text size="small" tone="secondary">tip = slower-mode extra</Text>
+          <Text size="small" tone="secondary">grey = overlap</Text>
+          <Text size="small" tone="secondary">yellow tip = battery slower</Text>
+          <Text size="small" tone="secondary">green tip = AC slower</Text>
         </Row>
 
         <div
@@ -594,22 +594,14 @@ function LatestComparison() {
                   const hi = Math.max(batt, ac);
                   const basePct = (lo / maxMs) * 100;
                   const deltaPct = ((hi - lo) / maxMs) * 100;
-                  const baseColor =
-                    batt <= ac ? theme.category.yellow : theme.category.green;
+                  const overlapColor = theme.category.gray;
                   const tipColor =
                     batt > ac ? theme.category.yellow : theme.category.green;
                   if (deltaPct < 1e-9) {
                     return (
                       <div style={{ minWidth: 0 }}>
                         <div style={track}>
-                          <div
-                            style={{
-                              height: "100%",
-                              width: `${Math.max(2, basePct)}%`,
-                              background: `linear-gradient(90deg, ${theme.category.yellow} 0 50%, ${theme.category.green} 50% 100%)`,
-                              flex: "0 0 auto",
-                            }}
-                          />
+                          {seg(Math.max(2, basePct), overlapColor)}
                         </div>
                       </div>
                     );
@@ -617,7 +609,7 @@ function LatestComparison() {
                   return (
                     <div style={{ minWidth: 0 }}>
                       <div style={track}>
-                        {seg(basePct, baseColor)}
+                        {seg(basePct, overlapColor)}
                         {seg(Math.max(deltaPct, 0.8), tipColor)}
                       </div>
                     </div>
