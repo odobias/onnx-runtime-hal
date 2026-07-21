@@ -411,13 +411,13 @@ function LatestComparison() {
         </H2>
         <Text size="small" tone="secondary">
           One row per cohort. One bar: blue overlap is min(battery, AC);
-          the tip overhang is colored by the slower mode (yellow = battery, green = AC).
+          the tip overhang is a lighter or deeper blue for battery vs AC.
           Click a cohort chip to sort by that part.
         </Text>
-        <Row gap={12}>
-          <Text size="small" tone="secondary">blue = overlap</Text>
-          <Text size="small" tone="secondary">yellow tip = battery slower</Text>
-          <Text size="small" tone="secondary">green tip = AC slower</Text>
+        <Row gap=12>
+          <Text size="small" tone="secondary">mid blue = overlap</Text>
+          <Text size="small" tone="secondary">lighter = battery slower</Text>
+          <Text size="small" tone="secondary">deeper = AC slower</Text>
         </Row>
 
         <div
@@ -601,8 +601,8 @@ function LatestComparison() {
                     const value = (batt ?? ac) as number;
                     const color =
                       batt != null
-                        ? theme.category.yellow
-                        : theme.category.green;
+                        ? "#a9c6ec"
+                        : "#5d96cf";
                     return valueWrap(
                       (value / maxMs) * 100,
                       seg(100, color)
@@ -611,9 +611,9 @@ function LatestComparison() {
                   const lo = Math.min(batt, ac);
                   const hi = Math.max(batt, ac);
                   const totalPct = (hi / maxMs) * 100;
-                  const overlapColor = theme.category.blue;
+                  const overlapColor = "#7bafe9";
                   const tipColor =
-                    batt > ac ? theme.category.yellow : theme.category.green;
+                    batt > ac ? "#a9c6ec" : "#5d96cf";
                   if (hi - lo < 1e-9) {
                     return valueWrap(totalPct, seg(100, overlapColor));
                   }
@@ -641,7 +641,7 @@ function LatestComparison() {
                       color:
                         row.batteryMs == null
                           ? theme.text.tertiary
-                          : theme.category.yellow,
+                          : "#a9c6ec",
                       display: "inline-flex",
                       gap: 6,
                       alignItems: "baseline",
@@ -659,7 +659,7 @@ function LatestComparison() {
                       color:
                         row.acMs == null
                           ? theme.text.tertiary
-                          : theme.category.green,
+                          : "#5d96cf",
                       display: "inline-flex",
                       gap: 6,
                       alignItems: "baseline",
