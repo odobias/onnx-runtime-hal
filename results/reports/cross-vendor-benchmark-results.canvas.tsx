@@ -203,21 +203,11 @@ function CohortParts({
 }
 
 
-function percentile(values: number[], p: number): number {
-  if (values.length === 0) return 1;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
-  );
-  return sorted[idx];
-}
-
 function axisMaxFor(rows: Array<{ batteryMs: number | null; acMs: number | null }>): number {
   const peaks = rows
     .flatMap((row) => [row.batteryMs, row.acMs])
     .filter((value): value is number => value != null);
-  return Math.max(percentile(peaks, 90), 1);
+  return Math.max(...peaks, 1);
 }
 
 function battDeltaPct(
@@ -555,7 +545,7 @@ function LatestComparison() {
         </H2>
         <Text size="small" tone="secondary">
           One row per cohort. AC is the baseline; battery overhang appears only when
-          battery is slower. If battery is faster than AC, the bar spans to AC with a tick at battery. Axis capped at p90 of max(batt, ac). Click a chip to sort.
+          battery is slower. If battery is faster than AC, the bar spans to AC with a tick at battery. Linear axis to max(batt, ac). Click a chip to sort.
         </Text>
         <Row gap={12}>
           <Text size="small" tone="secondary">blue = AC baseline</Text>
@@ -708,28 +698,12 @@ function LatestComparison() {
                 >
                   {qualityText}
                 </Text>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 8,
-                    alignItems: "center",
-                    minWidth: 0,
-                  }}
-                >
-                  <PowerLatencyBar
-                    batteryMs={row.batteryMs}
-                    acMs={row.acMs}
-                    maxLatency={maxLatency}
-                    theme={theme}
-                  />
-                  {Math.max(row.batteryMs ?? 0, row.acMs ?? 0) >
-                  maxLatency + 1e-9 ? (
-                    <Text size="small" tone="secondary" style={{ color: theme.category.yellow }}>
-                      p90+
-                    </Text>
-                  ) : null}
-                </div>
+                <PowerLatencyBar
+                  batteryMs={row.batteryMs}
+                  acMs={row.acMs}
+                  maxLatency={maxLatency}
+                  theme={theme}
+                />
                 <div
                   style={{
                     display: "grid",
