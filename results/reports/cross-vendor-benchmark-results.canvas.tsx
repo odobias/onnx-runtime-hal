@@ -790,20 +790,6 @@ function LatestComparison() {
                     </Text>
                     {row.acMs == null ? "—" : format(row.acMs)}
                   </Text>
-                  {(() => {
-                    const pct = battDeltaPct(row.batteryMs, row.acMs);
-                    if (pct == null || pct < -1e-9) return null;
-                    const sign = pct > 0 ? "+" : "";
-                    return (
-                      <Text
-                        size="small"
-                        weight="semibold"
-                        style={{ color: theme.text.secondary }}
-                      >
-                        {`batt ${sign}${format(pct, 0)}% vs AC`}
-                      </Text>
-                    );
-                  })()}
                 </div>
               </div>
             </div>
