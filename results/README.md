@@ -206,19 +206,22 @@ write ephemeral outputs to `local/` (gitignored). Neutral ONNX portability
 findings remain in `reports/onnx-portability.md` and
 `reports/cpp-onnx-npu-findings.md`.
 
-### Classifier snapshot curation
+### Ledger curation (latest complete only)
 
-The pre-schema-v1 classifier snapshot is split by evidence quality:
+Active latency ledgers keep only the latest schema-v1 complete row per cohort
+(workload / profile / graph / model / runtime-target / provider / device /
+hardware / power). Superseded complete campaigns are removed; pre-schema or
+incomplete rows are archived, not mixed into current comparisons:
 
-- `ledgers/classifiers.csv` retains nine rows that include latency, accuracy,
-  probability agreement, and provider-placement metrics: the matched AMD
-  CPU/DirectML/VitisAI sweep and the complete Qualcomm QNN sweep.
-- `ledgers/classifiers.legacy.csv` preserves 18 superseded or incomplete rows.
-  The sole Intel OpenVINO EP result is retained there pending a current-contract
-  rerun; it lacks provider-placement metrics.
+- `ledgers/asr.csv` — latest complete ASR latency rows
+- `ledgers/asr.legacy.csv` — pre-schema / incomplete ASR rows retained for history
+- `ledgers/classifiers.csv` — latest complete classifier latency rows
+- `ledgers/classifiers.legacy.csv` — pre-schema / incomplete / superseded classifier
+  rows (including the older Intel OpenVINO EP result pending a current-contract
+  rerun)
 
-Do not mix the legacy rows into current latency or offload comparisons. These
-snapshots also predate the extended schema-v1 fields for cache state, provider
+Do not mix legacy rows into current latency or offload comparisons. Legacy
+snapshots also predate extended schema-v1 fields for cache state, provider
 attempts, fallback, and errors, so future suite runs should write a fresh
 schema-v1 ledger rather than append incompatible rows.
 
