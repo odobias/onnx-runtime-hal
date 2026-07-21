@@ -1,0 +1,29 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-21T14:10:10.4741834Z",
+    "provenance_scope":  "pre-execution-input-artifact-and-compiler-context",
+    "artifact_stage":  "provider-input",
+    "execution_profile":  "npu-split-intel",
+    "graph_role":  "frontend",
+    "target_vendor":  "CPU",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\models\\deepfake\\fakeaudio\\model.frontend-fp32.onnx",
+    "artifact_sha256":  "37fe1acb80dbe19d4f59e3b2ab3beefa464cb1cc92388f861ad1333409e7d179",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "unknown",
+                     "version":  "unknown",
+                     "version_source":  "unknown: no authoritative SDK manifest or provider binary version was found"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compiled_cache_artifact":  {
+                                    "status":  "not-captured",
+                                    "reason":  "provider compilation occurs during session creation after this input-artifact record is generated"
+                                },
+    "compilation_host_snapshot_id":  "4fc2764941c24327b2c5",
+    "id":  "a98267a3760bd711958e"
+}

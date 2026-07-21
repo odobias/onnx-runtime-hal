@@ -1,0 +1,37 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-21T14:51:41.2107698Z",
+    "provenance_scope":  "pre-execution-input-artifact-and-compiler-context",
+    "artifact_stage":  "provider-input",
+    "execution_profile":  "npu-split-intel",
+    "graph_role":  "backbone",
+    "target_vendor":  "Intel",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\artifacts\\workloads\\classifiers\\fakeaudio\\model.backbone.expanded-attention-bias.onnx",
+    "artifact_sha256":  "ec215831f632ecfc84dd59272624430edca852ec09bec462e1aeed1f295bc5f9",
+    "source_model_sha256":  "39861136487bf9a2a6d81a674939df8d8015900a78e5f5f95b67667281650de8",
+    "compiler":  {
+                     "name":  "Intel execution-provider compiler",
+                     "version":  "2025.4.1.20426",
+                     "version_source":  "runtime binary file version: openvino.dll"
+                 },
+    "compile_or_export_options":  {
+                                      "executor":  "OpenVINO NPU",
+                                      "generated_model":  "../../fakeaudio/model.backbone.expanded-attention-bias.onnx",
+                                      "generated_model_sha256":  "ec215831f632ecfc84dd59272624430edca852ec09bec462e1aeed1f295bc5f9",
+                                      "max_cpu_logit_delta":  0.0,
+                                      "patched_attention_blocks":  7,
+                                      "schema_version":  1,
+                                      "source_model":  "../../fakeaudio/model.backbone-fp32.onnx",
+                                      "source_model_sha256":  "39861136487bf9a2a6d81a674939df8d8015900a78e5f5f95b67667281650de8",
+                                      "transform":  "expand-add-softmax-attention-bias",
+                                      "vendor":  "Intel"
+                                  },
+    "transformation_recipe":  "expand-add-softmax-attention-bias",
+    "compiled_cache_artifact":  {
+                                    "status":  "not-captured",
+                                    "reason":  "provider compilation occurs during session creation after this input-artifact record is generated"
+                                },
+    "compilation_host_snapshot_id":  "dac5b64f89576bc40667",
+    "id":  "6f14f08e1c1a7a1a61d5"
+}

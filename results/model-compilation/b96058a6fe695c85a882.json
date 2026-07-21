@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-07-18T11:43:54.5569167Z",
+  "provenance_scope": "pre-execution-input-artifact-and-compiler-context",
+  "artifact_stage": "provider-input",
+  "execution_profile": "sherpa-export-kv",
+  "graph_role": "whole",
+  "target_vendor": "AMD",
+  "target_architecture": "X64",
+  "artifact_path": "C:\\Sources\\Projects\\whisper-npu-hal\\artifacts\\workloads\\whisper\\models\\sherpa-export",
+  "artifact_sha256": "d9e0cbb6656d77e8359e49e7137f8f2b15c95cc7d63de2b435ee475d48719bcd",
+  "source_model_sha256": "unknown",
+  "compiler": {
+    "name": "AMD execution-provider compiler",
+    "version": "unknown",
+    "version_source": "unknown: no authoritative SDK manifest or provider binary version was found"
+  },
+  "compile_or_export_options": {
+    "status": "unknown",
+    "reason": "no generated fixture-step metadata"
+  },
+  "transformation_recipe": "none-recorded",
+  "compiled_cache_artifact": {
+    "status": "not-captured",
+    "reason": "provider compilation occurs during session creation after this input-artifact record is generated"
+  },
+  "compilation_host_snapshot_id": "faf5bbdea098ff1424a8",
+  "id": "b96058a6fe695c85a882"
+}
