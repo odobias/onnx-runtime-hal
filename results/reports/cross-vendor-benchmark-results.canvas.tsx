@@ -202,6 +202,100 @@ function CohortParts({
   );
 }
 
+
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 1;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
+  );
+  return sorted[idx];
+}
+
+function axisMaxFor(rows: Array<{ batteryMs: number | null; acMs: number | null }>): number {
+  const peaks = rows
+    .flatMap((row) => [row.batteryMs, row.acMs])
+    .filter((value): value is number => value != null);
+  return Math.max(percentile(peaks, 90), 1);
+}
+
+function battDeltaPct(
+  batteryMs: number | null,
+  acMs: number | null
+): number | null {
+  if (batteryMs == null || acMs == null || acMs <= 0) return null;
+  return ((batteryMs - acMs) / acMs) * 100;
+}
+
+function PowerLatencyBar({
+  batteryMs,
+  acMs,
+  maxLatency,
+  theme,
+}: {
+  batteryMs: number | null;
+  acMs: number | null;
+  maxLatency: number;
+  theme: ReturnType<typeof useHostTheme>;
+}) {
+  const overlapColor = "#7bafe9";
+  const batteryColor = "#a9c6ec";
+  const track = {
+    height: 10,
+    background: theme.fill.tertiary,
+    borderRadius: 999,
+    overflow: "hidden" as const,
+    minWidth: 0,
+  };
+  const valueWrap = (totalPct: number, children: any) => (
+    <div style={track}>
+      <div
+        style={{
+          height: "100%",
+          width: `${Math.min(100, Math.max(totalPct, 2))}%`,
+          display: "flex",
+          flexDirection: "row",
+          borderRadius: 999,
+          overflow: "hidden",
+          minWidth: 4,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+  const seg = (widthPct: number, color: string) => (
+    <div
+      style={{
+        height: "100%",
+        width: `${widthPct}%`,
+        background: color,
+        flex: "0 0 auto",
+      }}
+    />
+  );
+  if (batteryMs == null && acMs == null) return <div style={track} />;
+  if (batteryMs == null || acMs == null) {
+    const value = (batteryMs ?? acMs) as number;
+    return valueWrap(
+      (value / maxLatency) * 100,
+      seg(100, acMs != null ? overlapColor : batteryColor)
+    );
+  }
+  if (batteryMs + 1e-9 < acMs) {
+    return valueWrap((batteryMs / maxLatency) * 100, seg(100, overlapColor));
+  }
+  if (Math.abs(batteryMs - acMs) < 1e-9) {
+    return valueWrap((acMs / maxLatency) * 100, seg(100, overlapColor));
+  }
+  const acShare = (acMs / batteryMs) * 100;
+  return valueWrap((batteryMs / maxLatency) * 100, [
+    seg(acShare, overlapColor),
+    seg(100 - acShare, batteryColor),
+  ]);
+}
+
 function LatestComparison() {
   const theme = useHostTheme();
   const [workload, setWorkload] = useCanvasState<keyof typeof workloadNames>(
@@ -238,7 +332,13 @@ function LatestComparison() {
       exactModelPair: true,
     }));
 
-  const maxLatency = Math.max(...combined.map((row) => row.latencyMs), 1);
+  const maxLatency = axisMaxFor(combined);
+  const inversions = combined.filter(
+    (row) =>
+      row.batteryMs != null &&
+      row.acMs != null &&
+      row.batteryMs + 1e-9 < row.acMs
+  ).length;
   const fastestMs = Math.min(
     ...combined.map((row) => row.latencyMs),
     Number.POSITIVE_INFINITY
@@ -395,6 +495,14 @@ function LatestComparison() {
         </Callout>
       )}
 
+      {inversions > 0 && (
+        <Callout title="Battery faster than AC" tone="warning">
+          {inversions} cohort{inversions === 1 ? "" : "s"} have battery latency below AC.
+          Those rows are flagged; the bar shows only the faster baseline without an AC tip.
+          Primary comparison is battery % vs AC.
+        </Callout>
+      )}
+
       {!isClassifier && werRegressions > 0 && (
         <Callout title="WER regressions vs best in this workload" tone="danger">
           {werRegressions} cohort
@@ -410,14 +518,14 @@ function LatestComparison() {
           {isClassifier ? "accuracy" : "WER"}
         </H2>
         <Text size="small" tone="secondary">
-          One row per cohort. One bar: blue overlap is min(battery, AC);
-          the tip overhang is a lighter or deeper blue for battery vs AC.
-          Click a cohort chip to sort by that part.
+          One row per cohort. AC is the baseline; battery overhang appears only when
+          battery is slower. If battery is faster than AC, the row is flagged anomalous
+          (no AC tip). Axis capped at p90 of max(batt, ac). Click a chip to sort.
         </Text>
         <Row gap={12}>
-          <Text size="small" tone="secondary">mid blue = overlap</Text>
+          <Text size="small" tone="secondary">blue = AC baseline</Text>
           <Text size="small" tone="secondary">lighter = battery slower</Text>
-          <Text size="small" tone="secondary">deeper = AC slower</Text>
+          <Text size="small" tone="secondary">flag = batt &lt; ac anomaly</Text>
         </Row>
 
         <div
@@ -450,7 +558,7 @@ function LatestComparison() {
             </Text>
           </div>
           <Text size="small" tone="tertiary" style={{ textAlign: "right" }}>
-            batt / ac
+            batt / ac · Δ
           </Text>
         </div>
 
@@ -527,15 +635,37 @@ function LatestComparison() {
                   minHeight: 28,
                 }}
               >
-                <CohortParts
-                  siliconVendor={row.siliconVendor}
-                  provider={row.provider}
-                  device={row.device}
-                  target={row.target}
-                  activePart={activeCohortPart}
-                  sortDir={sortDir}
-                  onSortPart={toggleSort}
-                />
+                <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                  <CohortParts
+                    siliconVendor={row.siliconVendor}
+                    provider={row.provider}
+                    device={row.device}
+                    target={row.target}
+                    activePart={activeCohortPart}
+                    sortDir={sortDir}
+                    onSortPart={toggleSort}
+                  />
+                  {row.batteryMs != null &&
+                    row.acMs != null &&
+                    row.batteryMs + 1e-9 < row.acMs && (
+                      <span
+                        title="Battery faster than AC — unexpected for power modes"
+                        style={{
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                          border: `1px solid ${theme.category.yellow}`,
+                          background: theme.fill.tertiary,
+                          color: theme.category.yellow,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.02em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        batt &lt; ac
+                      </span>
+                    )}
+                </span>
                 <Text
                   size="small"
                   weight="semibold"
@@ -543,89 +673,28 @@ function LatestComparison() {
                 >
                   {qualityText}
                 </Text>
-                {(() => {
-                  const maxMs = Math.max(
-                    ...sorted.flatMap((item) =>
-                      [item.batteryMs, item.acMs].filter(
-                        (ms): ms is number => ms != null
-                      )
-                    ),
-                    1
-                  );
-                  const batt = row.batteryMs;
-                  const ac = row.acMs;
-                  const track = {
-                    height: 10,
-                    background: theme.fill.tertiary,
-                    borderRadius: 999,
-                    overflow: "hidden" as const,
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: 8,
+                    alignItems: "center",
                     minWidth: 0,
-                  };
-                  const valueWrap = (totalPct: number, children: ReturnType<typeof seg> | ReturnType<typeof seg>[]) => (
-                    <div style={{ minWidth: 0 }}>
-                      <div style={track}>
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${Math.max(totalPct, 2)}%`,
-                            display: "flex",
-                            flexDirection: "row",
-                            borderRadius: 999,
-                            overflow: "hidden",
-                            minWidth: 4,
-                          }}
-                        >
-                          {children}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                  const seg = (widthPct: number, color: string) => (
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${widthPct}%`,
-                        background: color,
-                        flex: "0 0 auto",
-                      }}
-                    />
-                  );
-                  if (batt == null && ac == null) {
-                    return (
-                      <div style={{ minWidth: 0 }}>
-                        <div style={track} />
-                      </div>
-                    );
-                  }
-                  if (batt == null || ac == null) {
-                    const value = (batt ?? ac) as number;
-                    const color =
-                      batt != null
-                        ? "#a9c6ec"
-                        : "#5d96cf";
-                    return valueWrap(
-                      (value / maxMs) * 100,
-                      seg(100, color)
-                    );
-                  }
-                  const lo = Math.min(batt, ac);
-                  const hi = Math.max(batt, ac);
-                  const totalPct = (hi / maxMs) * 100;
-                  const overlapColor = "#7bafe9";
-                  const tipColor =
-                    batt > ac ? "#a9c6ec" : "#5d96cf";
-                  if (hi - lo < 1e-9) {
-                    return valueWrap(totalPct, seg(100, overlapColor));
-                  }
-                  const overlapShare = (lo / hi) * 100;
-                  return valueWrap(
-                    totalPct,
-                    [
-                      seg(overlapShare, overlapColor),
-                      seg(100 - overlapShare, tipColor),
-                    ]
-                  );
-                })()}
+                  }}
+                >
+                  <PowerLatencyBar
+                    batteryMs={row.batteryMs}
+                    acMs={row.acMs}
+                    maxLatency={maxLatency}
+                    theme={theme}
+                  />
+                  {Math.max(row.batteryMs ?? 0, row.acMs ?? 0) >
+                  maxLatency + 1e-9 ? (
+                    <Text size="small" tone="secondary" style={{ color: theme.category.yellow }}>
+                      p90+
+                    </Text>
+                  ) : null}
+                </div>
                 <div
                   style={{
                     display: "grid",
@@ -670,6 +739,25 @@ function LatestComparison() {
                     </Text>
                     {row.acMs == null ? "—" : format(row.acMs)}
                   </Text>
+                  {(() => {
+                    const pct = battDeltaPct(row.batteryMs, row.acMs);
+                    if (pct == null) return null;
+                    const anomalous = pct < -1e-9;
+                    const sign = pct > 0 ? "+" : "";
+                    return (
+                      <Text
+                        size="small"
+                        weight="semibold"
+                        style={{
+                          color: anomalous
+                            ? theme.category.yellow
+                            : theme.text.secondary,
+                        }}
+                      >
+                        {`batt ${sign}${format(pct, 0)}% vs AC`}
+                      </Text>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
