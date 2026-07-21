@@ -241,6 +241,7 @@ function PowerLatencyBar({
 }) {
   const overlapColor = "#7bafe9";
   const batteryColor = "#a9c6ec";
+  const markerColor = theme.category.yellow;
   const track = {
     height: 10,
     background: theme.fill.tertiary,
@@ -248,29 +249,59 @@ function PowerLatencyBar({
     overflow: "hidden" as const,
     minWidth: 0,
   };
-  const valueWrap = (totalPct: number, children: any) => (
+  const valueWrap = (
+    totalPct: number,
+    children: any,
+    markerPct: number | null = null
+  ) => (
     <div style={track}>
       <div
         style={{
+          position: "relative",
           height: "100%",
           width: `${Math.min(100, Math.max(totalPct, 2))}%`,
-          display: "flex",
-          flexDirection: "row",
-          borderRadius: 999,
-          overflow: "hidden",
           minWidth: 4,
         }}
       >
-        {children}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "row",
+            borderRadius: 999,
+            overflow: "hidden",
+          }}
+        >
+          {children}
+        </div>
+        {markerPct != null && (
+          <div
+            title="battery"
+            style={{
+              position: "absolute",
+              top: -3,
+              bottom: -3,
+              left: `${Math.min(100, Math.max(0, markerPct))}%`,
+              width: 2,
+              marginLeft: -1,
+              background: markerColor,
+              borderRadius: 1,
+              zIndex: 2,
+              pointerEvents: "none",
+            }}
+          />
+        )}
       </div>
     </div>
   );
-  const seg = (widthPct: number, color: string) => (
+  const seg = (widthPct: number, color: string, opacity = 1) => (
     <div
       style={{
         height: "100%",
         width: `${widthPct}%`,
         background: color,
+        opacity,
         flex: "0 0 auto",
       }}
     />
@@ -284,7 +315,11 @@ function PowerLatencyBar({
     );
   }
   if (batteryMs + 1e-9 < acMs) {
-    return valueWrap((batteryMs / maxLatency) * 100, seg(100, overlapColor));
+    return valueWrap(
+      (acMs / maxLatency) * 100,
+      seg(100, overlapColor, 0.55),
+      (batteryMs / acMs) * 100
+    );
   }
   if (Math.abs(batteryMs - acMs) < 1e-9) {
     return valueWrap((acMs / maxLatency) * 100, seg(100, overlapColor));
@@ -295,6 +330,7 @@ function PowerLatencyBar({
     seg(100 - acShare, batteryColor),
   ]);
 }
+
 
 function LatestComparison() {
   const theme = useHostTheme();
@@ -519,8 +555,7 @@ function LatestComparison() {
         </H2>
         <Text size="small" tone="secondary">
           One row per cohort. AC is the baseline; battery overhang appears only when
-          battery is slower. If battery is faster than AC, the row is flagged anomalous
-          (no AC tip). Axis capped at p90 of max(batt, ac). Click a chip to sort.
+          battery is slower. If battery is faster than AC, the bar spans to AC with a tick at battery. Axis capped at p90 of max(batt, ac). Click a chip to sort.
         </Text>
         <Row gap={12}>
           <Text size="small" tone="secondary">blue = AC baseline</Text>
