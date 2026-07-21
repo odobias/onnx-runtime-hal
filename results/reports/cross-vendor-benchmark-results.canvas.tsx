@@ -239,8 +239,8 @@ function PowerLatencyBar({
   maxLatency: number;
   theme: ReturnType<typeof useHostTheme>;
 }) {
-  const overlapColor = "#7bafe9";
-  const batteryColor = "#a9c6ec";
+  const overlapColor = "#4f8fd9";
+  const batteryColor = "#e08a3c";
   const markerColor = theme.category.yellow;
   const track = {
     position: "relative" as const,
@@ -589,7 +589,7 @@ function LatestComparison() {
         </Text>
         <Row gap={12}>
           <Text size="small" tone="secondary">blue = AC baseline</Text>
-          <Text size="small" tone="secondary">lighter = battery slower</Text>
+          <Text size="small" tone="secondary">amber = battery slower</Text>
           <Text size="small" tone="secondary">flag = batt &lt; ac anomaly</Text>
         </Row>
 
@@ -799,7 +799,7 @@ function LatestComparison() {
                         size="small"
                         weight="semibold"
                         style={{
-                          color: "#a9c6ec",
+                          color: "#e08a3c",
                           display: "inline-flex",
                           gap: 6,
                           alignItems: "baseline",
@@ -819,7 +819,7 @@ function LatestComparison() {
                       color:
                         row.acMs == null
                           ? theme.text.tertiary
-                          : "#5d96cf",
+                          : "#4f8fd9",
                       display: "inline-flex",
                       gap: 6,
                       alignItems: "baseline",
