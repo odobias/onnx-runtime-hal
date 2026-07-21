@@ -1,0 +1,302 @@
+﻿{
+    "schema_version":  1,
+    "collected_utc":  "2026-07-16T13:32:26.2101509Z",
+    "runtime_target":  "bundled",
+    "build_tree":  "x64-ovep",
+    "runner_id":  "",
+    "executable":  {
+                       "path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\build\\x64-ovep\\Release\\NpuInferenceBench.exe",
+                       "sha256":  "9ef40dde8c661d89bbb3f5504c28cbf4b261523bda125d7bc29681bd09fa42c3"
+                   },
+    "host":  {
+                 "hostname":  "MSI",
+                 "architecture":  "X64",
+                 "os_caption":  "Microsoft Windows 11 Pro",
+                 "os_version":  "10.0.26200",
+                 "windows_build":  "26200",
+                 "ubr":  8875,
+                 "memory_bytes":  68169183232,
+                 "system_product":  "Prestige 13 AI+ Evo A3VMG",
+                 "system_vendor":  "Micro-Star International Co., Ltd.",
+                 "bios_vendor":  "American Megatrends International, LLC.",
+                 "bios_version":  "E13Q4IMS.005",
+                 "bios_release_date":  "2025-07-02T02:00:00.0000000+02:00"
+             },
+    "hardware":  {
+                     "collected_utc":  "2026-07-16T13:32:25Z",
+                     "hostname":  "MSI",
+                     "os":  "Microsoft Windows 11 Pro",
+                     "memory_gb":  63.5,
+                     "cpu":  {
+                                 "name":  "Genuine Intel(R) 0000",
+                                 "vendor":  "Intel",
+                                 "cores":  16,
+                                 "threads":  16,
+                                 "max_clock_mhz":  2000,
+                                 "description":  "Intel64 Family 6 Model 204 Stepping 0"
+                             },
+                     "gpus":  [
+                                  {
+                                      "name":  "Intel(R) Graphics",
+                                      "video_processor":  "Intel(R) Graphics Family",
+                                      "driver_version":  "32.0.101.6960",
+                                      "driver_date":  "2025-06-04T02:00:00.0000000+02:00",
+                                      "pnp_id":  "PCI\\VEN_8086\u0026DEV_B0B0\u0026SUBSYS_14DE1462\u0026REV_00\\3\u002611583659\u00260\u002610",
+                                      "vram_mb_approx":  2048,
+                                      "resolution":  "2880x1800"
+                                  }
+                              ],
+                     "npu":  {
+                                 "name":  "Intel(R) NPU",
+                                 "architecture":  "",
+                                 "present":  true,
+                                 "manufacturer":  "Intel Corporation",
+                                 "pci_id":  "8086:B03E",
+                                 "driver_version":  "32.0.100.4778",
+                                 "driver_date":  "2026-04-28T02:00:00.0000000+02:00",
+                                 "instance_id":  "PCI\\VEN_8086\u0026DEV_B03E\u0026SUBSYS_14DE1462\u0026REV_00\\3\u002611583659\u00260\u002658"
+                             }
+                 },
+    "power":  {
+                  "source":  "battery",
+                  "active_plan":  "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+                  "energy_saver_enabled":  null,
+                  "overlay_scheme":  {
+                                         "ac":  "",
+                                         "dc":  ""
+                                     },
+                  "battery":  {
+                                  "device_id":  "MSIBIF0_9",
+                                  "status":  "OK",
+                                  "battery_status":  1,
+                                  "estimated_charge_remaining_pct":  55,
+                                  "estimated_runtime_minutes":  124,
+                                  "design_voltage_mv":  15177,
+                                  "chemistry":  6
+                              },
+                  "thermal_zones":  [
+
+                                    ]
+              },
+    "runtime_binaries":  [
+                             {
+                                 "name":  "concrt140.dll",
+                                 "sha256":  "2405355f0a58067b258f8df33c327e3a3d716eaac5a3a5aebb757842d85bd376",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140.dll",
+                                 "sha256":  "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_1.dll",
+                                 "sha256":  "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_2.dll",
+                                 "sha256":  "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_atomic_wait.dll",
+                                 "sha256":  "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "msvcp140_codecvt_ids.dll",
+                                 "sha256":  "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "NpuInferenceBench.exe",
+                                 "sha256":  "9ef40dde8c661d89bbb3f5504c28cbf4b261523bda125d7bc29681bd09fa42c3",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "onnxruntime.dll",
+                                 "sha256":  "66e62f7bebf65b048ff1a93c40a73df93c36f93ce5bb085076de92b1a1e754fd",
+                                 "file_version":  "1.24.1",
+                                 "product_version":  "1.24.1"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_openvino.dll",
+                                 "sha256":  "85bddbff00fb464d3fe2669993845769d42a8c570ddd947d20ad1aebe4096ef1",
+                                 "file_version":  "1.24.1",
+                                 "product_version":  "1.24.1"
+                             },
+                             {
+                                 "name":  "onnxruntime_providers_shared.dll",
+                                 "sha256":  "5cb1ffe332a2bca0f3957d0a484394d505b0cfdc048daee7a8d0568f86c697d3",
+                                 "file_version":  "1.24.1",
+                                 "product_version":  "1.24.1"
+                             },
+                             {
+                                 "name":  "OnnxRuntimeHal.Tests.exe",
+                                 "sha256":  "732ab22fefa5059c1b90481bd8ae97a9bab084af135aca3b7c280809bb63dffd",
+                                 "file_version":  "",
+                                 "product_version":  ""
+                             },
+                             {
+                                 "name":  "openvino.dll",
+                                 "sha256":  "28fc34988e653d3710a75c654be1a8a18f26c00c35809db3846ebe5083335082",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_auto_batch_plugin.dll",
+                                 "sha256":  "0742dd51c59f252627e6083df5ee47d59d3115eec4d19a99209fc7e1032cf372",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_auto_plugin.dll",
+                                 "sha256":  "564f905038f30930b20e8a10c3c657eb37c7e24d64dd90217cd67437535eb9ea",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_c.dll",
+                                 "sha256":  "df1cc77e10b97fcb2cb86caca4450b81d9f2cd6d4a0c7594b83ff166e6a100b3",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_hetero_plugin.dll",
+                                 "sha256":  "ac2dec02c0237d066b9a229b58f0fde1890d9a5ad7bbfbddcaf23201dcdc2f09",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_intel_cpu_plugin.dll",
+                                 "sha256":  "e4d224cd5b51905416a7c1687c7fea63f14fc282a07c53d2bdb76b555d2f87cd",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_intel_gpu_plugin.dll",
+                                 "sha256":  "41da8f28ca387aca0c3198060c322f3affb9a4bf51773af6a07b526daf680f23",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_intel_npu_plugin.dll",
+                                 "sha256":  "d550e983c7f993c643a4908b6e41369ff57fe1ee0fbef9e227aab5e4dd4fa5a7",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_ir_frontend.dll",
+                                 "sha256":  "825046f9aa991c03a19f7b34005952587fc37d7b96feb2dede92802bf650d123",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_jax_frontend.dll",
+                                 "sha256":  "86ee9b0bed65cf692010de0d4fdc85e13e0f9d136bd0c960ecbbbb4c5bfc3cfe",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_onnx_frontend.dll",
+                                 "sha256":  "287080fd413711e645667f4a3a56172a639fd999dd10ca700ce4c2a82d1449b7",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_paddle_frontend.dll",
+                                 "sha256":  "03fae0290574b4e051c9b638b62bac858cf5c2be29e365006e93c2e0212bd580",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_pytorch_frontend.dll",
+                                 "sha256":  "76fe304ca5a4f883f706a325c61fa323afb27ec32b50debaf1da2f70925ee294",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_tensorflow_frontend.dll",
+                                 "sha256":  "f74153d375b66d97f3bd8573ffcec838750fa26ebc98f53f4cd7626989738417",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "openvino_tensorflow_lite_frontend.dll",
+                                 "sha256":  "ab37782fc0d84994d4edf43c12416b1cee60377a70678cda28cda5e76ae2bb7c",
+                                 "file_version":  "2025.4.1.20426",
+                                 "product_version":  "2025.4.1-20426-82bbf0292c5-releases/2025/4"
+                             },
+                             {
+                                 "name":  "tbb12.dll",
+                                 "sha256":  "18866358d94d8657feabf3cd05e205904b6cee2da99a00a5e08f82eb7c41ad02",
+                                 "file_version":  "2021.2.6",
+                                 "product_version":  "2021.2.6"
+                             },
+                             {
+                                 "name":  "tbbbind_2_5.dll",
+                                 "sha256":  "221f9395c808bdcbd5c9c30ec76b771da8e22a5af38700100c7a645aafd37e18",
+                                 "file_version":  "2021.2.6",
+                                 "product_version":  "2021.2.6"
+                             },
+                             {
+                                 "name":  "tbbmalloc.dll",
+                                 "sha256":  "69a8a7206abd344bc18713e7c8fe305d35ae12f2ea466ac8b7c0cc5d254f35e3",
+                                 "file_version":  "2021.2.6",
+                                 "product_version":  "2021.2.6"
+                             },
+                             {
+                                 "name":  "tbbmalloc_proxy.dll",
+                                 "sha256":  "b54274049d96e617cf8ca9eb0b19a10b87d7b082ee087b3de7a40454563c3b7c",
+                                 "file_version":  "2021.2.6",
+                                 "product_version":  "2021.2.6"
+                             },
+                             {
+                                 "name":  "vccorlib140.dll",
+                                 "sha256":  "19839407c3fdbc824e5bce189bf68ddf8097f12ec28b757797ffa0415c144ddd",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140.dll",
+                                 "sha256":  "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_1.dll",
+                                 "sha256":  "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             },
+                             {
+                                 "name":  "vcruntime140_threads.dll",
+                                 "sha256":  "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa",
+                                 "file_version":  "14.44.35211.0",
+                                 "product_version":  "14.44.35211.0"
+                             }
+                         ],
+    "vendor_sdk_manifests":  [
+                                 {
+                                     "path":  "third_party/windows-ml/VERSION.json",
+                                     "sha256":  "1e9bf17b04dc7a1d10cee79f9b89db7ec422108ebeb61c6c751aa3479d7a6228",
+                                     "metadata":  {
+                                                      "schema_version":  1,
+                                                      "vendor":  "Microsoft",
+                                                      "package":  "Microsoft.WindowsAppSDK.ML",
+                                                      "version":  "2.1.70",
+                                                      "rid":  "win-x64",
+                                                      "source":  "NuGet package metadata"
+                                                  }
+                                 }
+                             ],
+    "id":  "85b5e52d4820c9b63541"
+}

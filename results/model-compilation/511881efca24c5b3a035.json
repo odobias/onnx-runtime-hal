@@ -1,0 +1,29 @@
+﻿{
+    "schema_version":  1,
+    "created_utc":  "2026-07-16T13:24:16.4702294Z",
+    "provenance_scope":  "pre-execution-input-artifact-and-compiler-context",
+    "artifact_stage":  "provider-input",
+    "execution_profile":  "whole-fp32",
+    "graph_role":  "whole",
+    "target_vendor":  "Intel",
+    "target_architecture":  "X64",
+    "artifact_path":  "C:\\Users\\Ondrej Dobias\\.cursor\\worktrees\\whisper-npu-hal\\tfkb\\models\\deepfake\\tsc\\model.onnx",
+    "artifact_sha256":  "08b2c466cc9336934e52697e95e30858fb6faa24db73a28654ce5b63510ed44e",
+    "source_model_sha256":  "unknown",
+    "compiler":  {
+                     "name":  "Intel execution-provider compiler",
+                     "version":  "2025.4.1.20426",
+                     "version_source":  "runtime binary file version: openvino.dll"
+                 },
+    "compile_or_export_options":  {
+                                      "status":  "unknown",
+                                      "reason":  "no generated fixture-step metadata"
+                                  },
+    "transformation_recipe":  "none-recorded",
+    "compiled_cache_artifact":  {
+                                    "status":  "not-captured",
+                                    "reason":  "provider compilation occurs during session creation after this input-artifact record is generated"
+                                },
+    "compilation_host_snapshot_id":  "7cf68e0df3d9e4c79daf",
+    "id":  "511881efca24c5b3a035"
+}
