@@ -54,8 +54,12 @@ function format(value: number, digits = 1) {
   });
 }
 
+function displayTarget(target: string) {
+  return target === "winml" ? "WinML" : target;
+}
+
 function configLabel(row: ResultRow) {
-  return `${row.siliconVendor} · ${row.provider} · ${row.device} · ${row.target}`;
+  return `${row.siliconVendor} · ${row.provider} · ${row.device} · ${displayTarget(row.target)}`;
 }
 
 function cohortKey(row: ResultRow) {
@@ -145,7 +149,7 @@ function CohortParts({
     },
     {
       key: "target",
-      value: target,
+      value: displayTarget(target),
       color: targetColors[target] ?? hashHue(target, fallback),
     },
   ];
@@ -967,9 +971,9 @@ function MissingRuns() {
             "bundled · QNN · NPU",
             "bundled · DirectML · GPU",
             "bundled · CPU EP · CPU",
-            "winml · QNN · NPU",
-            "winml · DirectML · GPU",
-            "winml · CPU EP · CPU",
+            "WinML · QNN · NPU",
+            "WinML · DirectML · GPU",
+            "WinML · CPU EP · CPU",
           ],
         },
         {
@@ -978,8 +982,8 @@ function MissingRuns() {
           cells: [
             "bundled · DirectML · GPU",
             "bundled · CPU EP · CPU",
-            "winml · DirectML · GPU",
-            "winml · CPU EP · CPU",
+            "WinML · DirectML · GPU",
+            "WinML · CPU EP · CPU",
           ],
         },
       ],
@@ -999,9 +1003,9 @@ function MissingRuns() {
             "bundled · VitisAI · NPU",
             "bundled · DirectML · GPU",
             "bundled · CPU EP · CPU",
-            "winml · VitisAI · NPU",
-            "winml · DirectML · GPU",
-            "winml · CPU EP · CPU",
+            "WinML · VitisAI · NPU",
+            "WinML · DirectML · GPU",
+            "WinML · CPU EP · CPU",
           ],
         },
         {
@@ -1010,8 +1014,8 @@ function MissingRuns() {
           cells: [
             "bundled · DirectML · GPU",
             "bundled · CPU EP · CPU",
-            "winml · DirectML · GPU",
-            "winml · CPU EP · CPU",
+            "WinML · DirectML · GPU",
+            "WinML · CPU EP · CPU",
           ],
         },
       ],
@@ -1033,9 +1037,9 @@ function MissingRuns() {
             "bundled · OpenVINO · CPU",
             "bundled · DirectML · GPU",
             "bundled · CPU EP · CPU",
-            "winml · OpenVINO · NPU",
-            "winml · DirectML · GPU",
-            "winml · CPU EP · CPU",
+            "WinML · OpenVINO · NPU",
+            "WinML · DirectML · GPU",
+            "WinML · CPU EP · CPU",
           ],
         },
         {
@@ -1046,8 +1050,8 @@ function MissingRuns() {
             "bundled · OpenVINO · CPU",
             "bundled · DirectML · GPU",
             "bundled · CPU EP · CPU",
-            "winml · DirectML · GPU",
-            "winml · CPU EP · CPU",
+            "WinML · DirectML · GPU",
+            "WinML · CPU EP · CPU",
           ],
         },
       ],
@@ -1086,7 +1090,7 @@ function MissingRuns() {
             "fakeaudio · model 549143bc · profile npu-whole-diagnostic · graph whole",
           cells: [
             "bundled · QNN · NPU",
-            "winml · QNN · NPU",
+            "WinML · QNN · NPU",
           ],
         },
       ],
