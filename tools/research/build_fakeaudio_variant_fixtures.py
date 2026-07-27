@@ -29,10 +29,24 @@ import onnxruntime as ort
 from onnx import helper
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
-FIXROOT = os.path.join(ROOT, "workloads", "classifiers", "fixtures")
+FA = os.path.join(ROOT, "artifacts", "workloads", "classifiers", "fakeaudio")
+FIXROOT = os.path.join(ROOT, "artifacts", "workloads", "classifiers", "fixtures")
 BASEFIX = os.path.join(FIXROOT, "fakeaudio")
-SAMPLES = ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
+
+
+def _fixture_sample_ids(fix_dir):
+    data = os.path.join(fix_dir, "data")
+    if not os.path.isdir(data):
+        return ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
+    ids = sorted(
+        f[:-len("__input.bin")]
+        for f in os.listdir(data)
+        if f.endswith("__input.bin")
+    )
+    return ids or ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
+
+
+SAMPLES = _fixture_sample_ids(BASEFIX)
 WINDOW = 308700
 POS_IDX, THRESH, POS, NEG = 1, 0.5, "deepfake", "real"
 

@@ -25,8 +25,8 @@ Output (gitignored, under artifacts/workloads/classifiers/fixtures/<model>/):
   inputs.tsv   sample_id <tab> input_name <tab> dtype(f32|i64) <tab> shape(csv) <tab> file
   data/*.bin   raw little-endian tensors
 
-    artifacts/venv\\Scripts\\python.exe scripts\\experiments\\dump_fixtures.py
-    artifacts/venv\\Scripts\\python.exe scripts\\experiments\\dump_fixtures.py --models tsc
+    .venv\\Scripts\\python.exe tools\\fixtures\\generate.py
+    .venv\\Scripts\\python.exe tools\\fixtures\\generate.py --models fakeaudio
 """
 import argparse
 import importlib
@@ -38,10 +38,13 @@ import onnxruntime as ort
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+VALIDATE = os.path.join(ROOT, "tools", "validate")
+RESEARCH = os.path.join(ROOT, "tools", "research")
+for p in (HERE, VALIDATE, RESEARCH):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
-FIX_ROOT = os.path.join(ROOT, "workloads", "classifiers", "fixtures")
+FIX_ROOT = os.path.join(ROOT, "artifacts", "workloads", "classifiers", "fixtures")
 
 # numpy dtype -> the two tokens the C++ loader understands.
 DTYPE_TOKEN = {np.dtype(np.int64): "i64", np.dtype(np.float32): "f32"}

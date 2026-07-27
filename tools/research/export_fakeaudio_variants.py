@@ -48,10 +48,25 @@ from onnx import shape_inference
 from onnxruntime.transformers import float16
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FA = os.path.join(ROOT, "workloads", "classifiers", "fakeaudio")
+FA = os.path.join(ROOT, "artifacts", "workloads", "classifiers", "fakeaudio")
 MODEL = os.path.join(FA, "model.onnx")
-FIX = os.path.join(ROOT, "workloads", "classifiers", "fixtures", "fakeaudio")
-SAMPLES = ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
+FIX = os.path.join(ROOT, "artifacts", "workloads", "classifiers", "fixtures", "fakeaudio")
+
+
+def _fixture_sample_ids():
+    """Discover baked fixture PCM ids (prefers Šimon test_audio 5+5 rebake)."""
+    data = os.path.join(FIX, "data")
+    if not os.path.isdir(data):
+        return ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
+    ids = sorted(
+        f[:-len("__input.bin")]
+        for f in os.listdir(data)
+        if f.endswith("__input.bin")
+    )
+    return ids or ["deepfake_1", "deepfake_2", "real_1", "real_2", "real_3"]
+
+
+SAMPLES = _fixture_sample_ids()
 WINDOW = 308700
 # The log-mel boundary: front-end = input..CUT, backbone = CUT..output.
 CUT = "/embedder/base/htsat/logmel_extractor/Log_output_0"

@@ -23,7 +23,11 @@ _SPECS = {
     "fakeaudio": {
         "sentinel": os.path.join(CLASSIFIERS_DIR, "fakeaudio", "model.onnx"),
         "legacy": os.path.join(LEGACY_DIR, "fakeaudio", "model.onnx"),
-        "patterns": ["deepfake/fakeaudio/*", "deepfake/audio-samples/*"],
+        "patterns": [
+            "deepfake/fakeaudio/*",
+            "deepfake/audio-samples/**",
+            "deepfake/fixtures/fakeaudio/**",
+        ],
         "hf_dir": "deepfake/fakeaudio",
         "local_dir": "fakeaudio",
     },
@@ -104,7 +108,21 @@ def ensure_deepfake_models(models=("tsc", "fakeaudio"), repo=None):
                 samples_src = os.path.join(staging, "deepfake", "audio-samples")
                 samples_dst = os.path.join(CLASSIFIERS_DIR, "audio-samples")
                 if os.path.isdir(samples_src):
+                    # Keep Šimon's test_audio/ across HF refreshes of the legacy
+                    # YouTube flat WAVs that ship in the mirror.
+                    keep = os.path.join(samples_dst, "test_audio")
+                    keep_tmp = None
+                    if os.path.isdir(keep):
+                        keep_tmp = keep + ".preserve"
+                        if os.path.exists(keep_tmp):
+                            shutil.rmtree(keep_tmp)
+                        shutil.move(keep, keep_tmp)
                     _copytree(samples_src, samples_dst)
+                    if keep_tmp and os.path.isdir(keep_tmp):
+                        dest_keep = os.path.join(samples_dst, "test_audio")
+                        if os.path.exists(dest_keep):
+                            shutil.rmtree(dest_keep)
+                        shutil.move(keep_tmp, dest_keep)
             fix_name = m
             fix_src = os.path.join(staging, "deepfake", "fixtures", fix_name)
             fix_dst = os.path.join(CLASSIFIERS_DIR, "fixtures", fix_name)

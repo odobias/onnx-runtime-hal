@@ -46,8 +46,9 @@ if ($repoId -notmatch "/") {
 $includes = @()
 if ($Models -contains "fakeaudio") {
     $includes += "deepfake/fakeaudio/model.onnx"
-    $includes += "deepfake/audio-samples/*"
-    $includes += "deepfake/fixtures/fakeaudio/*"
+    # Nested test_audio/ (Šimon export smoke) plus legacy flat YouTube WAVs.
+    $includes += "deepfake/audio-samples/**"
+    $includes += "deepfake/fixtures/fakeaudio/**"
 }
 if ($Models -contains "tsc") {
     $includes += "deepfake/tsc/*"
@@ -78,9 +79,27 @@ function Move-Mapped([string]$HfRel, [string]$LocalRel) {
 }
 
 if ($Models -contains "fakeaudio") {
+    # Preserve Šimon's test_audio kit across HF mirror refreshes (legacy YouTube
+    # WAVs still live at the audio-samples root from the mirror).
+    $testAudioKeep = Join-Path $outRoot "audio-samples\test_audio"
+    $testAudioTmp = Join-Path $root "artifacts\scratch\test_audio_preserve"
+    $hadTestAudio = Test-Path -LiteralPath $testAudioKeep
+    if ($hadTestAudio) {
+        if (Test-Path $testAudioTmp) { Remove-Item $testAudioTmp -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path (Split-Path $testAudioTmp) | Out-Null
+        Move-Item -LiteralPath $testAudioKeep -Destination $testAudioTmp -Force
+    }
     Move-Mapped "deepfake/fakeaudio/model.onnx" "artifacts/workloads/classifiers/fakeaudio/model.onnx"
     Move-Mapped "deepfake/audio-samples" "artifacts/workloads/classifiers/audio-samples"
     Move-Mapped "deepfake/fixtures/fakeaudio" "artifacts/workloads/classifiers/fixtures/fakeaudio"
+    if ($hadTestAudio) {
+        $restore = Join-Path $outRoot "audio-samples\test_audio"
+        if (Test-Path $restore) { Remove-Item $restore -Recurse -Force }
+        Move-Item -LiteralPath $testAudioTmp -Destination $restore -Force
+        Write-Host "  restored audio-samples/test_audio (wanna-deepfk export smoke)" -ForegroundColor DarkCyan
+    } else {
+        Write-Host "  tip: .\tools\fetch\get-fakeaudio-test-audio.ps1  # balanced 5+5 smoke set" -ForegroundColor DarkGray
+    }
 }
 if ($Models -contains "tsc") {
     Move-Mapped "deepfake/tsc" "artifacts/workloads/classifiers/tsc"
