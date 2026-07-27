@@ -28,9 +28,23 @@ $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 
 $hf = (Get-Command hf -ErrorAction SilentlyContinue).Source
+$hfArgsPrefix = @()
 if (-not $hf) {
-    $venvHf = Join-Path $root "artifacts/venv\Scripts\hf.exe"
-    if (Test-Path $venvHf) { $hf = $venvHf }
+    foreach ($candidate in @(
+        (Join-Path $root "artifacts\venv\Scripts\hf.exe"),
+        (Join-Path $root ".venv\Scripts\hf.exe")
+    )) {
+        if (Test-Path $candidate) { $hf = $candidate; break }
+    }
+}
+if (-not $hf) {
+    # Older venvs ship huggingface-cli only; invoke via python -m.
+    $py = Join-Path $root ".venv\Scripts\python.exe"
+    if (-not (Test-Path $py)) { $py = (Get-Command python -ErrorAction SilentlyContinue).Source }
+    if ($py) {
+        $hf = $py
+        $hfArgsPrefix = @("-m", "huggingface_hub.commands.huggingface_cli")
+    }
 }
 if (-not $hf) { Write-Host "hf CLI not found. Install with: pip install -U 'huggingface_hub[cli]'" -ForegroundColor Red; exit 1 }
 
@@ -52,8 +66,19 @@ $entries = (Get-Content $mapPath -Raw | ConvertFrom-Json).map
 $visibility = if ($Public) { "--public" } else { "--private" }
 $vLabel = if ($Public) { "public" } else { "private" }
 Write-Host "Ensuring $vLabel repo $repoId exists..." -ForegroundColor Cyan
-& $hf repos create $repoId --type model $visibility --exist-ok
-if ($LASTEXITCODE -ne 0) { exit 1 }
+# Newer `hf` CLI uses `repos create`; older huggingface-cli uses `repo create`.
+$createOk = $false
+foreach ($createCmd in @(
+    (@("repos", "create", $repoId, "--type", "model", $visibility, "--exist-ok")),
+    (@("repo", "create", $repoId, "--type", "model", $visibility, "--exist-ok"))
+)) {
+    & $hf @hfArgsPrefix @createCmd 2>$null
+    if ($LASTEXITCODE -eq 0) { $createOk = $true; break }
+}
+if (-not $createOk) {
+    # Repo may already exist; verify with a no-op listing via upload path later.
+    Write-Host "  (repo create skipped/failed; continuing if $repoId already exists)" -ForegroundColor DarkYellow
+}
 
 # Upload each mapped local path to its HF target. Per-entry (rather than one blanket
 # upload) is what lets the HF layout differ from local when the map isn't identity.
@@ -64,7 +89,7 @@ foreach ($e in $entries) {
         continue
     }
     Write-Host "  $($e.local -replace '/', '\')  ->  $($e.hf)" -ForegroundColor DarkGray
-    & $hf upload $repoId $localPath $e.hf --repo-type model --commit-message $Message
+    & $hf @hfArgsPrefix upload $repoId $localPath $e.hf --repo-type model --commit-message $Message
     if ($LASTEXITCODE -ne 0) { Write-Host "Upload failed for $($e.local)." -ForegroundColor Red; exit 1 }
 }
 

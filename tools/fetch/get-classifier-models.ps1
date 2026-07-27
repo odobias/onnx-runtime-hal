@@ -45,10 +45,13 @@ if ($repoId -notmatch "/") {
 
 $includes = @()
 if ($Models -contains "fakeaudio") {
-    $includes += "deepfake/fakeaudio/model.onnx"
+    # Whole FakeAudio graph + NPU split variants (frontend / backbone / expanded bias).
+    $includes += "deepfake/fakeaudio/**"
     # Nested test_audio/ (Šimon export smoke) plus legacy flat YouTube WAVs.
     $includes += "deepfake/audio-samples/**"
     $includes += "deepfake/fixtures/fakeaudio/**"
+    $includes += "deepfake/fixtures/fakeaudio-bb-fp32/**"
+    $includes += "deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/**"
 }
 if ($Models -contains "tsc") {
     $includes += "deepfake/tsc/*"
@@ -89,9 +92,11 @@ if ($Models -contains "fakeaudio") {
         New-Item -ItemType Directory -Force -Path (Split-Path $testAudioTmp) | Out-Null
         Move-Item -LiteralPath $testAudioKeep -Destination $testAudioTmp -Force
     }
-    Move-Mapped "deepfake/fakeaudio/model.onnx" "artifacts/workloads/classifiers/fakeaudio/model.onnx"
+    Move-Mapped "deepfake/fakeaudio" "artifacts/workloads/classifiers/fakeaudio"
     Move-Mapped "deepfake/audio-samples" "artifacts/workloads/classifiers/audio-samples"
     Move-Mapped "deepfake/fixtures/fakeaudio" "artifacts/workloads/classifiers/fixtures/fakeaudio"
+    Move-Mapped "deepfake/fixtures/fakeaudio-bb-fp32" "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32"
+    Move-Mapped "deepfake/fixtures/fakeaudio-bb-expanded-attention-bias" "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias"
     if ($hadTestAudio) {
         $restore = Join-Path $outRoot "audio-samples\test_audio"
         if (Test-Path $restore) { Remove-Item $restore -Recurse -Force }

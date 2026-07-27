@@ -24,9 +24,11 @@ _SPECS = {
         "sentinel": os.path.join(CLASSIFIERS_DIR, "fakeaudio", "model.onnx"),
         "legacy": os.path.join(LEGACY_DIR, "fakeaudio", "model.onnx"),
         "patterns": [
-            "deepfake/fakeaudio/*",
+            "deepfake/fakeaudio/**",
             "deepfake/audio-samples/**",
             "deepfake/fixtures/fakeaudio/**",
+            "deepfake/fixtures/fakeaudio-bb-fp32/**",
+            "deepfake/fixtures/fakeaudio-bb-expanded-attention-bias/**",
         ],
         "hf_dir": "deepfake/fakeaudio",
         "local_dir": "fakeaudio",
@@ -123,11 +125,17 @@ def ensure_deepfake_models(models=("tsc", "fakeaudio"), repo=None):
                         if os.path.exists(dest_keep):
                             shutil.rmtree(dest_keep)
                         shutil.move(keep_tmp, dest_keep)
-            fix_name = m
-            fix_src = os.path.join(staging, "deepfake", "fixtures", fix_name)
-            fix_dst = os.path.join(CLASSIFIERS_DIR, "fixtures", fix_name)
-            if os.path.isdir(fix_src):
-                _copytree(fix_src, fix_dst)
+            fixture_names = [m]
+            if m == "fakeaudio":
+                fixture_names += [
+                    "fakeaudio-bb-fp32",
+                    "fakeaudio-bb-expanded-attention-bias",
+                ]
+            for fix_name in fixture_names:
+                fix_src = os.path.join(staging, "deepfake", "fixtures", fix_name)
+                fix_dst = os.path.join(CLASSIFIERS_DIR, "fixtures", fix_name)
+                if os.path.isdir(fix_src):
+                    _copytree(fix_src, fix_dst)
     except Exception as e:  # noqa: BLE001
         raise SystemExit(
             f"[models] auto-download of {', '.join(missing)} from {repo} failed "
