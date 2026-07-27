@@ -5,6 +5,8 @@
     { "local": "artifacts/workloads/whisper/models/dynamic-onnx", "hf": "whisper/en-onnx" },
     { "local": "artifacts/workloads/whisper/models/ov-ir", "hf": "whisper/en-ov" },
     { "local": "artifacts/workloads/whisper/models/vendor/amd", "hf": "whisper/amd" },
+    { "local": "artifacts/workloads/whisper/models/sherpa-export", "hf": "whisper/sherpa-export" },
+    { "local": "models/deepfake/whisper-tiny-en-sherpa", "hf": "deepfake/whisper-tiny-en-sherpa" },
     { "local": "artifacts/workloads/whisper/manifest.json", "hf": "manifest.json", "kind": "file" },
     { "local": "artifacts/workloads/whisper/manifest.research.json", "hf": "manifest.research.json", "kind": "file" },
     { "local": "artifacts/workloads/audio/jfk.wav", "hf": "audio/jfk.wav", "kind": "file" },
