@@ -76,6 +76,14 @@ if ($Exe) {
 }
 Write-Host "Runner: $exe" -ForegroundColor DarkGray
 
+# QNN context binaries and the VitisAI cache are written into --cache, so two builds sharing
+# one cache directory hand each other their compiled artifacts. Key it on the runner's own
+# build tree instead of the vendor guess; for the derived path those are the same string, so
+# default runs keep using the cache they already have.
+$runnerTree = Split-Path (Split-Path $exe -Parent) -Parent
+$cacheKey = if ($runnerTree) { (Split-Path $runnerTree -Leaf) -replace '[^\w.-]', '_' } else { "" }
+if (-not $cacheKey) { $cacheKey = $platform }
+
 $clips = @(Get-Content -LiteralPath $manifestPath -Encoding UTF8 |
     Where-Object { $_.Trim() } |
     ForEach-Object { $_ | ConvertFrom-Json })
@@ -114,7 +122,7 @@ function Invoke-TaskRun {
             "the score below covers those clips only.")
     }
 
-    $cache = Join-Path $root "artifacts\build\cache\whisper-tasks\$platform\$Device\$TaskName"
+    $cache = Join-Path $root "artifacts\build\cache\whisper-tasks\$cacheKey\$Device\$TaskName"
     New-Item -ItemType Directory -Force -Path $cache | Out-Null
     $jsonOutput = Join-Path $cache "batch-result.json"
     Remove-Item -LiteralPath $jsonOutput -Force -ErrorAction SilentlyContinue
@@ -231,6 +239,10 @@ $jsonPath = Join-Path $reportDir "$stem.json"
     runtime = $Runtime
     window_mode = $Window
     language_mode = "auto-detect"
+    # Runs with and without -Exe write the same report, so the report has to say which binary
+    # produced it or two build trees get compared as though they were one.
+    runner = ($exe -replace [regex]::Escape($root + "\"), "" -replace '\\', '/')
+    runner_built_utc = (Get-Item -LiteralPath $exe).LastWriteTimeUtc.ToString("o")
     generated_utc = [DateTime]::UtcNow.ToString("o")
     tasks = @($results)
 } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
@@ -238,7 +250,9 @@ $jsonPath = Join-Path $reportDir "$stem.json"
 $md = [System.Collections.Generic.List[string]]::new()
 $md.Add("# Whisper task check: static-onnx-tiny-multi-7s ($Device, $Window window)")
 $md.Add("")
-$md.Add("Runner: ``NpuInferenceBench.exe`` (the shipping static engine), language auto-detected per clip.")
+$md.Add(("Runner: ``{0}`` (the shipping static engine, built {1}), language auto-detected per clip." -f `
+    ($exe -replace [regex]::Escape($root + "\"), "" -replace '\\', '/'),
+    (Get-Item -LiteralPath $exe).LastWriteTimeUtc.ToString("u")))
 $windowNote = if ($Window -eq "product") {
     "Audio is cut into 7s windows with 1s overlap and the transcripts stitched on their shared words, " +
     "so a clip costs one encoder pass per window."
