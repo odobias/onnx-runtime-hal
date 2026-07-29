@@ -47,7 +47,7 @@ if (-not $Model) {
         default { $Model = Join-Path $root "artifacts\workloads\whisper\models\ov-ir\fp16" }
     }
 }
-if (-not $Audio) { $Audio = Join-Path $root "artifacts\workloads\audio\jfk.wav" }
+if (-not $Audio) { $Audio = Join-Path $root "artifacts\workloads\speech\jfk.wav" }
 if (-not $Results) { $Results = Join-Path $root "results\ledgers\asr.csv" }
 
 $exe = Join-Path $root "artifacts\build\$Platform\$Configuration\NpuInferenceBench.exe"

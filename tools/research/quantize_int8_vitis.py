@@ -145,7 +145,7 @@ def main():
     ap.add_argument("--src", default="artifacts/workloads/whisper/models/dynamic-onnx")
     ap.add_argument("--out", default="artifacts/workloads/whisper/models/dynamic-onnx-int8")
     ap.add_argument("--eval", default="src/workloads/eval/eval.jsonl")
-    ap.add_argument("--extra-wav", default="artifacts/workloads/audio/jfk.wav")
+    ap.add_argument("--extra-wav", default="artifacts/workloads/speech/jfk.wav")
     ap.add_argument("--max-clips", type=int, default=13)
     ap.add_argument("--max-steps", type=int, default=24)
     ap.add_argument("--dec-len", type=int, default=128,

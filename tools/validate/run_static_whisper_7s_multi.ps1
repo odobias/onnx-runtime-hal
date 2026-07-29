@@ -22,6 +22,9 @@
 .PARAMETER Suite
   Also run the portable HAL suite for whisper on the same devices (needs build).
 
+.PARAMETER Eval
+  Also run multi-sample WER over eval.jsonl (product 7s fit + full 30s canvas).
+
 .PARAMETER PythonCpu
   Python for CPU smoke (default: .venv).
 
@@ -34,6 +37,7 @@ param(
 
     [switch]$SkipFetch,
     [switch]$Suite,
+    [switch]$Eval,
 
     [string]$PythonCpu = "",
     [string]$PythonGpu = "",
@@ -51,8 +55,9 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $root
 
 $model = Join-Path $root "artifacts\workloads\whisper\models\static-onnx-tiny-multi-7s"
-$audio = Join-Path $root "artifacts\workloads\audio\jfk.wav"
+$audio = Join-Path $root "artifacts\workloads\speech\jfk.wav"
 $smoke = Join-Path $root "tools\validate\smoke_static_whisper_7s_multi.py"
+$evalPy = Join-Path $root "tools\validate\eval_static_whisper_7s_multi.py"
 
 function Resolve-Py([string]$explicit, [string[]]$candidates) {
     if ($explicit -and (Test-Path -LiteralPath $explicit)) { return (Resolve-Path $explicit).Path }
@@ -119,6 +124,36 @@ foreach ($dev in $Device) {
             Python = $py
         })
     Write-Host ("[{0}] exit={1}" -f $dev, $code) -ForegroundColor $(if ($pass) { "Green" } else { "Red" })
+}
+
+if ($Eval) {
+    if (-not (Test-Path -LiteralPath $evalPy)) {
+        throw "Missing eval script: $evalPy"
+    }
+    foreach ($dev in $Device) {
+        $py = switch ($dev) {
+            "cpu" { $pyCpu }
+            "gpu" { $pyGpu }
+            "npu" { $pyNpu }
+        }
+        if (-not $py) {
+            Write-Host "FAIL eval [$dev]: no Python" -ForegroundColor Red
+            $failed = $true
+            continue
+        }
+        foreach ($winArgs in @(
+                @("--window", "product", "--only-fit"),
+                @("--window", "full")
+            )) {
+            Write-Host ""
+            Write-Host ("==> Eval device={0} {1}" -f $dev, ($winArgs -join ' ')) -ForegroundColor Cyan
+            & $py $evalPy --device $dev @winArgs
+            if ($LASTEXITCODE -ne 0) {
+                $failed = $true
+                Write-Host "FAIL eval device=$dev exit=$LASTEXITCODE" -ForegroundColor Red
+            }
+        }
+    }
 }
 
 if ($Suite) {

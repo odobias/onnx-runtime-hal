@@ -58,7 +58,7 @@ if (-not $evalRows.Count) { throw "eval.jsonl is empty" }
 $clipSpecs = foreach ($eval in $evalRows) {
     $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
     if (-not (Test-Path -LiteralPath $clipPath)) {
-        $clipPath = Join-Path $root "artifacts\workloads\eval\$($eval.id).wav"
+        $clipPath = Join-Path $root "artifacts\workloads\speech\$($eval.id).wav"
     }
     if (-not (Test-Path -LiteralPath $clipPath)) {
         throw "Eval audio missing for $($eval.id)"
@@ -120,7 +120,7 @@ $updated = foreach ($eval in $evalRows) {
     $id = [string]$eval.id
     $clip = $byId[$id]
     if (-not $clip) { throw "Bake result missing clip '$id'" }
-    $audioRel = "artifacts/workloads/eval/$id.wav"
+    $audioRel = "artifacts/workloads/speech/$id.wav"
     if (-not (Test-Path -LiteralPath (Join-Path $root ($audioRel -replace '/', '\')))) {
         $audioRel = [string]$eval.audio
     }

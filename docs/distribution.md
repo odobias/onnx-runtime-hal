@@ -15,9 +15,10 @@ artifacts/dist/npu-inference-bench-ARM64/
   benchmark/
   tools/                    # allowlisted helpers (fetch/eval/fixtures/validate)
   src/workloads/
+    eval/eval.jsonl         # tracked manifest + baked baselines
+  artifacts/workloads/
     whisper/models/static-onnx/
-    eval/                   # eval.jsonl + ls_*.wav (+ baked baselines)
-    audio/
+    speech/                 # jfk.wav + ls_*.wav (HF: speech/)
     classifiers/
       tsc/
       fakeaudio/

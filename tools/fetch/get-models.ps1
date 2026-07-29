@@ -4,8 +4,8 @@
 # since models/ is gitignored and never committed.
 #
 # The HF repo and the local models/ tree share one clean, browsable layout
-# (whisper/en-static-onnx, whisper/amd, whisper/variants-ov/fp32, audio/jfk.wav,
-# eval/, deepfake/, ...). The canonical map lives in scripts/asset-map.json;
+# (whisper/en-static-onnx, whisper/amd, whisper/variants-ov/fp32, speech/,
+# deepfake/, ...). The canonical map lives in tools/fetch/asset-map.json;
 # this script downloads each hf path to its local target (identity today, but the
 # indirection means a future layout change is a one-file edit in the map).
 #

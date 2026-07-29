@@ -28,7 +28,7 @@ param(
     [string[]]$Variant = @(),
     [string]$Configuration = "Release",
     [ValidateSet("x64", "ARM64")][string]$BuildPlatform = "",
-    # Skip the self-contained bootstrap (build + fetch artifacts/workloads/eval/audio). Use when
+    # Skip the self-contained bootstrap (build + fetch artifacts/workloads/speech). Use when
     # you have already prepared the environment and want the sweep to start faster.
     [switch]$SkipBootstrap,
     # Reuse any persisted compiled-model cache under cache/<variant>-<device> instead
@@ -60,7 +60,7 @@ $exe = Join-Path $root "artifacts\build\$BuildPlatform\$Configuration\NpuInferen
 $platform = Get-BenchmarkPlatform
 
 # Self-contained bootstrap: build the app for this host's backends and fetch any
-# missing artifacts/workloads/eval/audio so the benchmark runs from a fresh checkout. Idempotent
+# missing artifacts/workloads/speech so the benchmark runs from a fresh checkout. Idempotent
 # (present artifacts are skipped) and opt-out via -SkipBootstrap.
 if (-not $SkipBootstrap) {
     Initialize-BenchmarkEnvironment -Root $root -Exe $exe -Manifest $Manifest -EvalSet $EvalSet `

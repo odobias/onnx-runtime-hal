@@ -19,8 +19,7 @@
       "include": [
         "artifacts/workloads/whisper/models/static-onnx",
         "artifacts/workloads/whisper/manifest.json",
-        "artifacts/workloads/audio",
-        "artifacts/workloads/eval"
+        "artifacts/workloads/speech"
       ]
     },
     {

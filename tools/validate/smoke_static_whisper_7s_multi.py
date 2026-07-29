@@ -19,7 +19,7 @@ from transformers.models.whisper.feature_extraction_whisper import WhisperFeatur
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
-AUDIO = ROOT / "artifacts/workloads/audio/jfk.wav"
+AUDIO = ROOT / "artifacts/workloads/speech/jfk.wav"
 
 N_FRAMES, ENC_SEQ, D_MODEL, MAXLEN = 3000, 1500, 384, 128
 PRODUCT_SAMPLES, SR = 112000, 16000

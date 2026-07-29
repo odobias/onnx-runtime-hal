@@ -3,7 +3,7 @@
 # Falls back to the single jfk.wav clip (with a known reference) if the download
 # fails, so the benchmark harness always has something to run.
 #
-#   .\get-eval-set.ps1              # WAVs -> artifacts/workloads/eval; manifest -> src/workloads/eval/eval.jsonl
+#   .\get-eval-set.ps1              # WAVs -> artifacts/workloads/speech; manifest -> src/workloads/eval/eval.jsonl
 #   .\get-eval-set.ps1 -Count 5
 
 [CmdletBinding()]
@@ -17,7 +17,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new()
 $env:PYTHONUTF8 = "1"; $env:PYTHONIOENCODING = "utf-8"
 
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$evalDir = Join-Path $root "artifacts\workloads\eval"
+$evalDir = Join-Path $root "artifacts\workloads\speech"
 $trackedJsonl = Join-Path $root "src\workloads\eval\eval.jsonl"
 New-Item -ItemType Directory -Force -Path $evalDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path $trackedJsonl -Parent) | Out-Null
@@ -64,10 +64,10 @@ if ($ok -and (Test-Path -LiteralPath $generatedJsonl)) {
 
 if (-not $ok) {
     Write-Host "Dataset build failed; falling back to jfk.wav clip." -ForegroundColor Yellow
-    $jfk = Join-Path $root "artifacts\workloads\audio\jfk.wav"
+    $jfk = Join-Path $root "artifacts\workloads\speech\jfk.wav"
     if (-not (Test-Path $jfk)) { & (Join-Path $PSScriptRoot "get-audio.ps1") }
     $ref = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
-    $rec = [ordered]@{ id = "jfk"; audio = "artifacts/workloads/audio/jfk.wav"; ref = $ref; duration_s = 11.0 }
+    $rec = [ordered]@{ id = "jfk"; audio = "artifacts/workloads/speech/jfk.wav"; ref = $ref; duration_s = 11.0 }
     ($rec | ConvertTo-Json -Compress) | Set-Content -Path $trackedJsonl -Encoding UTF8
     $evalPath = $trackedJsonl
     Write-Host "Wrote 1 utterance (jfk) to src\workloads\eval\eval.jsonl" -ForegroundColor Green

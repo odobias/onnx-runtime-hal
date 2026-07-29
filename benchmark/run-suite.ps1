@@ -303,7 +303,7 @@ if (-not $AttemptLedger) { $AttemptLedger = Join-Path $root "results\ledgers\att
 $accuracyLedgerExplicit = [bool]$AccuracyLedger
 if (-not $Manifest) { $Manifest = Join-Path $root "benchmark\manifests\portable.json" }
 $audioExplicit = [bool]$Audio
-if (-not $Audio) { $Audio = Join-Path $root "artifacts\workloads\eval\ls_000.wav" }
+if (-not $Audio) { $Audio = Join-Path $root "artifacts\workloads\speech\ls_000.wav" }
 
 if (-not (Test-Path $Manifest)) {
     Write-Host "Benchmark manifest missing: $Manifest" -ForegroundColor Red
