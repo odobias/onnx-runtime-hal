@@ -43,7 +43,8 @@ if (Test-Path -LiteralPath $evalPath) {
         if (-not $_) { return }
         $row = $_ | ConvertFrom-Json
         if (-not $row.id) { return }
-        if ($row.PSObject.Properties.Name -contains "baseline_wer") {
+        if (($row.PSObject.Properties.Name -contains "baseline_wer") -or
+            ($row.PSObject.Properties.Name -contains "baselines")) {
             $priorBaselines[[string]$row.id] = $row
         }
     }
@@ -80,7 +81,8 @@ if ($priorBaselines.Count -gt 0 -and (Test-Path -LiteralPath $evalPath)) {
         $row = $_ | ConvertFrom-Json
         $prior = $priorBaselines[[string]$row.id]
         if ($prior) {
-            foreach ($field in @("baseline_hyp", "baseline_wer", "baseline_cer", "baseline_source")) {
+            foreach ($field in @("baseline_hyp", "baseline_wer", "baseline_cer", "baseline_lang",
+                                 "baseline_task", "baseline_source", "baselines")) {
                 if ($prior.PSObject.Properties.Name -contains $field) {
                     $row | Add-Member -NotePropertyName $field -NotePropertyValue $prior.$field -Force
                 }

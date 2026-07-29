@@ -49,6 +49,129 @@ namespace {
 
 #include "benchmark_support.ipp"
 #include "classifier_benchmark.ipp"
+
+void append_utf8(std::string& out, unsigned int cp) {
+    if (cp < 0x80u) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800u) {
+        out.push_back(static_cast<char>(0xC0u | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80u | (cp & 0x3Fu)));
+    } else if (cp < 0x10000u) {
+        out.push_back(static_cast<char>(0xE0u | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80u | ((cp >> 6) & 0x3Fu)));
+        out.push_back(static_cast<char>(0x80u | (cp & 0x3Fu)));
+    } else {
+        out.push_back(static_cast<char>(0xF0u | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80u | ((cp >> 12) & 0x3Fu)));
+        out.push_back(static_cast<char>(0x80u | ((cp >> 6) & 0x3Fu)));
+        out.push_back(static_cast<char>(0x80u | (cp & 0x3Fu)));
+    }
+}
+
+unsigned int parse_hex4(const std::string& text, size_t& pos) {
+    unsigned int value = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (pos >= text.size()) throw std::runtime_error("truncated \\u escape");
+        const char ch = text[pos++];
+        value <<= 4;
+        if (ch >= '0' && ch <= '9') value |= static_cast<unsigned>(ch - '0');
+        else if (ch >= 'a' && ch <= 'f') value |= static_cast<unsigned>(ch - 'a' + 10);
+        else if (ch >= 'A' && ch <= 'F') value |= static_cast<unsigned>(ch - 'A' + 10);
+        else throw std::runtime_error("bad \\u escape");
+    }
+    return value;
+}
+
+std::string parse_json_text(const std::string& text, size_t& pos) {
+    if (pos >= text.size() || text[pos] != '"') throw std::runtime_error("expected string");
+    ++pos;
+    std::string out;
+    while (pos < text.size()) {
+        const char ch = text[pos++];
+        if (ch == '"') return out;
+        if (ch != '\\') {
+            out.push_back(ch);
+            continue;
+        }
+        if (pos >= text.size()) break;
+        const char esc = text[pos++];
+        switch (esc) {
+            case 'n': out.push_back('\n'); break;
+            case 'r': out.push_back('\r'); break;
+            case 't': out.push_back('\t'); break;
+            case 'b': out.push_back('\b'); break;
+            case 'f': out.push_back('\f'); break;
+            case 'u': {
+                unsigned int cp = parse_hex4(text, pos);
+                // Surrogate pair: ConvertTo-Json emits these for astral characters.
+                if (cp >= 0xD800u && cp <= 0xDBFFu && pos + 1 < text.size() &&
+                    text[pos] == '\\' && text[pos + 1] == 'u') {
+                    pos += 2;
+                    const unsigned int low = parse_hex4(text, pos);
+                    cp = 0x10000u + ((cp - 0xD800u) << 10) + (low - 0xDC00u);
+                }
+                append_utf8(out, cp);
+                break;
+            }
+            default: out.push_back(esc); break;
+        }
+    }
+    throw std::runtime_error("unterminated string");
+}
+
+void skip_json_value(const std::string& text, size_t& pos) {
+    if (pos >= text.size()) return;
+    if (text[pos] == '"') {
+        parse_json_text(text, pos);
+        return;
+    }
+    if (text[pos] == '{' || text[pos] == '[') {
+        int depth = 0;
+        while (pos < text.size()) {
+            const char ch = text[pos];
+            if (ch == '"') {
+                parse_json_text(text, pos);
+                continue;
+            }
+            ++pos;
+            if (ch == '{' || ch == '[') ++depth;
+            else if (ch == '}' || ch == ']') {
+                if (--depth == 0) return;
+            }
+        }
+        return;
+    }
+    while (pos < text.size() && text[pos] != ',' && text[pos] != '}') ++pos;
+}
+
+// String-valued members of one flat JSON object. Parsed member-by-member rather than
+// by searching for `"key"`, so a key name appearing inside a reference transcript
+// cannot be mistaken for the field itself.
+std::unordered_map<std::string, std::string> json_object_strings(const std::string& line) {
+    std::unordered_map<std::string, std::string> out;
+    size_t pos = line.find('{');
+    if (pos == std::string::npos) return out;
+    ++pos;
+    while (pos < line.size()) {
+        while (pos < line.size() && (std::isspace(static_cast<unsigned char>(line[pos])) ||
+                                     line[pos] == ',')) {
+            ++pos;
+        }
+        if (pos >= line.size() || line[pos] == '}') break;
+        if (line[pos] != '"') break;
+        const std::string key = parse_json_text(line, pos);
+        while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos]))) ++pos;
+        if (pos >= line.size() || line[pos] != ':') break;
+        ++pos;
+        while (pos < line.size() && std::isspace(static_cast<unsigned char>(line[pos]))) ++pos;
+        if (pos < line.size() && line[pos] == '"') {
+            out[key] = parse_json_text(line, pos);
+        } else {
+            skip_json_value(line, pos);
+        }
+    }
+    return out;
+}
 }  // namespace
 
 int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
@@ -93,6 +216,46 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
             clip.audio = argv[++i];
             clip.reference = argv[++i];
             eval_clips.push_back(std::move(clip));
+        } else if (a == "--eval-set" && i + 1 < argc) {
+            // References routinely contain double quotes, which the Windows command
+            // line silently truncates at -- a reference cut short inflates WER without
+            // any error. Reading clips from a UTF-8 JSONL file avoids argv entirely.
+            const std::string set_path = argv[++i];
+            std::ifstream in(set_path, std::ios::binary);
+            if (!in) {
+                std::cerr << "Failed to open eval set: " << set_path << "\n";
+                return 1;
+            }
+            std::string line;
+            int line_no = 0;
+            while (std::getline(in, line)) {
+                ++line_no;
+                if (line_no == 1 && line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
+                    static_cast<unsigned char>(line[1]) == 0xBB &&
+                    static_cast<unsigned char>(line[2]) == 0xBF) {
+                    line.erase(0, 3);
+                }
+                while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+                if (line.find_first_not_of(" \t") == std::string::npos) continue;
+                std::unordered_map<std::string, std::string> fields;
+                try {
+                    fields = json_object_strings(line);
+                } catch (const std::exception& e) {
+                    std::cerr << "Bad eval-set line " << line_no << " in " << set_path << ": "
+                              << e.what() << "\n";
+                    return 1;
+                }
+                EvalClipSpec clip;
+                clip.id = fields.count("id") ? fields["id"] : "";
+                clip.audio = fields.count("audio") ? fields["audio"] : "";
+                clip.reference = fields.count("ref") ? fields["ref"] : "";
+                if (clip.id.empty() || clip.audio.empty()) {
+                    std::cerr << "Eval-set line " << line_no << " in " << set_path
+                              << " needs both \"id\" and \"audio\"\n";
+                    return 1;
+                }
+                eval_clips.push_back(std::move(clip));
+            }
         } else if (a == "--threads" && i + 1 < argc) {
             cpu_threads = std::max(0, std::atoi(argv[++i]));
         } else if ((a == "--provider" || a == "--device-override") && i + 1 < argc) {
@@ -149,6 +312,8 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
                   << "  --hot-only  : load once from a populated --cache (skip cold compile; cold=n/a)\n"
                   << "  --ref \"text\": reference transcript -> compute WER/CER\n"
                   << "  --eval-clip <id> <audio> <ref>: repeat to evaluate clips in one loaded session\n"
+                  << "  --eval-set <file.jsonl>: same, read from UTF-8 JSONL {id,audio,ref} lines\n"
+                  << "      (use this when references contain quotes -- argv would truncate them)\n"
                   << "  --threads N: CPU inference thread count (CPU device only)\n"
                   << "  --provider <ort-ep>: backend-specific provider override (e.g. VitisAIExecutionProvider)\n"
                   << "  --json: emit one machine-readable JSON record\n"
@@ -388,6 +553,9 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
             output << ",\"char_edits\":" << clip_error.char_edits;
             output << ",\"ref\":\"" << json_escape(spec.reference) << "\"";
             output << ",\"text\":\"" << json_escape(clip_text) << "\"";
+            output << ",\"language\":\"" << json_escape(clip_result.language) << "\"";
+            output << ",\"task\":\"" << json_escape(clip_result.task) << "\"";
+            if (clip_result.windows > 0) output << ",\"windows\":" << clip_result.windows;
             output << "}";
         }
         output << "]}";
@@ -506,6 +674,9 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
             js << ",\"ref\":\"" << json_escape(reference) << "\"";
         }
         js << ",\"text\":\"" << json_escape(text) << "\"";
+        js << ",\"language\":\"" << json_escape(last.language) << "\"";
+        js << ",\"task\":\"" << json_escape(last.task) << "\"";
+        if (last.windows > 0) js << ",\"windows\":" << last.windows;
         js << "}";
         std::cout << js.str() << "\n";
     } else {

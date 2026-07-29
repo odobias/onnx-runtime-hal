@@ -9,7 +9,8 @@ encoders + stock decoder). True shape reduction needs fine-tuning — out of sco
 This export therefore:
   * ships onnx-community/whisper-tiny encoder+decoder (multilingual, static-friendly)
   * pins decoder input_ids to [1,128] for the HAL static-no-KV loop
-  * records product_window_s=7 so runtimes pad 7s PCM to the 30s mel canvas
+  * records product_window_s=7 / product_overlap_s=1 so runtimes cut longer audio into
+    overlapping 7s windows and pad each to the 30s mel canvas
 
 Output: artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s/
 """
@@ -28,6 +29,9 @@ from huggingface_hub import hf_hub_download, snapshot_download
 from onnx import shape_inference
 
 WINDOW_S = 7
+# Consecutive windows share 1s so a word on a boundary is heard whole by one of them;
+# the runtime stitches the transcripts on the words they agree about.
+OVERLAP_S = 1
 PAD_S = 30
 SAMPLE_RATE = 16000
 N_SAMPLES = PAD_S * SAMPLE_RATE  # 480000 graph canvas
@@ -128,6 +132,7 @@ def build(dst: Path) -> None:
         "multilingual": True,
         "product_window_s": WINDOW_S,
         "product_n_samples": PRODUCT_SAMPLES,
+        "product_overlap_s": OVERLAP_S,
         "pad_to_s": PAD_S,
         "window_s": PAD_S,
         "sample_rate": SAMPLE_RATE,

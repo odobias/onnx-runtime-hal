@@ -1,0 +1,104 @@
+﻿{
+    "model":  "C:/Projects/whisper-npu-hal/artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s",
+    "manifest":  "artifacts/workloads/speech/multilingual/manifest.jsonl",
+    "device":  "cpu",
+    "runtime":  "bundled",
+    "window_mode":  "product",
+    "language_mode":  "auto-detect",
+    "generated_utc":  "2026-07-29T14:54:00.4048202Z",
+    "tasks":  [
+                  {
+                      "task":  "transcribe",
+                      "device":  "cpu",
+                      "runtime":  "bundled",
+                      "window_mode":  "product",
+                      "resolved_provider":  "CPUExecutionProvider",
+                      "clips":  6,
+                      "source_language_detected":  6,
+                      "task_confirmed":  6,
+                      "windows":  11,
+                      "wer":  0.39473684210526316,
+                      "cer":  0.16842105263157894,
+                      "rows":  [
+                                   {
+                                       "id":  "fleurs_de",
+                                       "expected_lang":  "de",
+                                       "detected_lang":  "de",
+                                       "lang_ok":  true,
+                                       "reported_task":  "transcribe",
+                                       "windows":  2,
+                                       "wer":  0.238095,
+                                       "cer":  0.107143,
+                                       "ref":  "die höhle befindet sich auf der spitze eines der berge nördlich von mekka und ist vom rest der welt völlig isoliert",
+                                       "hyp":  "Die Höhle befindet sich auf der Spitze eines der Bergen örtlich von Mecker und ist zum Rest. Welt völlig isoliert.",
+                                       "duration_s":  9.9
+                                   },
+                                   {
+                                       "id":  "fleurs_fr",
+                                       "expected_lang":  "fr",
+                                       "detected_lang":  "fr",
+                                       "lang_ok":  true,
+                                       "reported_task":  "transcribe",
+                                       "windows":  2,
+                                       "wer":  0.75,
+                                       "cer":  0.282051,
+                                       "ref":  "il a ajouté qu’« on ne devrait cependant pas leur demander d’assumer des obligations qui dépassent leur stade de développement leur responsabilité et leurs capacités. »",
+                                       "hyp":  "Il ajoutait qu\u0027on ne devrait se prendre un balleur de monnaie d\u0027assumer des obligations qui n\u0027est pas sur un style de développement, de responsabilité et leur capacité.",
+                                       "duration_s":  8.28
+                                   },
+                                   {
+                                       "id":  "fleurs_es",
+                                       "expected_lang":  "es",
+                                       "detected_lang":  "es",
+                                       "lang_ok":  true,
+                                       "reported_task":  "transcribe",
+                                       "windows":  2,
+                                       "wer":  0.045455,
+                                       "cer":  0.017857,
+                                       "ref":  "fue tanta la cantidad de gente que se concentró que no todos pudieron acceder al funeral en la plaza de san pedro",
+                                       "hyp":  "Fue tanta la cantidad de gente que se concentró que no todos pudieron acceder al funerado. en la plaza de San Pedro.",
+                                       "duration_s":  9.72
+                                   },
+                                   {
+                                       "id":  "fleurs_cs",
+                                       "expected_lang":  "cs",
+                                       "detected_lang":  "cs",
+                                       "lang_ok":  true,
+                                       "reported_task":  "transcribe",
+                                       "windows":  2,
+                                       "wer":  0.6875,
+                                       "cer":  0.424658,
+                                       "ref":  "kůra je silná přibližně 70 km na přivrácené straně a okolo 100 km na odvrácené straně",
+                                       "hyp":  "Kůry jsou na přebně 70 km na přeberáce nestraňi a okolostu kilometrů na odveracone straňi.",
+                                       "duration_s":  7.32
+                                   },
+                                   {
+                                       "id":  "fleurs_it",
+                                       "expected_lang":  "it",
+                                       "detected_lang":  "it",
+                                       "lang_ok":  true,
+                                       "reported_task":  "transcribe",
+                                       "windows":  1,
+                                       "wer":  0,
+                                       "cer":  0,
+                                       "ref":  "l\u0027incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico",
+                                       "hyp":  "L\u0027incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico.",
+                                       "duration_s":  7.08
+                                   },
+                                   {
+                                       "id":  "fleurs_pl",
+                                       "expected_lang":  "pl",
+                                       "detected_lang":  "pl",
+                                       "lang_ok":  true,
+                                       "reported_task":  "transcribe",
+                                       "windows":  2,
+                                       "wer":  0.588235,
+                                       "cer":  0.179688,
+                                       "ref":  "większość mniejszych wysp to narody niezależne lub sprzymierzone z francją i słynące jako luksusowe nadmorskie miejscowości wypoczynkowe",
+                                       "hyp":  "W większość mniejszych wysp to narady niezależne lub zpomieżone sferancją i trunące jako lub sosowe nadbalskie miejscowości wypoczynko.",
+                                       "duration_s":  7.68
+                                   }
+                               ]
+                  }
+              ]
+}

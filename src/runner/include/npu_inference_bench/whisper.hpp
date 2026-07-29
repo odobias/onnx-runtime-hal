@@ -71,10 +71,19 @@ struct TranscribeResult {
     std::string decode_strategy;  // e.g. "static-no-kv", "genai-bounded-kv"
     long max_context = 0;         // static decoder context length (0 = n/a)
 
-    // ISO code the transcript is in: detected from the audio, or pinned by the
-    // caller. Empty for English-only models. Transcripts are always verbatim in
-    // this language -- backends must not translate to English.
+    // ISO code of the speech, detected from the audio or pinned by the caller.
+    // Empty for English-only models. This is the *spoken* language, so under the
+    // "translate" task the transcript is English while this still reports the source.
     std::string language;
+
+    // "transcribe" (verbatim, in `language`) or "translate" (English out of foreign
+    // speech). Empty for English-only models, which have no task token.
+    std::string task;
+
+    // Number of audio windows decoded for this clip. >1 means the clip exceeded the
+    // product window and was stitched from overlapping windows, which costs a full
+    // encoder pass each.
+    long windows = 0;
 };
 
 // 16 kHz, mono, float PCM normalized to [-1, 1].

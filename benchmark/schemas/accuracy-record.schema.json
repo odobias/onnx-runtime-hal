@@ -45,7 +45,9 @@
       "properties": {
         "outputs_finite": { "type": "boolean" },
         "compared": { "type": "integer", "minimum": 0 },
-        "decision_flips": { "type": "integer", "minimum": 0 }
+        "decision_flips": { "type": "integer", "minimum": 0 },
+        "language_drifts": { "type": "integer", "minimum": 0 },
+        "task_drifts": { "type": "integer", "minimum": 0 }
       }
     },
     "trust_gate": {
@@ -63,6 +65,9 @@
         "intended_provider_resolved": { "type": "boolean" },
         "accuracy_eligible": { "type": "boolean" },
         "npu_operation_assignment_recorded": { "type": "boolean" },
+        "baseline_compared": { "type": "boolean" },
+        "no_language_drift": { "type": "boolean" },
+        "no_task_drift": { "type": "boolean" },
         "valid": { "type": "boolean" }
       }
     }

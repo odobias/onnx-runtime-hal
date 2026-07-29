@@ -1,13 +1,25 @@
 # Bake CPU fp32 Whisper-static hypotheses + WER/CER into src/workloads/eval/eval.jsonl
 # so later suite runs can compare against a frozen baseline.
 #
+# Without -BaselineKey the flat baseline_* fields are written (the tiny.en
+# static-onnx reference shared by every workload that ships those weights).
+# With -BaselineKey the hypotheses land under baselines.<key> instead, so a
+# package with different weights gets its own frozen reference and is never
+# graded against another package's transcripts. The manifest workload must
+# declare the matching "baselineKey" for the suite to use it.
+#
 #   .\tools\eval\bake-whisper-baselines.ps1
 #   .\tools\eval\bake-whisper-baselines.ps1 -Device cpu -Runtime bundled
+#   .\tools\eval\bake-whisper-baselines.ps1 `
+#       -ModelDir artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s `
+#       -BaselineKey static-onnx-tiny-multi-7s
 
 [CmdletBinding()]
 param(
     [ValidateSet("cpu", "gpu", "npu")][string]$Device = "cpu",
-    [ValidateSet("bundled", "winml")][string]$Runtime = "bundled"
+    [ValidateSet("bundled", "winml")][string]$Runtime = "bundled",
+    [string]$ModelDir = "",
+    [string]$BaselineKey = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,7 +57,19 @@ if (-not (Test-Path -LiteralPath $exe)) {
     throw "Benchmark executable missing: $exe"
 }
 
-$modelDir = Join-Path $root "artifacts\workloads\whisper\models\static-onnx"
+if ($BaselineKey -and -not $ModelDir) {
+    throw "-BaselineKey requires -ModelDir so the key cannot be baked from the wrong package"
+}
+$modelRel = if ($ModelDir) {
+    ($ModelDir -replace '\\', '/').TrimEnd('/')
+} else {
+    "artifacts/workloads/whisper/models/static-onnx"
+}
+$modelDir = if ([System.IO.Path]::IsPathRooted($modelRel)) {
+    $modelRel
+} else {
+    Join-Path $root ($modelRel -replace '/', '\')
+}
 if (-not (Test-Path -LiteralPath (Join-Path $modelDir "encoder_model.onnx"))) {
     throw "Whisper static model missing: $modelDir"
 }
@@ -75,14 +99,21 @@ New-Item -ItemType Directory -Force -Path $cache | Out-Null
 $jsonOutput = Join-Path $cache "batch-result.json"
 Remove-Item -LiteralPath $jsonOutput -Force -ErrorAction SilentlyContinue
 
+# Clips go through a UTF-8 JSONL file, not --eval-clip: a reference containing a
+# double quote is truncated by the Windows command line, which would silently bake a
+# baseline against a partial reference.
+$setPath = Join-Path $cache "clips.jsonl"
+$clipSpecs | ForEach-Object {
+    [pscustomobject]@{ id = $_.id; audio = $_.audio; ref = $_.ref } |
+        ConvertTo-Json -Compress -Depth 3
+} | Set-Content -LiteralPath $setPath -Encoding UTF8
+
 $args = @(
     "run", "whisper", $modelDir, $clipSpecs[0].audio,
     "onnx-static", $Device, "1",
-    "--cache", $cache, "--json", "--json-output", $jsonOutput
+    "--cache", $cache, "--json", "--json-output", $jsonOutput,
+    "--eval-set", $setPath
 )
-foreach ($clip in $clipSpecs) {
-    $args += @("--eval-clip", $clip.id, $clip.audio, $clip.ref)
-}
 
 Write-Host "Baking baselines via $exe ($Runtime/$Device)..." -ForegroundColor Cyan
 $native = Invoke-BenchmarkNativeJson -Exe $exe -Arguments $args `
@@ -111,7 +142,7 @@ $source = [ordered]@{
             [string]$native.payload.clips[0].device
         } else { "" }
     )
-    model = "artifacts/workloads/whisper/models/static-onnx"
+    model = $modelRel
     baked_at_utc = [DateTime]::UtcNow.ToString("o")
     contract = "whisper-eval-v1"
 }
@@ -125,22 +156,58 @@ $updated = foreach ($eval in $evalRows) {
         $audioRel = [string]$eval.audio
     }
     $hyp = if ($clip.text) { [string]$clip.text } else { [string]$clip.transcription }
-    [ordered]@{
-        id = $id
-        audio = $audioRel
-        ref = [string]$eval.ref
-        duration_s = [double]$eval.duration_s
-        baseline_hyp = $hyp
-        baseline_wer = [double]$clip.wer
-        baseline_cer = [double]$clip.cer
-        baseline_source = $source
+    # Multilingual packages detect a language per clip; freeze it so a later run
+    # that hears a different one is flagged instead of silently graded on WER.
+    # English-only packages report none and stay uncompared.
+    $lang = [string]$clip.language
+    $task = [string]$clip.task
+    if (-not $BaselineKey) {
+        $flat = [ordered]@{
+            id = $id
+            audio = $audioRel
+            ref = [string]$eval.ref
+            duration_s = [double]$eval.duration_s
+            baseline_hyp = $hyp
+            baseline_wer = [double]$clip.wer
+            baseline_cer = [double]$clip.cer
+        }
+        if ($lang) { $flat["baseline_lang"] = $lang }
+        if ($task) { $flat["baseline_task"] = $task }
+        $flat["baseline_source"] = $source
+        $flat
+        continue
     }
+    # Keep every existing field -- other workloads' keys and the flat legacy
+    # mirror included -- and replace only this key's entry.
+    $row = [ordered]@{}
+    foreach ($property in $eval.PSObject.Properties) {
+        if ($property.Name -eq "baselines") { continue }
+        $row[$property.Name] = $property.Value
+    }
+    $row["audio"] = $audioRel
+    $map = [ordered]@{}
+    if (($eval.PSObject.Properties.Name -contains "baselines") -and $eval.baselines) {
+        foreach ($property in $eval.baselines.PSObject.Properties) {
+            $map[$property.Name] = $property.Value
+        }
+    }
+    $entry = [ordered]@{
+        hyp = $hyp
+        wer = [double]$clip.wer
+        cer = [double]$clip.cer
+    }
+    if ($lang) { $entry["lang"] = $lang }
+    if ($task) { $entry["task"] = $task }
+    $entry["source"] = $source
+    $map[$BaselineKey] = $entry
+    $row["baselines"] = $map
+    $row
 }
 
 $backup = Join-Path $root ("src\workloads\eval\eval.jsonl.bak-{0:yyyyMMdd-HHmmss}" -f (Get-Date))
 Copy-Item -LiteralPath $evalPath -Destination $backup -Force
 $updated | ForEach-Object {
-    ($_ | ConvertTo-Json -Compress -Depth 6)
+    ($_ | ConvertTo-Json -Compress -Depth 10)
 } | Set-Content -LiteralPath $evalPath -Encoding UTF8
 
 $agg = Measure-BenchmarkClips $native.payload.clips
