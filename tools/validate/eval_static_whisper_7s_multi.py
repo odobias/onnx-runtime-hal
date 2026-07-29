@@ -20,6 +20,10 @@ import soundfile as sf
 from transformers import WhisperTokenizer
 from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import baseline  # noqa: E402  (local helpers, need the path insert above)
+from providers import DEVICE_PROVIDERS, pick_providers  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
 EVAL = ROOT / "src/workloads/eval/eval.jsonl"
@@ -28,17 +32,6 @@ JFK = SPEECH_DIR / "jfk.wav"
 
 N_FRAMES, ENC_SEQ, D_MODEL, MAXLEN = 3000, 1500, 384, 128
 PRODUCT_SAMPLES, FULL_SAMPLES, SR = 112000, 480000, 16000
-
-DEVICE_PROVIDERS: dict[str, list[str]] = {
-    "cpu": ["CPUExecutionProvider"],
-    "gpu": ["DmlExecutionProvider", "CPUExecutionProvider"],
-    "npu": [
-        "VitisAIExecutionProvider",
-        "QNNExecutionProvider",
-        "OpenVINOExecutionProvider",
-        "CPUExecutionProvider",
-    ],
-}
 
 JFK_REF = (
     "AND SO MY FELLOW AMERICANS ASK NOT WHAT YOUR COUNTRY CAN DO FOR YOU "
@@ -72,22 +65,6 @@ def wer(ref: str, hyp: str) -> float:
                 dp[j] = 1 + min(prev, dp[j], dp[j - 1])
             prev = cur
     return dp[-1] / len(r)
-
-
-def pick_providers(device: str, explicit: str | None) -> list[str]:
-    available = set(ort.get_available_providers())
-    if explicit:
-        if explicit not in available:
-            raise SystemExit(f"Provider {explicit!r} missing; have {sorted(available)}")
-        return [explicit]
-    chosen = [p for p in DEVICE_PROVIDERS[device] if p in available]
-    if device == "gpu" and "DmlExecutionProvider" not in chosen:
-        raise SystemExit(f"DmlExecutionProvider missing; have {sorted(available)}")
-    if device == "npu" and chosen == ["CPUExecutionProvider"]:
-        raise SystemExit(f"No NPU EP; have {sorted(available)}")
-    if not chosen:
-        raise SystemExit(f"No providers for {device}; have {sorted(available)}")
-    return chosen
 
 
 def load_wav(path: Path, max_samples: int) -> tuple[np.ndarray, float]:
@@ -227,6 +204,18 @@ def main() -> int:
     )
     ap.add_argument("--no-jfk", action="store_true")
     ap.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Record this run as the reference other runners compare against",
+    )
+    ap.add_argument("--no-baseline", action="store_true", help="Skip baseline comparison")
+    ap.add_argument(
+        "--baseline-tol",
+        type=float,
+        default=0.02,
+        help="Allowed mean-WER regression vs baseline, absolute (default 0.02 = 2 pts)",
+    )
+    ap.add_argument(
         "--only-fit",
         action="store_true",
         help="With --window product, skip clips longer than 7s (fair WER)",
@@ -346,6 +335,21 @@ def main() -> int:
         encoding="utf-8",
     )
     print("wrote", out)
+
+    suite = f"english-{args.window}"
+    scored_rows = [r for r in rows if not r["truncated"]]
+    provider = enc.get_providers()[0]
+    if args.update_baseline:
+        path = baseline.update(suite, scored_rows, mean_wer, provider)
+        print("updated baseline", path)
+    elif not args.no_baseline:
+        print()
+        ok, lines = baseline.compare(suite, scored_rows, mean_wer, args.baseline_tol)
+        for line in lines:
+            print(line)
+        if not ok:
+            fail = True
+
     if fail or not scored_wer:
         print("FAIL", file=sys.stderr)
         return 1

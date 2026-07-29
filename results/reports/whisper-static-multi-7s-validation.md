@@ -68,21 +68,25 @@ The C++ static engine previously defaulted to `<|en|>` whenever `NPU_INFERENCE_B
 
 ## How to run elsewhere (incl. NPU)
 
-```powershell
-# CPU + DirectML GPU smoke (default)
-.\tools\validate\run_static_whisper_7s_multi.ps1
+Fetch the samples first — the WAVs are gitignored and live on HF under `speech/` (English clips plus `speech/multilingual/`):
 
-# Multi-sample WER (eval.jsonl + JFK), product-fit + full canvas:
+```powershell
+.\tools\fetch\get-models.ps1
+```
+
+Then one command runs the smoke, the English WER eval and the multilingual eval across both windows, and prints each result against the committed baseline:
+
+```powershell
+# CPU + DirectML GPU (default devices)
 .\tools\validate\run_static_whisper_7s_multi.ps1 -Device cpu,gpu -Eval
 
-# Verbatim multilingual decode with per-clip language detection:
-.\.venv\Scripts\python.exe tools\validate\eval_static_whisper_multilingual.py --lang-mode auto --window product --en-control
-.\.venv\Scripts\python.exe tools\validate\eval_static_whisper_multilingual.py --lang-mode auto --window full
-
-# NPU host with registered ORT NPU EP in Python:
+# NPU host with a registered ORT NPU EP in Python
 .\tools\validate\run_static_whisper_7s_multi.ps1 -Device npu -Eval
 
-# Full HAL portable suite (needs npu_inference_bench build):
+# Smoke only (no WER)
+.\tools\validate\run_static_whisper_7s_multi.ps1
+
+# Full HAL portable suite (needs npu_inference_bench build)
 .\tools\validate\run_static_whisper_7s_multi.ps1 -Device npu -Suite
 # or:
 .\benchmark\run-suite.ps1 -Device npu -Only whisper -Provider auto
@@ -90,9 +94,24 @@ The C++ static engine previously defaulted to `<|en|>` whenever `NPU_INFERENCE_B
 
 Workload id in `benchmark/manifests/portable.json`: `whisper-tiny-static-multi-7s`.
 
+### Comparing your error rate against the baseline
+
+`results/baselines/whisper-static-multi-7s.json` holds per-clip WER and detected language for four suites — `english-{product,full}` and `multilingual-{product,full}` — recorded on CPU on the host named in the file. Every eval compares itself to that file by clip id and prints, for example:
+
+```
+baseline 'english-product' from host=WA-CZC5177DH7 provider=CPUExecutionProvider commit=0f4f89a
+baseline: clips=5 mean_wer=14.1% vs 14.1% (delta -0.0 pts, tolerance +2.0)
+baseline OK
+```
+
+A run **fails** if the mean WER regresses by more than the tolerance (default 2 points absolute, `--baseline-tol`) or if any clip's detected language differs from the baseline. Language drift is a hard failure regardless of WER: it means the EP changed the encoder output enough to break language ID, which no WER average would show clearly.
+
+Individual scripts take `--no-baseline` to skip the check, and `--update-baseline` to re-record — the latter only on a trusted reference host, since it overwrites the numbers everyone else measures against. DirectML GPU on the reference host reproduces all four suites at delta 0.0 pts.
+
 ## Notes
 
 - Truncating encoder to 700 frames without fine-tuning **fails** (token loops). Documented in package `note` and baseline doc.
 - English-only `whisper-tiny-static` remains the prior NPU golden path; this package reuses the same static-no-KV decode strategy with multilingual weights + SOT language/task tokens.
 - Language is detected per clip, never assumed English. Transcripts stay verbatim in the spoken language; translation to English is not a supported mode.
 - GPU smoke requires `onnxruntime-directml` (separate `.venv-dml`); stock `onnxruntime` is CPU-only.
+- The baseline is CPU-recorded on one host. An NPU run that lands within tolerance is evidence the EP preserves accuracy, not that the baseline is universally right — re-record only after deciding the new numbers are the intended reference.
