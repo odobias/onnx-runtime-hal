@@ -326,10 +326,10 @@ function Copy-RedistributableAssets([string]$Root, [string]$Output) {
     }
 
     if ($catalog.require_eval_wavs) {
-        $evalDir = Join-Path $Root "artifacts\workloads\eval"
+        $evalDir = Join-Path $Root "artifacts\workloads\speech"
         $wavs = @(Get-ChildItem -LiteralPath $evalDir -Filter "ls_*.wav" -File -ErrorAction SilentlyContinue)
         if ($wavs.Count -lt 1) {
-            throw "Redistributable eval WAVs missing under artifacts/workloads/eval (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
+            throw "Redistributable speech WAVs missing under artifacts/workloads/speech (ls_*.wav). Run tools/fetch/get-eval-set.ps1 first."
         }
         $evalJsonl = Join-Path $Root "src\workloads\eval\eval.jsonl"
         if (-not (Test-Path -LiteralPath $evalJsonl)) {

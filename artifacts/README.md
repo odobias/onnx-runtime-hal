@@ -10,9 +10,10 @@ tree is source; most of it is gitignored (only this README and
 | `dist/` | Assembled redistributable packages |
 | `third_party/` | Vendor SDKs / ORT drops (setup + fetch) |
 | `cache/` | Provider compilation cache |
-| `workloads/` | Fetched models, fixtures, eval WAVs, sample audio |
+| `workloads/` | Fetched models, fixtures, ASR speech WAVs |
 | `scratch/` | Ephemeral research/sweep outputs |
 | `venv*/` | Python virtualenvs used by fetch/export tools |
 
-Tracked eval metadata stays in `src/workloads/eval/eval.jsonl`. Published
-benchmark evidence stays in repo-root `results/` (not here).
+ASR speech WAVs live in `workloads/speech/` (HF: `speech/`). Tracked eval
+metadata stays in `src/workloads/eval/eval.jsonl`. Published benchmark evidence
+stays in repo-root `results/` (not here).

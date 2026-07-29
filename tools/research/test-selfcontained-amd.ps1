@@ -26,7 +26,7 @@ Write-Host ""
 
 $staticModel = Join-Path $pkg "artifacts\workloads\whisper\models\static-onnx"
 $amdModel    = Join-Path $pkg "artifacts\workloads\whisper\models\vendor\amd"
-$audio       = Join-Path $pkg "artifacts\workloads\audio\jfk.wav"
+$audio       = Join-Path $pkg "artifacts\workloads\speech\jfk.wav"
 
 # (backend, device, model, cacheSubdir). -HotOnly skips CPU/GPU and reuses the NPU
 # caches a prior full run compiled, so it's fast and free of the VitisAI compile spam.

@@ -115,7 +115,7 @@ function Invoke-NativeBenchmark {
             $eval = $evalRows[$i]
             $clipPath = Join-Path $root (([string]$eval.audio -replace '/', '\'))
             if (-not (Test-Path -LiteralPath $clipPath)) {
-                $clipPath = Join-Path $root "artifacts\workloads\eval\$($eval.id).wav"
+                $clipPath = Join-Path $root "artifacts\workloads\speech\$($eval.id).wav"
             }
             if (-not (Test-Path -LiteralPath $clipPath)) {
                 $message = "Whisper evaluation audio is missing: $clipPath"

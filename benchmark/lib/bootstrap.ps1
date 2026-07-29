@@ -75,7 +75,7 @@ function Add-BenchmarkUnifiedAutoVariant {
 }
 
 # Ensure everything a sweep needs exists, building the app and fetching
-# artifacts/workloads/eval/audio on demand so `benchmark-quant.ps1` works from a fresh checkout.
+# artifacts/workloads/speech on demand so `benchmark-quant.ps1` works from a fresh checkout.
 # Idempotent: every step is skipped when its output is already present. This
 # assumes the toolchain + vendor SDK are installed (that is bootstrap.ps1's job);
 # if the build can't run it says exactly that. Model fetches for the neutral
@@ -146,9 +146,15 @@ function Initialize-BenchmarkEnvironment {
     }
 
     # 2) Sample audio (public) -- also the fallback clip for the eval set.
-    if (-not (Test-Path (Join-Path $models "audio\jfk.wav"))) {
+    $jfk = Join-Path $Root "artifacts\workloads\speech\jfk.wav"
+    if (-not (Test-Path -LiteralPath $jfk)) {
         Write-Host "  - fetch sample audio" -ForegroundColor DarkCyan
-        Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-audio.ps1") | Out-Null
+        $getAudio = Join-Path $Root "tools\fetch\get-audio.ps1"
+        if (Test-Path -LiteralPath $getAudio) {
+            Invoke-BenchmarkChildScript -ScriptPath $getAudio | Out-Null
+        } else {
+            Invoke-BenchmarkChildScript -ScriptPath (Join-Path $scripts "get-audio.ps1") | Out-Null
+        }
     }
 
     # 3) Models for this host's runnable variants. The private snapshot

@@ -157,7 +157,7 @@ def smoke_cpu(dst: Path) -> None:
     from transformers import WhisperTokenizer
     from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
-    audio = _repo_root() / "artifacts/workloads/audio/jfk.wav"
+    audio = _repo_root() / "artifacts/workloads/speech/jfk.wav"
     wav, sr = sf.read(str(audio), dtype="float32", always_2d=False)
     if wav.ndim > 1:
         wav = wav.mean(axis=1)

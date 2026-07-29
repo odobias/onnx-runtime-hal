@@ -47,7 +47,7 @@ Root identity files (stay put for MSBuild / package shims):
 | `dist/` | Assembled redistributables (bench + HAL packages) |
 | `third_party/` | Downloaded vendor SDKs / ORT drops |
 | `cache/` | Provider compilation cache |
-| `workloads/` | Fetched models, fixtures, eval WAVs, sample audio |
+| `workloads/` | Fetched models, fixtures, ASR speech WAVs (`speech/`) |
 | `scratch/` | Ephemeral research/sweep outputs |
 | `venv*/` | Python virtualenvs used by fetch/export tools |
 
