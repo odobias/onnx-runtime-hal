@@ -15,7 +15,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Repo = "odobias/npu-hal-over-9000",
+    [string]$Repo = "gendigital/npu-hal-over-9000",
     [string]$Message = "Update models",
     [switch]$Public
 )

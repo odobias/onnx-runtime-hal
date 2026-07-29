@@ -9,7 +9,7 @@
 param(
     [ValidateSet("fakeaudio", "tsc", "all")]
     [string[]]$Models = @("all"),
-    [string]$Repo = "odobias/npu-hal-over-9000"
+    [string]$Repo = "gendigital/npu-hal-over-9000"
 )
 
 $ErrorActionPreference = "Stop"
