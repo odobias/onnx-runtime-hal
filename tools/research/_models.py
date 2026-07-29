@@ -10,7 +10,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CLASSIFIERS_DIR = os.path.join(ROOT, "artifacts", "workloads", "classifiers")
 LEGACY_DIR = os.path.join(ROOT, "models", "deepfake")
-DEFAULT_REPO = os.environ.get("NPU_INFERENCE_BENCH_MODELS_REPO", "odobias/npu-hal-over-9000")
+DEFAULT_REPO = os.environ.get("NPU_INFERENCE_BENCH_MODELS_REPO", "gendigital/npu-hal-over-9000")
 
 _SPECS = {
     "tsc": {
