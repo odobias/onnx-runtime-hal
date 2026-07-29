@@ -1,0 +1,290 @@
+{
+  "torch_device": "cpu",
+  "larger_model": "openai/whisper-small",
+  "window": "full_30s",
+  "decode": "greedy",
+  "mean_wer": {
+    "onnx_static_tiny_multi": 0.09859300251472115,
+    "hf_whisper_tiny": 0.09859300251472115,
+    "hf_larger": 0.07284228264635421
+  },
+  "delta_pp": {
+    "onnx_minus_hf_tiny": 0.0,
+    "onnx_minus_larger": 2.575071986836694
+  },
+  "rows": [
+    {
+      "id": "jfk",
+      "duration_s": 11.0,
+      "ref": "AND SO MY FELLOW AMERICANS ASK NOT WHAT YOUR COUNTRY CAN DO FOR YOU ASK WHAT YOU CAN DO FOR YOUR COUNTRY",
+      "onnx": {
+        "hyp": "And so my fellow Americans ask not what your country can do for you ask what you can do for your country.",
+        "wer": 0.0,
+        "ms": 588.5
+      },
+      "hf_tiny": {
+        "hyp": "And so my fellow Americans ask not what your country can do for you ask what you can do for your country.",
+        "wer": 0.0,
+        "ms": 504.3
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+        "wer": 0.0,
+        "ms": 1765.7
+      }
+    },
+    {
+      "id": "ls_000",
+      "duration_s": 5.86,
+      "ref": "MISTER QUILTER IS THE APOSTLE OF THE MIDDLE CLASSES AND WE ARE GLAD TO WELCOME HIS GOSPEL",
+      "onnx": {
+        "hyp": "Mr. Quilter is the apostle of the middle classes and we are glad to welcome his gospel.",
+        "wer": 0.0588,
+        "ms": 574.7
+      },
+      "hf_tiny": {
+        "hyp": "Mr. Quilter is the apostle of the middle classes and we are glad to welcome his gospel.",
+        "wer": 0.0588,
+        "ms": 436.7
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "Mr. Quilter is the apostle of the middle classes, and we are glad to welcome his gospel.",
+        "wer": 0.0588,
+        "ms": 1505.3
+      }
+    },
+    {
+      "id": "ls_001",
+      "duration_s": 4.82,
+      "ref": "NOR IS MISTER QUILTER'S MANNER LESS INTERESTING THAN HIS MATTER",
+      "onnx": {
+        "hyp": "Nor is Mr. Quilters' manner less interesting than his matter.",
+        "wer": 0.1,
+        "ms": 403.2
+      },
+      "hf_tiny": {
+        "hyp": "Nor is Mr. Quilters' manner less interesting than his matter.",
+        "wer": 0.1,
+        "ms": 356.0
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "Nor is Mr. Quilter's manner less interesting than his matter.",
+        "wer": 0.1,
+        "ms": 1177.5
+      }
+    },
+    {
+      "id": "ls_002",
+      "duration_s": 12.48,
+      "ref": "HE TELLS US THAT AT THIS FESTIVE SEASON OF THE YEAR WITH CHRISTMAS AND ROAST BEEF LOOMING BEFORE US SIMILES DRAWN FROM EATING AND ITS RESULTS OCCUR MOST READILY TO THE MIND",
+      "onnx": {
+        "hyp": "He tells us that at this festive season of the year with Christmas and roast beef looming before us, similarly drawn from eating and its results occur most readily to the mind.",
+        "wer": 0.0312,
+        "ms": 817.1
+      },
+      "hf_tiny": {
+        "hyp": "He tells us that at this festive season of the year with Christmas and roast beef looming before us, similarly drawn from eating and its results occur most readily to the mind.",
+        "wer": 0.0312,
+        "ms": 704.3
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "He tells us that at this festive season of the year, with Christmas and roast beef looming before us, symbolies drawn from eating and its results occur most readily to the mind.",
+        "wer": 0.0312,
+        "ms": 2087.5
+      }
+    },
+    {
+      "id": "ls_003",
+      "duration_s": 9.9,
+      "ref": "HE HAS GRAVE DOUBTS WHETHER SIR FREDERICK LEIGHTON'S WORK IS REALLY GREEK AFTER ALL AND CAN DISCOVER IN IT BUT LITTLE OF ROCKY ITHACA",
+      "onnx": {
+        "hyp": "He has grave doubts whether Sir Frederick Layton's work is really Greek after all and can discover in it but little of Rocky Ithaca.",
+        "wer": 0.0417,
+        "ms": 679.1
+      },
+      "hf_tiny": {
+        "hyp": "He has grave doubts whether Sir Frederick Layton's work is really Greek after all and can discover in it but little of Rocky Ithaca.",
+        "wer": 0.0417,
+        "ms": 554.1
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "He has grave doubts whether Sir Frederick Layton's work is really Greek after all and can discover in it but little of rocky Ithaca.",
+        "wer": 0.0417,
+        "ms": 1689.3
+      }
+    },
+    {
+      "id": "ls_004",
+      "duration_s": 29.4,
+      "ref": "LINNELL'S PICTURES ARE A SORT OF UP GUARDS AND AT EM PAINTINGS AND MASON'S EXQUISITE IDYLLS ARE AS NATIONAL AS A JINGO POEM MISTER BIRKET FOSTER'S LANDSCAPES SMILE AT ONE MUCH IN THE SAME WAY THAT MISTER CARKER USED TO FLASH HIS TEETH AND MISTER JOHN COLLIER GIVES HIS SITTER A CHEERFUL SLAP ON THE BACK BEFORE HE SAYS LIKE A SHAMPOOER IN A TURKISH BATH NEXT MAN",
+      "onnx": {
+        "hyp": "Lennils, pictures are a sort of upguards and atom paintings, and Mason's exquisite Idols are as national as a jingo poem. Mr. Birkut Foster's landscapes smile at one much in the same way that Mr. Karker used to flash his teeth. And Mr. John Colier gives his sitter a cheerful slap on the back before he says, like a shampoo or a turkish bath, next man,",
+        "wer": 0.2059,
+        "ms": 1946.8
+      },
+      "hf_tiny": {
+        "hyp": "Lennils, pictures are a sort of upguards and atom paintings, and Mason's exquisite Idols are as national as a jingo poem. Mr. Birkut Foster's landscapes smile at one much in the same way that Mr. Karker used to flash his teeth. And Mr. John Colier gives his sitter a cheerful slap on the back before he says, like a shampoo or a turkish bath, next man,",
+        "wer": 0.2059,
+        "ms": 1592.2
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "Linnell's pictures are a sort of Up Guards and Adam paintings, and Mason's exquisite idles are as national as a jingle poem. Mr. Birkut Foster's landscapes smile at one much in the same way that Mr. Karker used to flash his teeth. And Mr. John Collier gives his sitter a cheerful slap on the back, before he says, like a shampoo or a Turkish bath, next man",
+        "wer": 0.1618,
+        "ms": 4110.1
+      }
+    },
+    {
+      "id": "ls_005",
+      "duration_s": 9.01,
+      "ref": "IT IS OBVIOUSLY UNNECESSARY FOR US TO POINT OUT HOW LUMINOUS THESE CRITICISMS ARE HOW DELICATE IN EXPRESSION",
+      "onnx": {
+        "hyp": "It is obviously unnecessary for us to point out how luminous these criticisms are, how delicate and expression.",
+        "wer": 0.0556,
+        "ms": 521.2
+      },
+      "hf_tiny": {
+        "hyp": "It is obviously unnecessary for us to point out how luminous these criticisms are, how delicate and expression.",
+        "wer": 0.0556,
+        "ms": 438.6
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "It is obviously unnecessary for us to point out how luminous these criticisms are, how delicate an expression.",
+        "wer": 0.0556,
+        "ms": 1384.8
+      }
+    },
+    {
+      "id": "ls_006",
+      "duration_s": 5.64,
+      "ref": "ON THE GENERAL PRINCIPLES OF ART MISTER QUILTER WRITES WITH EQUAL LUCIDITY",
+      "onnx": {
+        "hyp": "On the general principles of art and Mr. Quilter writes with equal lucidity.",
+        "wer": 0.1667,
+        "ms": 451.0
+      },
+      "hf_tiny": {
+        "hyp": "On the general principles of art and Mr. Quilter writes with equal lucidity.",
+        "wer": 0.1667,
+        "ms": 382.6
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "Under general principles of art, Mr. Quilter writes with equal lucidity.",
+        "wer": 0.25,
+        "ms": 1226.0
+      }
+    },
+    {
+      "id": "ls_007",
+      "duration_s": 9.24,
+      "ref": "PAINTING HE TELLS US IS OF A DIFFERENT QUALITY TO MATHEMATICS AND FINISH IN ART IS ADDING MORE FACT",
+      "onnx": {
+        "hyp": "Painting he tells us is of a different quality to mathematics and finish in art is adding more effect.",
+        "wer": 0.0526,
+        "ms": 518.4
+      },
+      "hf_tiny": {
+        "hyp": "Painting he tells us is of a different quality to mathematics and finish in art is adding more effect.",
+        "wer": 0.0526,
+        "ms": 415.7
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "Painting, he tells us, is of a different quality to mathematics, and finish in art is adding more factor.",
+        "wer": 0.0526,
+        "ms": 1500.4
+      }
+    },
+    {
+      "id": "ls_008",
+      "duration_s": 5.12,
+      "ref": "AS FOR ETCHINGS THEY ARE OF TWO KINDS BRITISH AND FOREIGN",
+      "onnx": {
+        "hyp": "As for etchings, there are two kinds, British and foreign.",
+        "wer": 0.1818,
+        "ms": 404.2
+      },
+      "hf_tiny": {
+        "hyp": "As for etchings, there are two kinds, British and foreign.",
+        "wer": 0.1818,
+        "ms": 329.3
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "As for etchings, they are of two kinds, British and Foreign.",
+        "wer": 0.0,
+        "ms": 1214.2
+      }
+    },
+    {
+      "id": "ls_009",
+      "duration_s": 18.29,
+      "ref": "HE LAMENTS MOST BITTERLY THE DIVORCE THAT HAS BEEN MADE BETWEEN DECORATIVE ART AND WHAT WE USUALLY CALL PICTURES MAKES THE CUSTOMARY APPEAL TO THE LAST JUDGMENT AND REMINDS US THAT IN THE GREAT DAYS OF ART MICHAEL ANGELO WAS THE FURNISHING UPHOLSTERER",
+      "onnx": {
+        "hyp": "He laments most bitterly the divorce that has been made between decorative art and what we usually call pictures makes a customary appeal to the last judgment and reminds us that in the great days of art Michael Angelov was the furnishing apostorer.",
+        "wer": 0.0698,
+        "ms": 1086.5
+      },
+      "hf_tiny": {
+        "hyp": "He laments most bitterly the divorce that has been made between decorative art and what we usually call pictures makes a customary appeal to the last judgment and reminds us that in the great days of art Michael Angelov was the furnishing apostorer.",
+        "wer": 0.0698,
+        "ms": 874.1
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "He laments most bitterly the divorce that has been made between decorative art and what we usually call pictures, makes a customary appeal to the last judgment and reminds us that in the great days of art Michelangelo was the furnishing upholsterer.",
+        "wer": 0.0698,
+        "ms": 2630.2
+      }
+    },
+    {
+      "id": "ls_010",
+      "duration_s": 5.6,
+      "ref": "NEAR THE FIRE AND THE ORNAMENTS FRED BROUGHT HOME FROM INDIA ON THE MANTEL BOARD",
+      "onnx": {
+        "hyp": "Near the fire, any ornaments Fred brought home from India on the mental board.",
+        "wer": 0.2,
+        "ms": 432.6
+      },
+      "hf_tiny": {
+        "hyp": "Near the fire, any ornaments Fred brought home from India on the mental board.",
+        "wer": 0.2,
+        "ms": 361.3
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "near the fire, and the ornaments Fred brought home from India on the mental board.",
+        "wer": 0.0667,
+        "ms": 1257.5
+      }
+    },
+    {
+      "id": "ls_011",
+      "duration_s": 15.12,
+      "ref": "IN FACT HE IS QUITE SEVERE ON MISTER RUSKIN FOR NOT RECOGNISING THAT A PICTURE SHOULD DENOTE THE FRAILTY OF MAN AND REMARKS WITH PLEASING COURTESY AND FELICITOUS GRACE THAT MANY PHASES OF FEELING",
+      "onnx": {
+        "hyp": "In fact, he is quite severe on Mr. Ruskin, for not recognizing that a picture should denote the frailty of man. And remarks with pleasing courtesy and falseness graced that many phases of feeling",
+        "wer": 0.1176,
+        "ms": 936.2
+      },
+      "hf_tiny": {
+        "hyp": "In fact, he is quite severe on Mr. Ruskin, for not recognizing that a picture should denote the frailty of man. And remarks with pleasing courtesy and falseness graced that many phases of feeling",
+        "wer": 0.1176,
+        "ms": 755.1
+      },
+      "hf_larger": {
+        "model": "openai/whisper-small",
+        "hyp": "In fact, he is quite severe on Mr. Ruskin for not recognizing that a picture should denote the frailty of man, and remarks with pleasing courtesy and felicitous grace that, many phases of feeling,",
+        "wer": 0.0588,
+        "ms": 2228.1
+      }
+    }
+  ]
+}

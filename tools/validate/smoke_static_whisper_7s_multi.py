@@ -126,9 +126,22 @@ def main() -> int:
     eos = int(gc.get("eos_token_id", 50257))
     pad = int(gc.get("pad_token_id", eos))
     nots = int(gc.get("no_timestamps_token_id", 50363))
+    transcribe = int((gc.get("task_to_id") or {}).get("transcribe", 50359))
+    lang_to_id = {
+        code.strip("<|>"): int(tid) for code, tid in (gc.get("lang_to_id") or {}).items()
+    }
+
+    # Detect the language exactly like the C++ static engine: one decoder step after
+    # <|sot|>, argmax over the <|xx|> tokens. JFK must come out as English.
+    probe = np.full((1, MAXLEN), pad, dtype=np.int64)
+    probe[0, 0] = sot
+    lang_logits = dec.run(None, {"input_ids": probe, "encoder_hidden_states": ehs})[0][0, 0]
+    lang_ids = np.fromiter(lang_to_id.values(), dtype=np.int64)
+    lang = list(lang_to_id)[int(lang_logits[lang_ids].argmax())]
+    print("detected_lang:", lang)
 
     ids = np.full((1, MAXLEN), pad, dtype=np.int64)
-    for i, t in enumerate([sot, 50259, 50359, nots]):
+    for i, t in enumerate([sot, lang_to_id[lang], transcribe, nots]):
         ids[0, i] = t
     cur = 4
     gen: list[int] = []
@@ -157,6 +170,10 @@ def main() -> int:
         return 1
     if args.device == "npu" and enc.get_providers()[0] == "CPUExecutionProvider":
         print("FAIL: encoder fell back to CPU", file=sys.stderr)
+        return 1
+
+    if lang != "en":
+        print(f"FAIL: JFK detected as {lang}, not en", file=sys.stderr)
         return 1
 
     if "fellow" not in text.lower() and "american" not in text.lower():
