@@ -34,8 +34,12 @@ constexpr int kNfft = 400;
 constexpr int kHop = 160;
 constexpr int kMelBins = 80;
 constexpr int kFftBins = 201;
-constexpr int kSamples = 480000;  // 30 s @ 16 kHz
+constexpr int kSamples = 480000;  // 30 s @ 16 kHz (default Whisper window)
 constexpr int kFrames = 3000;
+// Product Media Scan window (7 s @ 16 kHz) used by static-onnx-tiny-multi-7s.
+constexpr int kSamples7s = 112000;
+constexpr int kFrames7s = 700;
+constexpr int kEncSeq7s = 350;  // after Whisper encoder conv stride
 constexpr double kPi = 3.14159265358979323846;
 
 inline std::string read_text(const fs::path& path) {
@@ -253,23 +257,27 @@ inline const BluesteinCtx& bluestein_ctx() {
 }  // namespace detail
 
 inline std::vector<float> log_mel_spectrogram_fft(const std::vector<float>& input,
-                                                  const std::vector<float>& mel_filters) {
+                                                  const std::vector<float>& mel_filters,
+                                                  int n_samples = kSamples,
+                                                  int n_frames = kFrames) {
+    if (n_samples <= 0 || n_frames <= 0)
+        throw std::runtime_error("log_mel_spectrogram_fft: invalid n_samples/n_frames");
     const detail::BluesteinCtx& ctx = detail::bluestein_ctx();
     const size_t M = ctx.M;
 
-    std::vector<float> audio(kSamples, 0.0f);
+    std::vector<float> audio(static_cast<size_t>(n_samples), 0.0f);
     std::copy_n(input.begin(), (std::min)(input.size(), audio.size()), audio.begin());
 
-    std::vector<float> features(static_cast<size_t>(kMelBins) * kFrames);
+    std::vector<float> features(static_cast<size_t>(kMelBins) * n_frames);
 
     unsigned hw = std::thread::hardware_concurrency();
     if (hw == 0) hw = 4;
-    const unsigned n_threads = (std::min)(hw, static_cast<unsigned>(kFrames));
+    const unsigned n_threads = (std::min)(hw, static_cast<unsigned>(n_frames));
     std::vector<float> local_max(n_threads, -std::numeric_limits<float>::infinity());
 
     auto worker = [&](unsigned tid) {
-        const int lo = static_cast<int>(static_cast<long long>(kFrames) * tid / n_threads);
-        const int hi = static_cast<int>(static_cast<long long>(kFrames) * (tid + 1) / n_threads);
+        const int lo = static_cast<int>(static_cast<long long>(n_frames) * tid / n_threads);
+        const int hi = static_cast<int>(static_cast<long long>(n_frames) * (tid + 1) / n_threads);
         std::vector<detail::Cf> a(M);
         float fmax = -std::numeric_limits<float>::infinity();
         std::vector<float> power(kFftBins);
@@ -280,7 +288,7 @@ inline std::vector<float> log_mel_spectrogram_fft(const std::vector<float>& inpu
                 if (n < static_cast<size_t>(kNfft)) {
                     const int idx = base + static_cast<int>(n);
                     const float s =
-                        (idx >= 0 && idx < kSamples) ? audio[idx] * ctx.han[n] : 0.0f;
+                        (idx >= 0 && idx < n_samples) ? audio[static_cast<size_t>(idx)] * ctx.han[n] : 0.0f;
                     a[n] = detail::Cf(s, 0.0f) * ctx.chirp[n];
                 } else {
                     a[n] = detail::Cf(0.0f, 0.0f);
@@ -300,7 +308,7 @@ inline std::vector<float> log_mel_spectrogram_fft(const std::vector<float>& inpu
                 const float* filter = mel_filters.data() + mel * kFftBins;
                 for (int k = 0; k < kFftBins; ++k) energy += filter[k] * power[k];
                 const float logv = std::log10((std::max)(energy, 1.0e-10f));
-                features[static_cast<size_t>(mel) * kFrames + frame] = logv;
+                features[static_cast<size_t>(mel) * n_frames + frame] = logv;
                 fmax = (std::max)(fmax, logv);
             }
         }

@@ -1,7 +1,8 @@
-﻿// Generic static ONNX backend: runs the unchanged whisper/en-static-onnx
-// package through ONNX Runtime providers. The model contract is fixed-shape,
-// no-KV recompute: encoder [1,80,3000] -> [1,1500,384], decoder consumes
-// input_ids [1,128] + encoder_hidden_states [1,1500,384] and returns logits.
+﻿// Generic static ONNX backend: runs whisper static-onnx packages through ONNX
+// Runtime providers. Default (en-static-onnx / tiny.en): encoder [1,80,3000] ->
+// [1,1500,384], decoder input_ids [1,128] + encoder_hidden_states [1,1500,384].
+// Optional npu_hal_package.json overrides window (e.g. 7s multilingual tiny:
+// [1,80,700] -> [1,350,384]).
 #include "backend_registry.hpp"
 
 #include <algorithm>
@@ -48,15 +49,54 @@ namespace fs = std::filesystem;
 namespace fe = npu_inference_bench::frontend;
 namespace ep = npu_inference_bench::ort_common;
 
-constexpr int64_t kEncSeq = 1500;
-constexpr int64_t kDModel = 384;
+constexpr int64_t kEncSeqDefault = 1500;
+constexpr int64_t kDModelDefault = 384;
 constexpr int64_t kStaticMaxTokens = 128;
 
-int64_t env_max_tokens() {
+struct PackageConfig {
+    int n_samples = fe::kSamples;
+    int n_frames = fe::kFrames;
+    int64_t enc_seq = kEncSeqDefault;
+    int64_t d_model = kDModelDefault;
+    int64_t max_tokens = kStaticMaxTokens;
+    bool multilingual = false;
+};
+
+PackageConfig load_package_config(const fs::path& dir) {
+    PackageConfig cfg;
+    const fs::path pkg = dir / "npu_hal_package.json";
+    if (!fs::exists(pkg)) return cfg;
+    const std::string text = fe::read_text(pkg);
+    cfg.n_samples = static_cast<int>(fe::json_int(text, "n_samples", cfg.n_samples));
+    cfg.n_frames = static_cast<int>(fe::json_int(text, "n_frames", cfg.n_frames));
+    cfg.enc_seq = fe::json_int(text, "enc_seq", cfg.enc_seq);
+    cfg.d_model = fe::json_int(text, "d_model", cfg.d_model);
+    cfg.max_tokens = fe::json_int(text, "max_tokens", cfg.max_tokens);
+    // multilingual: true/false — cheap string search
+    cfg.multilingual = text.find("\"multilingual\": true") != std::string::npos ||
+                       text.find("\"multilingual\":true") != std::string::npos;
+    return cfg;
+}
+
+int64_t env_max_tokens(int64_t cap) {
     const char* v = std::getenv("NPU_INFERENCE_BENCH_ORT_MAX_TOKENS");
-    if (!v || !*v) return kStaticMaxTokens;
+    if (!v || !*v) return cap;
     const long n = std::strtol(v, nullptr, 10);
-    return (std::max<long>)(2, (std::min<long>)(n, kStaticMaxTokens));
+    return (std::max<long>)(2, (std::min<long>)(n, static_cast<long>(cap)));
+}
+
+// Look up <|xx|> language token id from generation_config.json lang_to_id map.
+int64_t language_token_id(const std::string& gc, const std::string& lang) {
+    if (lang.empty()) return -1;
+    const std::string key = "\"<|" + lang + "|>\"";
+    const size_t pos = gc.find(key);
+    if (pos == std::string::npos) return -1;
+    size_t colon = gc.find(':', pos + key.size());
+    if (colon == std::string::npos) return -1;
+    char* end = nullptr;
+    const long id = std::strtol(gc.c_str() + colon + 1, &end, 10);
+    if (end == gc.c_str() + colon + 1) return -1;
+    return id;
 }
 
 Ort::Value tensor_float(std::vector<float>& data, const std::vector<int64_t>& shape) {
@@ -73,8 +113,7 @@ class OrtStaticEngine final : public IWhisperEngine {
 public:
     explicit OrtStaticEngine(const EngineOptions& options)
         : options_(options),
-          context_(options),
-          max_tokens_(env_max_tokens()) {
+          context_(options) {
         const fs::path dir(options.model_dir);
         const fs::path enc_path = dir / "encoder_model.onnx";
         const fs::path dec_path = dir / "decoder_model.onnx";
@@ -84,13 +123,27 @@ public:
                 options.model_dir);
         }
 
+        pkg_ = load_package_config(dir);
+        max_tokens_ = env_max_tokens(pkg_.max_tokens);
+
         mel_filters_ = fe::parse_mel_filters(dir / "preprocessor_config.json");
         vocab_ = fe::load_vocab(dir / "vocab.json");
         const std::string gc = fe::read_text(dir / "generation_config.json");
-        sot_ = fe::json_int(gc, "decoder_start_token_id", 50257);
+        // Multilingual tiny uses decoder_start_token_id=50258; tiny.en uses 50257.
+        sot_ = fe::json_int(gc, "decoder_start_token_id", pkg_.multilingual ? 50258 : 50257);
         eos_ = fe::json_int(gc, "eos_token_id", 50256);
         pad_ = fe::json_int(gc, "pad_token_id", eos_);
-        no_timestamps_ = fe::json_int(gc, "no_timestamps_token_id", 50362);
+        no_timestamps_ = fe::json_int(gc, "no_timestamps_token_id", pkg_.multilingual ? 50363 : 50362);
+        // <|transcribe|> / <|translate|> — multilingual only
+        transcribe_ = fe::json_int(gc, "transcribe_token_id", 50359);
+        translate_ = fe::json_int(gc, "translate_token_id", 50358);
+        if (pkg_.multilingual) {
+            // Prefer explicit lang; default en when unset (product Media Scan).
+            const char* env_lang = std::getenv("NPU_INFERENCE_BENCH_WHISPER_LANG");
+            const std::string lang = (env_lang && *env_lang) ? env_lang : "en";
+            lang_token_ = language_token_id(gc, lang);
+            if (lang_token_ < 0) lang_token_ = language_token_id(gc, "en");
+        }
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
 
@@ -109,8 +162,9 @@ public:
     TranscribeResult transcribe(const AudioSamples& audio) override {
         const auto t0 = std::chrono::steady_clock::now();
 
-        std::vector<float> features = fe::log_mel_spectrogram_fft(audio, mel_filters_);
-        auto feature_tensor = tensor_float(features, {1, fe::kMelBins, fe::kFrames});
+        std::vector<float> features =
+            fe::log_mel_spectrogram_fft(audio, mel_filters_, pkg_.n_samples, pkg_.n_frames);
+        auto feature_tensor = tensor_float(features, {1, fe::kMelBins, pkg_.n_frames});
         const char* enc_in[] = {"input_features"};
         const char* enc_out[] = {"last_hidden_state"};
         auto encoder_outputs =
@@ -119,10 +173,14 @@ public:
         const size_t encoder_count = encoder_outputs[0].GetTensorTypeAndShapeInfo().GetElementCount();
         std::vector<float> encoder_state(encoder_ptr, encoder_ptr + encoder_count);
 
-        std::vector<int64_t> ids(static_cast<size_t>(kStaticMaxTokens), pad_);
-        ids[0] = sot_;
-        ids[1] = no_timestamps_;
-        int64_t cur = 2;
+        std::vector<int64_t> ids(static_cast<size_t>(max_tokens_), pad_);
+        int64_t cur = 0;
+        ids[static_cast<size_t>(cur++)] = sot_;
+        if (pkg_.multilingual) {
+            if (lang_token_ >= 0) ids[static_cast<size_t>(cur++)] = lang_token_;
+            ids[static_cast<size_t>(cur++)] = transcribe_;
+        }
+        ids[static_cast<size_t>(cur++)] = no_timestamps_;
         std::vector<int64_t> generated;
         double logprob_sum = 0.0;
         long n_gen = 0;
@@ -135,8 +193,8 @@ public:
             run_opts.AddConfigEntry("qnn.perf_mode", "burst");
         }
         while (cur < max_tokens_) {
-            auto token_tensor = tensor_int64(ids, {1, kStaticMaxTokens});
-            auto state_tensor = tensor_float(encoder_state, {1, kEncSeq, kDModel});
+            auto token_tensor = tensor_int64(ids, {1, max_tokens_});
+            auto state_tensor = tensor_float(encoder_state, {1, pkg_.enc_seq, pkg_.d_model});
             std::vector<Ort::Value> inputs;
             inputs.emplace_back(std::move(token_tensor));
             inputs.emplace_back(std::move(state_tensor));
@@ -193,8 +251,8 @@ public:
         out.has_token_metrics = true;
         out.runtime = ep::runtime_for(active_provider_);
         out.model_format = "onnx";
-        out.decode_strategy = "static-no-kv";
-        out.max_context = static_cast<long>(kStaticMaxTokens);
+        out.decode_strategy = pkg_.multilingual ? "static-no-kv-multi-7s" : "static-no-kv";
+        out.max_context = static_cast<long>(max_tokens_);
 
         // Finalize profiling after the first transcription (normally the harness
         // warmup), so measured runs do not accumulate profiler overhead.
@@ -224,6 +282,7 @@ public:
 private:
     EngineOptions options_;
     runtime::RuntimeContext context_;
+    PackageConfig pkg_{};
     mutable runtime::LoadedModelSet models_;
     mutable std::string active_provider_;  // EP that actually built/executed the sessions
     mutable ExecutionDiagnostics diagnostics_;
@@ -233,6 +292,9 @@ private:
     int64_t eos_ = 50256;
     int64_t pad_ = 50256;
     int64_t no_timestamps_ = 50362;
+    int64_t transcribe_ = 50359;
+    int64_t translate_ = 50358;
+    int64_t lang_token_ = -1;
     std::vector<int64_t> suppress_;
     std::vector<int64_t> begin_suppress_;
     std::vector<float> mel_filters_;

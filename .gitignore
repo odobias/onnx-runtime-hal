@@ -10,6 +10,7 @@
 /third_party/
 /cache/
 /.venv/
+/.venv-dml/
 /.venv-ovep/
 /.venv-quark*/
 /models/
