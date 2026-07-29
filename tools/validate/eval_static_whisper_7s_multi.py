@@ -150,16 +150,18 @@ def transcribe(
     fe: WhisperFeatureExtractor,
     tok: WhisperTokenizer,
     wav: np.ndarray,
-    sot_ids: list[int],
+    prefix: "Prefix",
     eos: int,
     pad: int,
-) -> tuple[str, int, float]:
+) -> tuple[str, int, float, str]:
     feats = fe(wav, sampling_rate=SR, return_tensors="np").input_features.astype(
         np.float32
     )
     t0 = time.perf_counter()
     ehs = enc.run(None, {"input_features": feats})[0]
     assert tuple(ehs.shape) == (1, ENC_SEQ, D_MODEL), ehs.shape
+    lang, lang_id = prefix.resolve(dec, ehs, pad)
+    sot_ids = [prefix.sot, lang_id, prefix.task, prefix.nots]
     ids = np.full((1, MAXLEN), pad, dtype=np.int64)
     for i, t in enumerate(sot_ids):
         ids[0, i] = t
@@ -175,7 +177,36 @@ def transcribe(
         cur += 1
     ms = (time.perf_counter() - t0) * 1000.0
     text = tok.decode(gen, skip_special_tokens=True).strip()
-    return text, len(gen), ms
+    return text, len(gen), ms, lang
+
+
+@dataclass
+class Prefix:
+    """Decoder prompt: <|sot|> <|lang|> <|transcribe|> <|notimestamps|>.
+
+    lang_id is None in auto mode, where the language is detected per clip the same
+    way the C++ static engine does it -- one decoder step after <|sot|>, argmax over
+    the <|xx|> tokens. Pinning <|en|> on non-English speech makes Whisper translate.
+    """
+
+    sot: int
+    task: int
+    nots: int
+    lang_to_id: dict[str, int]
+    lang: str | None = None
+
+    def resolve(
+        self, dec: ort.InferenceSession, ehs: np.ndarray, pad: int
+    ) -> tuple[str, int]:
+        if self.lang is not None:
+            return self.lang, self.lang_to_id[self.lang]
+        ids = np.full((1, MAXLEN), pad, dtype=np.int64)
+        ids[0, 0] = self.sot
+        row = dec.run(None, {"input_ids": ids, "encoder_hidden_states": ehs})[0][0, 0]
+        codes = list(self.lang_to_id)
+        ids_arr = np.fromiter(self.lang_to_id.values(), dtype=np.int64)
+        best = int(row[ids_arr].argmax())
+        return codes[best], int(ids_arr[best])
 
 
 def main() -> int:
@@ -189,6 +220,11 @@ def main() -> int:
         help="product=7s truncate (112k); full=up to 30s canvas (480k)",
     )
     ap.add_argument("--max-wer", type=float, default=0.35)
+    ap.add_argument(
+        "--lang-mode",
+        default="auto",
+        help="auto = detect per clip (product path); or an ISO code to pin, e.g. en",
+    )
     ap.add_argument("--no-jfk", action="store_true")
     ap.add_argument(
         "--only-fit",
@@ -218,8 +254,20 @@ def main() -> int:
     eos = int(gc.get("eos_token_id", 50257))
     pad = int(gc.get("pad_token_id", eos))
     nots = int(gc.get("no_timestamps_token_id", 50363))
-    # <|en|><|transcribe|><|notimestamps|>
-    sot_ids = [sot, 50259, 50359, nots]
+    task_to_id = gc.get("task_to_id") or {}
+    lang_to_id = {
+        code.strip("<|>"): int(tid) for code, tid in (gc.get("lang_to_id") or {}).items()
+    }
+    prefix = Prefix(
+        sot=sot,
+        task=int(task_to_id.get("transcribe", 50359)),
+        nots=nots,
+        lang_to_id=lang_to_id,
+        lang=None if args.lang_mode == "auto" else args.lang_mode,
+    )
+    if prefix.lang is not None and prefix.lang not in lang_to_id:
+        print(f"FAIL: --lang-mode {prefix.lang} is not a language of this model", file=sys.stderr)
+        return 2
 
     clips = load_clips(include_jfk=not args.no_jfk)
     rows = []
@@ -228,31 +276,35 @@ def main() -> int:
 
     print()
     print(
-        f"{'id':8s} {'dur':>5s} {'tok':>4s} {'ms':>7s} {'wer%':>6s}  hyp"
+        f"{'id':8s} {'dur':>5s} {'lang':4s} {'tok':>4s} {'ms':>7s} {'wer%':>6s}  hyp"
     )
+    n_en = 0
     for clip in clips:
         if args.only_fit and args.window == "product" and clip.duration_s > 7.01:
             print(f"{clip.id:8s} {clip.duration_s:5.2f}  SKIP (>7s, --only-fit)")
             continue
         wav, _ = load_wav(clip.path, max_samples)
-        hyp, ntok, ms = transcribe(enc, dec, fe, tok, wav, sot_ids, eos, pad)
+        hyp, ntok, ms, lang = transcribe(enc, dec, fe, tok, wav, prefix, eos, pad)
+        if lang == "en":
+            n_en += 1
         # Truncated product window vs full ref is expected to look ugly on long clips.
         truncated = args.window == "product" and clip.duration_s > 7.01
         w = wer(clip.ref, hyp)
-        gate = (not truncated) and (w > args.max_wer or ntok >= MAXLEN - len(sot_ids))
+        gate = (not truncated) and (w > args.max_wer or ntok >= MAXLEN - 4)
         if gate:
             fail = True
         tag = "TRUNC" if truncated else ("FAIL" if gate else "ok")
         if not truncated:
             scored_wer.append(w)
         print(
-            f"{clip.id:8s} {clip.duration_s:5.2f} {ntok:4d} {ms:7.1f} "
+            f"{clip.id:8s} {clip.duration_s:5.2f} {lang:4s} {ntok:4d} {ms:7.1f} "
             f"{100 * w:6.1f}  [{tag}] {hyp}"
         )
         rows.append(
             {
                 "id": clip.id,
                 "duration_s": clip.duration_s,
+                "lang": lang,
                 "tokens": ntok,
                 "latency_ms": round(ms, 1),
                 "wer": round(w, 4),
@@ -267,7 +319,8 @@ def main() -> int:
     print()
     print(
         f"scored_clips={len(scored_wer)} mean_wer={100 * mean_wer:.1f}% "
-        f"max_wer_gate={100 * args.max_wer:.0f}%"
+        f"max_wer_gate={100 * args.max_wer:.0f}% lang_mode={args.lang_mode} "
+        f"detected_en={n_en}/{len(rows)}"
     )
     out = (
         ROOT

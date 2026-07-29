@@ -36,3 +36,13 @@ NPU evidence applies to the **30s tiny.en static** pack, not to multilingual or 
 ### Why not mel `[1,80,700]` / enc_seq 350?
 
 Verified: truncating the encoder positional grid to 350 (Torch or ONNX) + stock decoder produces severe token loops on JFK. Whisper public weights assume the 30s canvas; true shape reduction needs fine-tuning. Product still always sends 7s — the runtime pads.
+
+### Language handling: verbatim, never translated
+
+Decoder prompt is `<|sot|> <|lang|> <|transcribe|> <|notimestamps|>`. `<|translate|>` is never used, and `<|lang|>` is **detected per clip**, not assumed:
+
+- one decoder step after `<|sot|>`, then argmax over the 99 `<|xx|>` tokens (same algorithm as the reference `whisper.detect_language()`)
+- costs one extra decoder forward per clip (~4% of a 7s-clip decode on CPU)
+- `NPU_INFERENCE_BENCH_WHISPER_LANG=<iso>` pins a language for A/B runs; an unknown code is a hard init error, never a silent fallback
+
+Forcing `<|en|>` on non-English speech makes Whisper paraphrase into English instead of transcribing. Measured on the Spanish FLEURS clip over the full 30s canvas: detected `es` → 0.0% WER verbatim, forced `en` → 104.5% WER ("It was so much the amount of people who were concentrated…"). Hence auto-detect is the default. Detection is 6/6 on de/fr/es/cs/it/pl at both the 7s product window and the full canvas.

@@ -1,0 +1,73 @@
+{
+  "device": "gpu",
+  "window": "product",
+  "providers": [
+    "DmlExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "mean_wer": 0.14146167557932263,
+  "max_wer_gate": 0.35,
+  "pass": true,
+  "rows": [
+    {
+      "id": "ls_000",
+      "duration_s": 5.86,
+      "lang": "en",
+      "tokens": 21,
+      "latency_ms": 590.5,
+      "wer": 0.0588,
+      "truncated": false,
+      "hyp": "Mr. Quilter is the apostle of the middle classes and we are glad to welcome his gospel.",
+      "ref": "MISTER QUILTER IS THE APOSTLE OF THE MIDDLE CLASSES AND WE ARE GLAD TO WELCOME HIS GOSPEL",
+      "pass": true
+    },
+    {
+      "id": "ls_001",
+      "duration_s": 4.82,
+      "lang": "en",
+      "tokens": 15,
+      "latency_ms": 379.2,
+      "wer": 0.1,
+      "truncated": false,
+      "hyp": "Nor is Mr. Quilters' manner less interesting than his matter.",
+      "ref": "NOR IS MISTER QUILTER'S MANNER LESS INTERESTING THAN HIS MATTER",
+      "pass": true
+    },
+    {
+      "id": "ls_006",
+      "duration_s": 5.64,
+      "lang": "en",
+      "tokens": 18,
+      "latency_ms": 451.1,
+      "wer": 0.1667,
+      "truncated": false,
+      "hyp": "On the general principles of art and Mr. Quilter writes with equal lucidity.",
+      "ref": "ON THE GENERAL PRINCIPLES OF ART MISTER QUILTER WRITES WITH EQUAL LUCIDITY",
+      "pass": true
+    },
+    {
+      "id": "ls_008",
+      "duration_s": 5.12,
+      "lang": "en",
+      "tokens": 15,
+      "latency_ms": 387.0,
+      "wer": 0.1818,
+      "truncated": false,
+      "hyp": "As for etchings, there are two kinds, British and foreign.",
+      "ref": "AS FOR ETCHINGS THEY ARE OF TWO KINDS BRITISH AND FOREIGN",
+      "pass": true
+    },
+    {
+      "id": "ls_010",
+      "duration_s": 5.6,
+      "lang": "en",
+      "tokens": 16,
+      "latency_ms": 402.7,
+      "wer": 0.2,
+      "truncated": false,
+      "hyp": "Near the fire, any ornaments Fred brought home from India on the mental board.",
+      "ref": "NEAR THE FIRE AND THE ORNAMENTS FRED BROUGHT HOME FROM INDIA ON THE MANTEL BOARD",
+      "pass": true
+    }
+  ]
+}

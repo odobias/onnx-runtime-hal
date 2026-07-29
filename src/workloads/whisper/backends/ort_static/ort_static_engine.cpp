@@ -85,6 +85,34 @@ int64_t env_max_tokens(int64_t cap) {
     return (std::max<long>)(2, (std::min<long>)(n, static_cast<long>(cap)));
 }
 
+// Parse the whole lang_to_id map ("<|en|>": 50259, ...) so the decoder can pick
+// the language from the audio instead of assuming one.
+std::vector<std::pair<std::string, int64_t>> parse_language_table(const std::string& gc) {
+    std::vector<std::pair<std::string, int64_t>> table;
+    const size_t map_start = gc.find("\"lang_to_id\"");
+    if (map_start == std::string::npos) return table;
+    const size_t open = gc.find('{', map_start);
+    if (open == std::string::npos) return table;
+    const size_t close = gc.find('}', open);
+    size_t pos = open;
+    while (true) {
+        const size_t key = gc.find("\"<|", pos);
+        if (key == std::string::npos || (close != std::string::npos && key > close)) break;
+        const size_t key_end = gc.find("|>\"", key);
+        if (key_end == std::string::npos) break;
+        const std::string code = gc.substr(key + 3, key_end - (key + 3));
+        const size_t colon = gc.find(':', key_end);
+        if (colon == std::string::npos) break;
+        char* end = nullptr;
+        const long id = std::strtol(gc.c_str() + colon + 1, &end, 10);
+        if (end != gc.c_str() + colon + 1 && !code.empty()) {
+            table.emplace_back(code, static_cast<int64_t>(id));
+        }
+        pos = colon + 1;
+    }
+    return table;
+}
+
 // Look up <|xx|> language token id from generation_config.json lang_to_id map.
 int64_t language_token_id(const std::string& gc, const std::string& lang) {
     if (lang.empty()) return -1;
@@ -138,11 +166,25 @@ public:
         transcribe_ = fe::json_int(gc, "transcribe_token_id", 50359);
         translate_ = fe::json_int(gc, "translate_token_id", 50358);
         if (pkg_.multilingual) {
-            // Prefer explicit lang; default en when unset (product Media Scan).
+            // Language is detected per clip unless pinned. Defaulting to <|en|> makes
+            // Whisper paraphrase non-English speech into English instead of
+            // transcribing it verbatim, so an unset env var means "auto".
+            lang_table_ = parse_language_table(gc);
             const char* env_lang = std::getenv("NPU_INFERENCE_BENCH_WHISPER_LANG");
-            const std::string lang = (env_lang && *env_lang) ? env_lang : "en";
-            lang_token_ = language_token_id(gc, lang);
-            if (lang_token_ < 0) lang_token_ = language_token_id(gc, "en");
+            const std::string want = (env_lang && *env_lang) ? env_lang : "auto";
+            if (want != "auto") {
+                lang_token_ = language_token_id(gc, want);
+                if (lang_token_ < 0) {
+                    throw std::runtime_error(
+                        "NPU_INFERENCE_BENCH_WHISPER_LANG=" + want +
+                        " is not a language token of this model (use 'auto' or an ISO code)");
+                }
+                language_ = want;
+            } else if (lang_table_.empty()) {
+                throw std::runtime_error(
+                    "multilingual model without a lang_to_id table in generation_config.json: "
+                    "cannot detect language, pin one via NPU_INFERENCE_BENCH_WHISPER_LANG");
+            }
         }
         suppress_ = fe::json_int_array(gc, "suppress_tokens");
         begin_suppress_ = fe::json_int_array(gc, "begin_suppress_tokens");
@@ -173,11 +215,15 @@ public:
         const size_t encoder_count = encoder_outputs[0].GetTensorTypeAndShapeInfo().GetElementCount();
         std::vector<float> encoder_state(encoder_ptr, encoder_ptr + encoder_count);
 
+        int64_t lang_token = lang_token_;
+        if (pkg_.multilingual && lang_token < 0) lang_token = detect_language(encoder_state);
+
         std::vector<int64_t> ids(static_cast<size_t>(max_tokens_), pad_);
         int64_t cur = 0;
         ids[static_cast<size_t>(cur++)] = sot_;
         if (pkg_.multilingual) {
-            if (lang_token_ >= 0) ids[static_cast<size_t>(cur++)] = lang_token_;
+            if (lang_token >= 0) ids[static_cast<size_t>(cur++)] = lang_token;
+            // Always transcribe: translate_ would emit English for foreign speech.
             ids[static_cast<size_t>(cur++)] = transcribe_;
         }
         ids[static_cast<size_t>(cur++)] = no_timestamps_;
@@ -189,9 +235,7 @@ public:
         const char* dec_in[] = {"input_ids", "encoder_hidden_states"};
         const char* dec_out[] = {"logits"};
         Ort::RunOptions run_opts;
-        if (options_.device == Device::NPU && ep::is_qnn(active_provider_)) {
-            run_opts.AddConfigEntry("qnn.perf_mode", "burst");
-        }
+        configure_run_options(run_opts);
         while (cur < max_tokens_) {
             auto token_tensor = tensor_int64(ids, {1, max_tokens_});
             auto state_tensor = tensor_float(encoder_state, {1, pkg_.enc_seq, pkg_.d_model});
@@ -253,6 +297,7 @@ public:
         out.model_format = "onnx";
         out.decode_strategy = pkg_.multilingual ? "static-no-kv-multi-7s" : "static-no-kv";
         out.max_context = static_cast<long>(max_tokens_);
+        out.language = language_;
 
         // Finalize profiling after the first transcription (normally the harness
         // warmup), so measured runs do not accumulate profiler overhead.
@@ -280,6 +325,46 @@ public:
     double load_seconds() const override { return load_seconds_; }
 
 private:
+    void configure_run_options(Ort::RunOptions& run_opts) const {
+        if (options_.device == Device::NPU && ep::is_qnn(active_provider_)) {
+            run_opts.AddConfigEntry("qnn.perf_mode", "burst");
+        }
+    }
+
+    // Whisper language ID: one decoder step with only <|startoftranscript|>, then
+    // take the highest-scoring <|xx|> token. Same algorithm as the reference
+    // whisper.detect_language(); costs one extra decoder forward per clip.
+    int64_t detect_language(std::vector<float>& encoder_state) {
+        std::vector<int64_t> ids(static_cast<size_t>(max_tokens_), pad_);
+        ids[0] = sot_;
+        auto token_tensor = tensor_int64(ids, {1, max_tokens_});
+        auto state_tensor = tensor_float(encoder_state, {1, pkg_.enc_seq, pkg_.d_model});
+        std::vector<Ort::Value> inputs;
+        inputs.emplace_back(std::move(token_tensor));
+        inputs.emplace_back(std::move(state_tensor));
+
+        const char* dec_in[] = {"input_ids", "encoder_hidden_states"};
+        const char* dec_out[] = {"logits"};
+        Ort::RunOptions run_opts;
+        configure_run_options(run_opts);
+        auto outputs = decoder_->Run(run_opts, dec_in, inputs.data(), inputs.size(), dec_out, 1);
+        const float* logits = outputs[0].GetTensorMutableData<float>();
+        const int64_t vocab = outputs[0].GetTensorTypeAndShapeInfo().GetShape().back();
+
+        int64_t best_token = -1;
+        float best_logit = -std::numeric_limits<float>::infinity();
+        for (const auto& entry : lang_table_) {
+            if (entry.second < 0 || entry.second >= vocab) continue;
+            const float value = logits[entry.second];
+            if (value > best_logit) {
+                best_logit = value;
+                best_token = entry.second;
+                language_ = entry.first;
+            }
+        }
+        return best_token;
+    }
+
     EngineOptions options_;
     runtime::RuntimeContext context_;
     PackageConfig pkg_{};
@@ -294,7 +379,9 @@ private:
     int64_t no_timestamps_ = 50362;
     int64_t transcribe_ = 50359;
     int64_t translate_ = 50358;
-    int64_t lang_token_ = -1;
+    int64_t lang_token_ = -1;  // >= 0 only when pinned; otherwise detected per clip
+    std::vector<std::pair<std::string, int64_t>> lang_table_;
+    std::string language_;  // pinned or last detected ISO code
     std::vector<int64_t> suppress_;
     std::vector<int64_t> begin_suppress_;
     std::vector<float> mel_filters_;

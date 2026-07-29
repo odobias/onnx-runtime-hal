@@ -70,6 +70,11 @@ struct TranscribeResult {
     std::string model_format;     // e.g. "onnx", "ov-ir"
     std::string decode_strategy;  // e.g. "static-no-kv", "genai-bounded-kv"
     long max_context = 0;         // static decoder context length (0 = n/a)
+
+    // ISO code the transcript is in: detected from the audio, or pinned by the
+    // caller. Empty for English-only models. Transcripts are always verbatim in
+    // this language -- backends must not translate to English.
+    std::string language;
 };
 
 // 16 kHz, mono, float PCM normalized to [-1, 1].
