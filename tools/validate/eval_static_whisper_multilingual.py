@@ -24,6 +24,10 @@ import soundfile as sf
 from transformers import WhisperTokenizer
 from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import baseline  # noqa: E402  (local helpers, need the path insert above)
+from providers import DEVICE_PROVIDERS, pick_providers  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
 MANIFEST = ROOT / "artifacts/workloads/speech/multilingual/manifest.jsonl"
@@ -116,6 +120,12 @@ def load_wav(path: Path, max_samples: int = FULL_SAMPLES) -> np.ndarray:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--device", choices=sorted(DEVICE_PROVIDERS), default="cpu")
+    ap.add_argument(
+        "--provider",
+        default=None,
+        help="Exact ORT provider name (overrides --device preference list)",
+    )
     ap.add_argument("--max-wer", type=float, default=0.55)
     ap.add_argument("--min-overlap", type=float, default=0.30)
     ap.add_argument(
@@ -129,6 +139,18 @@ def main() -> int:
         choices=["auto", "manifest"],
         default="auto",
         help="auto = detect language from audio (product path); manifest = trust the label",
+    )
+    ap.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Record this run as the reference other runners compare against",
+    )
+    ap.add_argument("--no-baseline", action="store_true", help="Skip baseline comparison")
+    ap.add_argument(
+        "--baseline-tol",
+        type=float,
+        default=0.02,
+        help="Allowed mean-WER regression vs baseline, absolute (default 0.02 = 2 pts)",
     )
     ap.add_argument(
         "--en-control",
@@ -162,8 +184,12 @@ def main() -> int:
         print("FAIL: generation_config has no lang_to_id table", file=sys.stderr)
         return 2
 
-    enc = ort.InferenceSession(str(MODEL / "encoder_model.onnx"), providers=["CPUExecutionProvider"])
-    dec = ort.InferenceSession(str(MODEL / "decoder_model.onnx"), providers=["CPUExecutionProvider"])
+    providers = pick_providers(args.device, args.provider)
+    print(f"device {args.device} providers {providers} window {args.window}")
+    enc = ort.InferenceSession(str(MODEL / "encoder_model.onnx"), providers=providers)
+    dec = ort.InferenceSession(str(MODEL / "decoder_model.onnx"), providers=providers)
+    print("encoder_active", enc.get_providers())
+    print("decoder_active", dec.get_providers())
 
     rows_out = []
     fail = False
@@ -324,13 +350,15 @@ def main() -> int:
         f"lang_mode={args.lang_mode} task=transcribe"
     )
 
-    stem = f"whisper-static-multi-7s-multilingual-{args.window}"
+    stem = f"whisper-static-multi-7s-multilingual-{args.device}-{args.window}"
     out = ROOT / "results" / "reports" / f"{stem}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(
             {
                 "model": str(MODEL),
+                "device": args.device,
+                "providers": enc.get_providers(),
                 "window": args.window,
                 "lang_mode": args.lang_mode,
                 "task": "transcribe",
@@ -378,6 +406,19 @@ def main() -> int:
     md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("wrote", out)
     print("wrote", md)
+
+    suite = f"multilingual-{args.window}"
+    provider = enc.get_providers()[0]
+    if args.update_baseline:
+        print("updated baseline", baseline.update(suite, rows_out, mean_w, provider))
+    elif not args.no_baseline:
+        print()
+        ok, blines = baseline.compare(suite, rows_out, mean_w, args.baseline_tol)
+        for line in blines:
+            print(line)
+        if not ok:
+            fail = True
+
     if fail or not rows_out:
         print("FAIL", file=sys.stderr)
         return 1

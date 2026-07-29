@@ -23,7 +23,16 @@
   Also run the portable HAL suite for whisper on the same devices (needs build).
 
 .PARAMETER Eval
-  Also run multi-sample WER over eval.jsonl (product 7s fit + full 30s canvas).
+  Also run multi-sample WER over eval.jsonl and the FLEURS multilingual clips
+  (product 7s fit + full 30s canvas), each compared against the committed baseline
+  in results\baselines\whisper-static-multi-7s.json.
+
+.PARAMETER UpdateBaseline
+  Record this host's numbers as the baseline instead of comparing against it.
+  Only for a trusted reference host.
+
+.PARAMETER NoBaseline
+  Run the evals without comparing against the baseline.
 
 .PARAMETER PythonCpu
   Python for CPU smoke (default: .venv).
@@ -38,6 +47,8 @@ param(
     [switch]$SkipFetch,
     [switch]$Suite,
     [switch]$Eval,
+    [switch]$UpdateBaseline,
+    [switch]$NoBaseline,
 
     [string]$PythonCpu = "",
     [string]$PythonGpu = "",
@@ -58,6 +69,8 @@ $model = Join-Path $root "artifacts\workloads\whisper\models\static-onnx-tiny-mu
 $audio = Join-Path $root "artifacts\workloads\speech\jfk.wav"
 $smoke = Join-Path $root "tools\validate\smoke_static_whisper_7s_multi.py"
 $evalPy = Join-Path $root "tools\validate\eval_static_whisper_7s_multi.py"
+$multiPy = Join-Path $root "tools\validate\eval_static_whisper_multilingual.py"
+$multiManifest = Join-Path $root "artifacts\workloads\speech\multilingual\manifest.jsonl"
 
 function Resolve-Py([string]$explicit, [string[]]$candidates) {
     if ($explicit -and (Test-Path -LiteralPath $explicit)) { return (Resolve-Path $explicit).Path }
@@ -130,6 +143,11 @@ if ($Eval) {
     if (-not (Test-Path -LiteralPath $evalPy)) {
         throw "Missing eval script: $evalPy"
     }
+    # Every eval prints its WER delta against results/baselines/whisper-static-multi-7s.json
+    # unless the caller is (re)recording that baseline on a reference host.
+    $baselineArgs = @()
+    if ($UpdateBaseline) { $baselineArgs += "--update-baseline" }
+    elseif ($NoBaseline) { $baselineArgs += "--no-baseline" }
     foreach ($dev in $Device) {
         $py = switch ($dev) {
             "cpu" { $pyCpu }
@@ -147,10 +165,24 @@ if ($Eval) {
             )) {
             Write-Host ""
             Write-Host ("==> Eval device={0} {1}" -f $dev, ($winArgs -join ' ')) -ForegroundColor Cyan
-            & $py $evalPy --device $dev @winArgs
+            & $py $evalPy --device $dev @winArgs $baselineArgs
             if ($LASTEXITCODE -ne 0) {
                 $failed = $true
                 Write-Host "FAIL eval device=$dev exit=$LASTEXITCODE" -ForegroundColor Red
+            }
+        }
+
+        if (-not (Test-Path -LiteralPath $multiManifest)) {
+            Write-Host "SKIP multilingual eval [$dev]: $multiManifest missing (run tools\fetch\get-models.ps1)" -ForegroundColor DarkYellow
+            continue
+        }
+        foreach ($win in @("product", "full")) {
+            Write-Host ""
+            Write-Host ("==> Multilingual eval device={0} --window {1}" -f $dev, $win) -ForegroundColor Cyan
+            & $py $multiPy --device $dev --window $win --lang-mode auto $baselineArgs
+            if ($LASTEXITCODE -ne 0) {
+                $failed = $true
+                Write-Host "FAIL multilingual eval device=$dev window=$win exit=$LASTEXITCODE" -ForegroundColor Red
             }
         }
     }

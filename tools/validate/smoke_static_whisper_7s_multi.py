@@ -17,52 +17,15 @@ import soundfile as sf
 from transformers import WhisperTokenizer
 from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from providers import DEVICE_PROVIDERS, pick_providers  # noqa: E402  (needs path insert)
+
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
 AUDIO = ROOT / "artifacts/workloads/speech/jfk.wav"
 
 N_FRAMES, ENC_SEQ, D_MODEL, MAXLEN = 3000, 1500, 384, 128
 PRODUCT_SAMPLES, SR = 112000, 16000
-
-DEVICE_PROVIDERS: dict[str, list[str]] = {
-    "cpu": ["CPUExecutionProvider"],
-    "gpu": ["DmlExecutionProvider", "CPUExecutionProvider"],
-    "npu": [
-        "VitisAIExecutionProvider",
-        "QNNExecutionProvider",
-        "OpenVINOExecutionProvider",
-        "CPUExecutionProvider",
-    ],
-}
-
-
-def _pick_providers(device: str, explicit: str | None) -> list[str]:
-    available = set(ort.get_available_providers())
-    if explicit:
-        if explicit not in available:
-            raise SystemExit(
-                f"Provider {explicit!r} not available. Have: {sorted(available)}"
-            )
-        return [explicit]
-    wanted = DEVICE_PROVIDERS[device]
-    chosen = [p for p in wanted if p in available]
-    if not chosen:
-        raise SystemExit(
-            f"No providers for device={device}. Wanted {wanted}; have {sorted(available)}"
-        )
-    # For gpu/npu, refuse silent CPU fallback when the preferred EP is missing.
-    if device == "gpu" and "DmlExecutionProvider" not in chosen:
-        raise SystemExit(
-            "GPU requested but DmlExecutionProvider missing. "
-            f"Install onnxruntime-directml. Available: {sorted(available)}"
-        )
-    if device == "npu" and chosen == ["CPUExecutionProvider"]:
-        raise SystemExit(
-            "NPU requested but no NPU EP registered "
-            f"(VitisAI/QNN/OpenVINO). Available: {sorted(available)}"
-        )
-    return chosen
-
 
 def _load_wav() -> np.ndarray:
     wav, sr = sf.read(str(AUDIO), dtype="float32", always_2d=False)
@@ -100,7 +63,7 @@ def main() -> int:
     assert pkg["n_frames"] == N_FRAMES
     assert int(pkg.get("product_window_s", 7)) == 7
 
-    providers = _pick_providers(args.device, args.provider)
+    providers = pick_providers(args.device, args.provider)
     print("ort", ort.__version__)
     print("available", ort.get_available_providers())
     print("requested_device", args.device)
