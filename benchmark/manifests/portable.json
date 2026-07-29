@@ -20,6 +20,22 @@
       "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
     },
     {
+      "id": "whisper-tiny-static-multi-7s",
+      "kind": "asr",
+      "backend": "onnx-static",
+      "path": "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s",
+      "executionProfiles": [
+        {
+          "id": "static-onnx-multi-7s",
+          "devices": ["npu", "gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
       "id": "whisper-tiny-dynamic",
       "kind": "asr",
       "backend": "onnx-dynamic",

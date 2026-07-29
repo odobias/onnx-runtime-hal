@@ -2,6 +2,7 @@
   "note": "Canonical mapping between benchmark-first repository paths and the Hugging Face asset snapshot. HF remote keys under deepfake/* stay stable; local runtime paths live under artifacts/workloads.",
   "map": [
     { "local": "artifacts/workloads/whisper/models/static-onnx", "hf": "whisper/en-static-onnx" },
+    { "local": "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s", "hf": "whisper/static-onnx-tiny-multi-7s" },
     { "local": "artifacts/workloads/whisper/models/dynamic-onnx", "hf": "whisper/en-onnx" },
     { "local": "artifacts/workloads/whisper/models/ov-ir", "hf": "whisper/en-ov" },
     { "local": "artifacts/workloads/whisper/models/vendor/amd", "hf": "whisper/amd" },
