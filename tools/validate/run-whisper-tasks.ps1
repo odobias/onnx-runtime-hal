@@ -11,6 +11,7 @@
 #   .\tools\validate\run-whisper-tasks.ps1 -Device npu
 #   .\tools\validate\run-whisper-tasks.ps1 -Task transcribe
 #   .\tools\validate\run-whisper-tasks.ps1 -Window full   # one long pass, for comparison
+#   .\tools\validate\run-whisper-tasks.ps1 -Exe artifacts\build\x64-dml\Release\NpuInferenceBench.exe
 
 [CmdletBinding()]
 param(
@@ -21,7 +22,11 @@ param(
     # full = decode the whole clip in one pass; only useful to price windowing.
     [ValidateSet("product", "full")][string]$Window = "product",
     [string]$ModelDir = "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s",
-    [string]$Manifest = "artifacts/workloads/speech/multilingual/manifest.jsonl"
+    [string]$Manifest = "artifacts/workloads/speech/multilingual/manifest.jsonl",
+    # Which build to exercise. Left empty, the tree is derived from this host's CPU vendor,
+    # which is wrong whenever the build under test lives elsewhere -- an ORT/DirectML build
+    # on an AMD host, say, where the vendor tree holds some older binary.
+    [string]$Exe = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,8 +63,18 @@ $platform = switch ($Runtime) {
         }
     }
 }
-$exe = Join-Path $root "artifacts\build\$platform\Release\NpuInferenceBench.exe"
-if (-not (Test-Path -LiteralPath $exe)) { throw "Benchmark executable missing: $exe" }
+if ($Exe) {
+    $exe = if ([System.IO.Path]::IsPathRooted($Exe)) { $Exe } else { Join-Path $root ($Exe -replace '/', '\') }
+    if (-not (Test-Path -LiteralPath $exe)) { throw "Benchmark executable missing: $exe (from -Exe)" }
+} else {
+    $exe = Join-Path $root "artifacts\build\$platform\Release\NpuInferenceBench.exe"
+    if (-not (Test-Path -LiteralPath $exe)) {
+        throw ("Benchmark executable missing: $exe -- -Runtime $Runtime on this host " +
+            "($hostArch, CPU vendor $hostVendor) selects the '$platform' build tree. " +
+            "Build that tree, or pass -Exe <path> to test another one.")
+    }
+}
+Write-Host "Runner: $exe" -ForegroundColor DarkGray
 
 $clips = @(Get-Content -LiteralPath $manifestPath -Encoding UTF8 |
     Where-Object { $_.Trim() } |
@@ -87,8 +102,16 @@ function Invoke-TaskRun {
         $TaskName -ne "translate" -or [string]$_.ref_en
     })
     if (-not $usable.Count) {
-        Write-Warning "$TaskName): no clip has a reference; skipping"
+        Write-Warning ("${TaskName}: no clip carries ref_en, so there is nothing to score against; " +
+            "skipping. Manifests written before ref_en existed need re-fetching with " +
+            "tools/fetch/fetch_multilingual_speech.py.")
         return $null
+    }
+    if ($usable.Count -lt $Clips.Count) {
+        # Otherwise a partial run reads as full coverage: the aggregate says nothing about
+        # how many clips it left out.
+        Write-Warning ("${TaskName}: only $($usable.Count) of $($Clips.Count) clips carry ref_en; " +
+            "the score below covers those clips only.")
     }
 
     $cache = Join-Path $root "artifacts\build\cache\whisper-tasks\$platform\$Device\$TaskName"
@@ -125,9 +148,17 @@ function Invoke-TaskRun {
         Remove-Item Env:NPU_INFERENCE_BENCH_WHISPER_TASK -ErrorAction SilentlyContinue
         Remove-Item Env:NPU_INFERENCE_BENCH_WHISPER_WINDOW -ErrorAction SilentlyContinue
     }
-    if (-not $native.succeeded -or -not $native.payload.clips) {
-        $err = if ($native.payload.error) { $native.payload.error } else { "exit $($native.exit_code)" }
+    if (-not $native.succeeded) {
+        $err = if ($native.payload.error) { [string]$native.payload.error } else { "exit $($native.exit_code)" }
         throw "$TaskName run failed: $err"
+    }
+    if (-not $native.payload.clips) {
+        # A run that succeeds yet reports no clips never saw --eval-set: it transcribed the
+        # single positional audio file and reported that instead, which is what a binary
+        # older than the flag does. Easy to hit, since the build tree is picked by vendor.
+        $built = (Get-Item -LiteralPath $exe).LastWriteTime.ToString("u")
+        throw ("$TaskName run returned no clips, so --eval-set was ignored: $exe (built $built) " +
+            "predates that flag. Rebuild it, or pass -Exe <path> to a build that supports it.")
     }
 
     $byId = @{}
