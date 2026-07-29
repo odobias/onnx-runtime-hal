@@ -194,7 +194,11 @@ def main() -> int:
         "--window",
         choices=["product", "full"],
         default="product",
-        help="product=7s truncate (112k); full=up to 30s canvas (480k)",
+        # Note this is NOT what the shipping runner calls "product": this script keeps
+        # only the first 7s of a clip (hence --only-fit), whereas the runner cuts long
+        # audio into overlapping 7s windows and stitches them. Use
+        # tools/validate/run-whisper-tasks.ps1 to measure the shipping behaviour.
+        help="product=first 7s only (112k); full=up to 30s canvas (480k)",
     )
     ap.add_argument("--max-wer", type=float, default=0.35)
     ap.add_argument(

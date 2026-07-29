@@ -60,6 +60,9 @@ struct PackageConfig {
     int64_t d_model = kDModelDefault;
     int64_t max_tokens = kStaticMaxTokens;
     bool multilingual = false;
+    int sample_rate = 16000;
+    int product_samples = 0;  // 0 = package declares no product window
+    int product_hop = 0;      // stride between window starts (window - overlap)
 };
 
 PackageConfig load_package_config(const fs::path& dir) {
@@ -75,6 +78,26 @@ PackageConfig load_package_config(const fs::path& dir) {
     // multilingual: true/false — cheap string search
     cfg.multilingual = text.find("\"multilingual\": true") != std::string::npos ||
                        text.find("\"multilingual\":true") != std::string::npos;
+
+    // Product window: the caller streams fixed-length windows rather than whole
+    // utterances, so audio longer than one window is decoded as several overlapping
+    // windows. Overlap exists so a word straddling a boundary is heard intact by at
+    // least one window.
+    cfg.sample_rate = static_cast<int>(fe::json_int(text, "sample_rate", cfg.sample_rate));
+    if (cfg.sample_rate <= 0) cfg.sample_rate = 16000;
+    cfg.product_samples = static_cast<int>(fe::json_int(text, "product_n_samples", 0));
+    if (cfg.product_samples <= 0) {
+        const int64_t window_s = fe::json_int(text, "product_window_s", 0);
+        if (window_s > 0) cfg.product_samples = static_cast<int>(window_s * cfg.sample_rate);
+    }
+    // A product window wider than the mel canvas would be silently truncated anyway.
+    if (cfg.product_samples > cfg.n_samples) cfg.product_samples = cfg.n_samples;
+    if (cfg.product_samples > 0) {
+        const int64_t overlap_s = fe::json_int(text, "product_overlap_s", 1);
+        int overlap = static_cast<int>(overlap_s * cfg.sample_rate);
+        overlap = (std::max)(0, (std::min)(overlap, cfg.product_samples - cfg.sample_rate / 10));
+        cfg.product_hop = cfg.product_samples - overlap;
+    }
     return cfg;
 }
 
@@ -127,6 +150,137 @@ int64_t language_token_id(const std::string& gc, const std::string& lang) {
     return id;
 }
 
+// Task id from generation_config.json's task_to_id map
+// ("task_to_id": {"transcribe": 50359, "translate": 50358}), which is what the HF
+// exporter actually writes. Older packages carried scalar <task>_token_id keys, so
+// those are still honoured before falling back to the hardcoded id.
+int64_t task_token_id(const std::string& gc, const std::string& task, int64_t fallback) {
+    const size_t map_start = gc.find("\"task_to_id\"");
+    if (map_start != std::string::npos) {
+        const size_t open = gc.find('{', map_start);
+        if (open != std::string::npos) {
+            const size_t close = gc.find('}', open);
+            const std::string key = "\"" + task + "\"";
+            const size_t pos = gc.find(key, open);
+            if (pos != std::string::npos && (close == std::string::npos || pos < close)) {
+                const size_t colon = gc.find(':', pos + key.size());
+                if (colon != std::string::npos) {
+                    char* end = nullptr;
+                    const long id = std::strtol(gc.c_str() + colon + 1, &end, 10);
+                    if (end != gc.c_str() + colon + 1) return static_cast<int64_t>(id);
+                }
+            }
+        }
+    }
+    return fe::json_int(gc, task + "_token_id", fallback);
+}
+
+// Overlapping windows re-transcribe the shared audio, so consecutive transcripts
+// repeat the words in the overlap. The seam is found by sliding the head of the new
+// transcript against the tail of what we have and keeping the alignment that agrees
+// on the most words.
+//
+// The agreement is deliberately fuzzy: the two windows heard the shared audio with
+// different amounts of context, so they routinely render a word or two differently
+// ("zum Rest" against "zum Reste"). Demanding an exact run means one such word
+// rejects the whole alignment and the overlap gets emitted twice.
+constexpr size_t kMaxOverlapWords = 48;
+constexpr double kOverlapMatchRatio = 0.6;
+
+std::vector<std::string> split_words(const std::string& text) {
+    std::vector<std::string> words;
+    size_t pos = 0;
+    while (pos < text.size()) {
+        while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) ++pos;
+        const size_t start = pos;
+        while (pos < text.size() && !std::isspace(static_cast<unsigned char>(text[pos]))) ++pos;
+        if (pos > start) words.push_back(text.substr(start, pos - start));
+    }
+    return words;
+}
+
+// Case- and punctuation-insensitive comparison key. Only ASCII is folded: UTF-8
+// continuation bytes must pass through untouched or accented words stop matching.
+std::string overlap_key(const std::string& word) {
+    std::string out;
+    out.reserve(word.size());
+    for (const char ch : word) {
+        const auto uch = static_cast<unsigned char>(ch);
+        if (uch < 0x80) {
+            if (std::isalnum(uch)) out.push_back(static_cast<char>(std::tolower(uch)));
+        } else {
+            out.push_back(ch);
+        }
+    }
+    return out;
+}
+
+// Two windows heard the same word with different context and often spell it slightly
+// differently, so the seam has to survive near-misses: comparing keys for equality
+// loses the alignment in exactly the garbled cases that need it most. Edit distance is
+// counted in bytes, so a differing accented letter costs two -- that only makes the
+// test stricter, never looser.
+bool words_agree(const std::string& a, const std::string& b) {
+    if (a == b) return true;
+    if (a.empty() || b.empty()) return false;
+    const size_t longest = (std::max)(a.size(), b.size());
+    const size_t budget = (longest / 4 > 1) ? longest / 4 : size_t{1};
+    if (a.size() > b.size() + budget || b.size() > a.size() + budget) return false;
+
+    std::vector<size_t> prev(b.size() + 1);
+    std::vector<size_t> cur(b.size() + 1);
+    for (size_t j = 0; j <= b.size(); ++j) prev[j] = j;
+    for (size_t i = 1; i <= a.size(); ++i) {
+        cur[0] = i;
+        size_t row_best = cur[0];
+        for (size_t j = 1; j <= b.size(); ++j) {
+            const size_t cost = (a[i - 1] == b[j - 1]) ? 0u : 1u;
+            cur[j] = (std::min)((std::min)(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            row_best = (std::min)(row_best, cur[j]);
+        }
+        if (row_best > budget) return false;  // no completion can come back under budget
+        prev.swap(cur);
+    }
+    return prev[b.size()] <= budget;
+}
+
+std::string stitch_transcripts(const std::string& accumulated, const std::string& next) {
+    if (accumulated.empty()) return next;
+    if (next.empty()) return accumulated;
+    const std::vector<std::string> have_raw = split_words(accumulated);
+    const std::vector<std::string> add = split_words(next);
+    std::vector<std::string> have;
+    have.reserve(have_raw.size());
+    for (const std::string& word : have_raw) have.push_back(overlap_key(word));
+    std::vector<std::string> add_keys;
+    add_keys.reserve(add.size());
+    for (const std::string& word : add) add_keys.push_back(overlap_key(word));
+    const size_t limit = (std::min)((std::min)(have.size(), add.size()), kMaxOverlapWords);
+
+    // Descending k so that, among alignments agreeing on equally many words, the
+    // longest overlap wins -- a long agreement is stronger evidence of the seam.
+    size_t shared = 0;
+    size_t best_hits = 0;
+    for (size_t k = limit; k >= 1; --k) {
+        size_t hits = 0;
+        for (size_t i = 0; i < k; ++i) {
+            if (words_agree(have[have.size() - k + i], add_keys[i])) ++hits;
+        }
+        if (static_cast<double>(hits) < kOverlapMatchRatio * static_cast<double>(k)) continue;
+        if (hits > best_hits) {
+            best_hits = hits;
+            shared = k;
+        }
+    }
+
+    std::string out = accumulated;
+    for (size_t i = shared; i < add.size(); ++i) {
+        out.push_back(' ');
+        out += add[i];
+    }
+    return out;
+}
+
 Ort::Value tensor_float(std::vector<float>& data, const std::vector<int64_t>& shape) {
     auto mem = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     return Ort::Value::CreateTensor<float>(mem, data.data(), data.size(), shape.data(), shape.size());
@@ -154,6 +308,24 @@ public:
         pkg_ = load_package_config(dir);
         max_tokens_ = env_max_tokens(pkg_.max_tokens);
 
+        // The product streams fixed windows, so that is the default whenever the
+        // package declares one. "full" decodes the whole clip in a single pass (the
+        // old behaviour), which is only useful for measuring what windowing costs.
+        const char* env_window = std::getenv("NPU_INFERENCE_BENCH_WHISPER_WINDOW");
+        const std::string window_mode = (env_window && *env_window) ? env_window : "product";
+        if (window_mode != "product" && window_mode != "full") {
+            throw std::runtime_error(
+                "NPU_INFERENCE_BENCH_WHISPER_WINDOW=" + window_mode +
+                " is not a window mode (use 'product' or 'full')");
+        }
+        windowed_ = (window_mode == "product") && pkg_.product_samples > 0 && pkg_.product_hop > 0;
+        strategy_ = pkg_.multilingual ? "static-no-kv-multi-7s" : "static-no-kv";
+        if (windowed_) {
+            const int window_s = pkg_.product_samples / pkg_.sample_rate;
+            const int overlap_s = (pkg_.product_samples - pkg_.product_hop) / pkg_.sample_rate;
+            strategy_ += "-sliding" + std::to_string(window_s) + "s-ov" + std::to_string(overlap_s) + "s";
+        }
+
         mel_filters_ = fe::parse_mel_filters(dir / "preprocessor_config.json");
         vocab_ = fe::load_vocab(dir / "vocab.json");
         const std::string gc = fe::read_text(dir / "generation_config.json");
@@ -163,9 +335,34 @@ public:
         pad_ = fe::json_int(gc, "pad_token_id", eos_);
         no_timestamps_ = fe::json_int(gc, "no_timestamps_token_id", pkg_.multilingual ? 50363 : 50362);
         // <|transcribe|> / <|translate|> — multilingual only
-        transcribe_ = fe::json_int(gc, "transcribe_token_id", 50359);
-        translate_ = fe::json_int(gc, "translate_token_id", 50358);
+        transcribe_ = task_token_id(gc, "transcribe", 50359);
+        translate_ = task_token_id(gc, "translate", 50358);
         if (pkg_.multilingual) {
+            if (transcribe_ == translate_) {
+                throw std::runtime_error(
+                    "generation_config.json gives <|transcribe|> and <|translate|> the same id (" +
+                    std::to_string(transcribe_) + "): task selection would be meaningless");
+            }
+            // Transcribe keeps the speaker's own language (what the product wants);
+            // translate asks Whisper for English out of foreign speech.
+            const char* env_task = std::getenv("NPU_INFERENCE_BENCH_WHISPER_TASK");
+            task_ = (env_task && *env_task) ? env_task : "transcribe";
+            if (task_ != "transcribe" && task_ != "translate") {
+                throw std::runtime_error(
+                    "NPU_INFERENCE_BENCH_WHISPER_TASK=" + task_ +
+                    " is not a Whisper task (use 'transcribe' or 'translate')");
+            }
+            // Translation needs the whole utterance: rendering half a sentence into
+            // English, then the other half, and gluing the fragments measured 203% WER
+            // against 92% for a single pass. Refuse the combination rather than return
+            // a transcript that looks plausible and is not.
+            if (windowed_ && task_ == "translate") {
+                throw std::runtime_error(
+                    "NPU_INFERENCE_BENCH_WHISPER_TASK=translate cannot be combined with the "
+                    "product window (" + std::to_string(pkg_.product_samples / pkg_.sample_rate) +
+                    "s): stitched fragments are not a translation. Set "
+                    "NPU_INFERENCE_BENCH_WHISPER_WINDOW=full to translate whole clips.");
+            }
             // Language is detected per clip unless pinned. Defaulting to <|en|> makes
             // Whisper paraphrase non-English speech into English instead of
             // transcribing it verbatim, so an unset env var means "auto".
@@ -203,7 +400,89 @@ public:
 
     TranscribeResult transcribe(const AudioSamples& audio) override {
         const auto t0 = std::chrono::steady_clock::now();
+        // Language is detected on the first window and reused: re-detecting per window
+        // lets one noisy window switch language mid-utterance.
+        detected_token_ = -1;
 
+        const std::vector<std::vector<float>> windows = split_windows(audio);
+        std::string text;
+        long total_tokens = 0;
+        double total_logprob = 0.0;
+        for (const std::vector<float>& window : windows) {
+            const WindowDecode decoded = decode_window(window);
+            text = stitch_transcripts(text, decoded.text);
+            total_tokens += decoded.generated_tokens;
+            total_logprob += decoded.logprob_sum;
+        }
+
+        TranscribeResult out;
+        out.text = text;
+        out.infer_seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        out.generated_tokens = total_tokens;
+        out.sequence_logprob = total_logprob;
+        if (total_tokens > 0) {
+            out.avg_logprob = total_logprob / static_cast<double>(total_tokens);
+            out.throughput_tps = static_cast<double>(total_tokens) / out.infer_seconds;
+            out.tpot_ms = out.infer_seconds * 1000.0 / static_cast<double>(total_tokens);
+        }
+        out.ttft_ms = -1.0;
+        out.has_token_metrics = true;
+        out.runtime = ep::runtime_for(active_provider_);
+        out.model_format = "onnx";
+        out.decode_strategy = strategy_;
+        out.max_context = static_cast<long>(max_tokens_);
+        out.language = language_;
+        out.task = pkg_.multilingual ? task_ : "";
+        out.windows = static_cast<long>(windows.size());
+
+        // Finalize profiling after the first transcription (normally the harness
+        // warmup), so measured runs do not accumulate profiler overhead.
+        (void)execution_diagnostics();
+        return out;
+    }
+
+    std::string backend_name() const override { return "ONNX Runtime (unified, static)"; }
+
+private:
+    struct WindowDecode {
+        std::string text;
+        long generated_tokens = 0;
+        double logprob_sum = 0.0;
+    };
+
+    // Cut the clip into product-sized windows. Audio that already fits goes through
+    // untouched, so short-utterance behaviour is unchanged.
+    std::vector<std::vector<float>> split_windows(const AudioSamples& audio) const {
+        const size_t total = audio.size();
+        const size_t window = static_cast<size_t>(pkg_.product_samples);
+        if (!windowed_ || total == 0 || total <= window) {
+            return {std::vector<float>(audio.begin(), audio.end())};
+        }
+        const size_t hop = static_cast<size_t>(pkg_.product_hop);
+        const size_t min_new = static_cast<size_t>(pkg_.sample_rate) / 4;
+
+        std::vector<std::vector<float>> out;
+        size_t covered = 0;
+        for (size_t start = 0;; start += hop) {
+            if (start + window < total) {
+                out.emplace_back(audio.begin() + static_cast<std::ptrdiff_t>(start),
+                                 audio.begin() + static_cast<std::ptrdiff_t>(start + window));
+                covered = start + window;
+                continue;
+            }
+            // Final window is aligned to the end of the audio rather than left as a
+            // stub: a fraction-of-a-second window invites hallucinated tokens. If it
+            // would add essentially no new audio, the previous window already had it.
+            if (!out.empty() && total - covered < min_new) break;
+            out.emplace_back(audio.begin() + static_cast<std::ptrdiff_t>(total - window),
+                             audio.end());
+            break;
+        }
+        return out;
+    }
+
+    WindowDecode decode_window(const std::vector<float>& audio) {
         std::vector<float> features =
             fe::log_mel_spectrogram_fft(audio, mel_filters_, pkg_.n_samples, pkg_.n_frames);
         auto feature_tensor = tensor_float(features, {1, fe::kMelBins, pkg_.n_frames});
@@ -216,15 +495,17 @@ public:
         std::vector<float> encoder_state(encoder_ptr, encoder_ptr + encoder_count);
 
         int64_t lang_token = lang_token_;
-        if (pkg_.multilingual && lang_token < 0) lang_token = detect_language(encoder_state);
+        if (pkg_.multilingual && lang_token < 0) {
+            if (detected_token_ < 0) detected_token_ = detect_language(encoder_state);
+            lang_token = detected_token_;
+        }
 
         std::vector<int64_t> ids(static_cast<size_t>(max_tokens_), pad_);
         int64_t cur = 0;
         ids[static_cast<size_t>(cur++)] = sot_;
         if (pkg_.multilingual) {
             if (lang_token >= 0) ids[static_cast<size_t>(cur++)] = lang_token;
-            // Always transcribe: translate_ would emit English for foreign speech.
-            ids[static_cast<size_t>(cur++)] = transcribe_;
+            ids[static_cast<size_t>(cur++)] = (task_ == "translate") ? translate_ : transcribe_;
         }
         ids[static_cast<size_t>(cur++)] = no_timestamps_;
         std::vector<int64_t> generated;
@@ -280,32 +561,14 @@ public:
             ++cur;
         }
 
-        TranscribeResult out;
+        WindowDecode out;
         out.text = fe::decode_tokens(generated, vocab_, eos_);
-        out.infer_seconds =
-            std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         out.generated_tokens = n_gen;
-        out.sequence_logprob = logprob_sum;
-        if (n_gen > 0) {
-            out.avg_logprob = logprob_sum / static_cast<double>(n_gen);
-            out.throughput_tps = static_cast<double>(n_gen) / out.infer_seconds;
-            out.tpot_ms = out.infer_seconds * 1000.0 / static_cast<double>(n_gen);
-        }
-        out.ttft_ms = -1.0;
-        out.has_token_metrics = true;
-        out.runtime = ep::runtime_for(active_provider_);
-        out.model_format = "onnx";
-        out.decode_strategy = pkg_.multilingual ? "static-no-kv-multi-7s" : "static-no-kv";
-        out.max_context = static_cast<long>(max_tokens_);
-        out.language = language_;
-
-        // Finalize profiling after the first transcription (normally the harness
-        // warmup), so measured runs do not accumulate profiler overhead.
-        (void)execution_diagnostics();
+        out.logprob_sum = logprob_sum;
         return out;
     }
 
-    std::string backend_name() const override { return "ONNX Runtime (unified, static)"; }
+public:
     std::string device_name() const override { return active_provider_; }
     std::string runtime_version() const override { return Ort::GetVersionString(); }
     ExecutionDiagnostics execution_diagnostics() const override {
@@ -382,6 +645,10 @@ private:
     int64_t lang_token_ = -1;  // >= 0 only when pinned; otherwise detected per clip
     std::vector<std::pair<std::string, int64_t>> lang_table_;
     std::string language_;  // pinned or last detected ISO code
+    std::string task_ = "transcribe";
+    int64_t detected_token_ = -1;  // language detected for the clip being transcribed
+    bool windowed_ = false;
+    std::string strategy_ = "static-no-kv";
     std::vector<int64_t> suppress_;
     std::vector<int64_t> begin_suppress_;
     std::vector<float> mel_filters_;

@@ -88,11 +88,48 @@ function Normalize-BenchmarkTranscript([string]$Text) {
     return $normalized.Trim()
 }
 
+# Resolve the baked baseline for one eval row. Workloads that declare a
+# `baselineKey` in the manifest are graded strictly against their own entry under
+# `baselines`, so a package with different weights (for example multilingual tiny)
+# is never compared to another package's frozen hypotheses. Workloads without a
+# key keep using the flat baseline_* fields.
+function Get-BenchmarkClipBaseline {
+    param(
+        [Parameter(Mandatory)][AllowNull()][object]$EvalRow,
+        [string]$BaselineKey = ""
+    )
+    if ($null -eq $EvalRow) { return $null }
+    if ($BaselineKey) {
+        $map = $EvalRow.baselines
+        if (-not $map -or -not ($map.PSObject.Properties.Name -contains $BaselineKey)) {
+            return $null
+        }
+        $entry = $map.$BaselineKey
+        if (-not $entry -or -not ($entry.PSObject.Properties.Name -contains "wer")) { return $null }
+        return [pscustomobject]@{
+            hyp = [string]$entry.hyp
+            wer = [double]$entry.wer
+            cer = [double]$entry.cer
+            lang = [string]$entry.lang
+            task = [string]$entry.task
+        }
+    }
+    if (-not ($EvalRow.PSObject.Properties.Name -contains "baseline_wer")) { return $null }
+    return [pscustomobject]@{
+        hyp = [string]$EvalRow.baseline_hyp
+        wer = [double]$EvalRow.baseline_wer
+        cer = [double]$EvalRow.baseline_cer
+        lang = [string]$EvalRow.baseline_lang
+        task = [string]$EvalRow.baseline_task
+    }
+}
+
 function Measure-BenchmarkWhisperBaselineAgreement {
     param(
         [Parameter(Mandatory)][object[]]$ClipResults,
         [Parameter(Mandatory)][object[]]$EvalRows,
-        [Parameter(Mandatory)][object]$Aggregate
+        [Parameter(Mandatory)][object]$Aggregate,
+        [string]$BaselineKey = ""
     )
     $byId = @{}
     foreach ($row in $EvalRows) { $byId[[string]$row.id] = $row }
@@ -101,6 +138,8 @@ function Measure-BenchmarkWhisperBaselineAgreement {
         (Test-BenchmarkFiniteNumber $Aggregate.cer)
     $compared = 0
     $hypMismatches = 0
+    $langDrifts = 0
+    $taskDrifts = 0
     $baselineWordEdits = 0.0
     $baselineRefWords = 0.0
     $baselineCharEdits = 0.0
@@ -109,19 +148,31 @@ function Measure-BenchmarkWhisperBaselineAgreement {
 
     foreach ($clip in $ClipResults) {
         $id = if ($clip.eval_id) { [string]$clip.eval_id } else { [string]$clip.id }
-        $eval = $byId[$id]
-        if (-not $eval -or -not ($eval.PSObject.Properties.Name -contains "baseline_wer")) {
-            continue
-        }
+        $baseline = Get-BenchmarkClipBaseline -EvalRow $byId[$id] -BaselineKey $BaselineKey
+        if (-not $baseline) { continue }
         $compared++
         $hyp = if ($clip.text) { [string]$clip.text } else { [string]$clip.transcription }
-        $baselineHyp = [string]$eval.baseline_hyp
+        $baselineHyp = $baseline.hyp
         if ($baselineHyp -and
             (Normalize-BenchmarkTranscript $hyp) -ne (Normalize-BenchmarkTranscript $baselineHyp)) {
             $hypMismatches++
         }
-        $baselineWer = [double]$eval.baseline_wer
-        $baselineCer = [double]$eval.baseline_cer
+        # Whisper picks the language per clip, so a run that detects a different one
+        # is transcribing (or worse, translating) something else entirely -- treat it
+        # as drift even when WER happens to land nearby. Baselines predating language
+        # capture record none, and stay uncompared.
+        $lang = [string]$clip.language
+        $baselineLang = $baseline.lang
+        $langMatches = (-not $baselineLang) -or ($lang -eq $baselineLang)
+        if (-not $langMatches) { $langDrifts++ }
+        # Same reasoning for transcribe vs translate: the transcript is answering a
+        # different question, so it must not be graded as though it were the baseline's.
+        $task = [string]$clip.task
+        $baselineTask = $baseline.task
+        $taskMatches = (-not $baselineTask) -or ($task -eq $baselineTask)
+        if (-not $taskMatches) { $taskDrifts++ }
+        $baselineWer = $baseline.wer
+        $baselineCer = $baseline.cer
         $clipWer = [double]$clip.wer
         $clipCer = [double]$clip.cer
         if (Test-BenchmarkFiniteNumber $clip.ref_words) {
@@ -144,6 +195,12 @@ function Measure-BenchmarkWhisperBaselineAgreement {
                 -not $baselineHyp -or
                 (Normalize-BenchmarkTranscript $hyp) -eq (Normalize-BenchmarkTranscript $baselineHyp)
             )
+            language = $lang
+            baseline_language = $baselineLang
+            language_matches_baseline = $langMatches
+            task = $task
+            baseline_task = $baselineTask
+            task_matches_baseline = $taskMatches
         })
     }
 
@@ -158,6 +215,8 @@ function Measure-BenchmarkWhisperBaselineAgreement {
         outputs_finite = $finite
         compared = $compared
         decision_flips = $hypMismatches
+        language_drifts = $langDrifts
+        task_drifts = $taskDrifts
         max_abs_probability_difference = $null
         basis = $(if ($compared -gt 0) {
             "human-transcript-reference+baked-baseline"
@@ -233,6 +292,8 @@ function New-BenchmarkAccuracyRecord {
             accuracy_eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or [bool]$ExecutionProfile.accuracyEligible
             npu_operation_assignment_recorded = $npuOperationAssignmentRecorded
             baseline_compared = ([int]$ReferenceAgreement.compared -gt 0)
+            no_language_drift = ([int]$ReferenceAgreement.language_drifts -eq 0)
+            no_task_drift = ([int]$ReferenceAgreement.task_drifts -eq 0)
             valid = $Valid
         }
         metrics = $Result

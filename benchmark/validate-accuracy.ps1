@@ -1,6 +1,21 @@
+# Validates the accuracy evidence for the current environment: the suite writes one
+# results/accuracy-runs/<environment-snapshot-id>.jsonl per environment, and the last
+# invocation in the attempt ledger says which of them is current.
+#
+# -All validates every ledger ever written instead, which is a different and much
+# stronger claim -- that no run on any past build or host ever failed the gate. One
+# honestly-recorded failure (an NPU run that fell back to the GPU, say) then fails this
+# check forever, and the only ways out are to keep -All out of CI or to delete evidence
+# of a real failure. Hence the default.
+#
+#   .\benchmark\validate-accuracy.ps1
+#   .\benchmark\validate-accuracy.ps1 -All
+#   .\benchmark\validate-accuracy.ps1 -Ledger results\accuracy-runs\<id>.jsonl
+
 [CmdletBinding()]
 param(
     [string]$Ledger = "",
+    [switch]$All,
     [switch]$AllowInvalid
 )
 
@@ -9,18 +24,43 @@ $ErrorActionPreference = "Stop"
 Initialize-BenchmarkConsole
 $root = Split-Path $PSScriptRoot -Parent
 $isAggregateValidation = -not [bool]$Ledger
+$runDirectory = Join-Path $root "results\accuracy-runs"
+$scope = "explicit ledger"
 $ledgerPaths = if ($Ledger) {
     @($Ledger)
-} else {
+} elseif ($All) {
+    $scope = "every recorded environment"
     $paths = @()
     $legacyLedger = Join-Path $root "results\ledgers\accuracy.jsonl"
     if (Test-Path -LiteralPath $legacyLedger) { $paths += $legacyLedger }
-    $runDirectory = Join-Path $root "results\accuracy-runs"
     if (Test-Path -LiteralPath $runDirectory) {
         $paths += @(Get-ChildItem -LiteralPath $runDirectory -Filter "*.jsonl" -File |
             Sort-Object Name | Select-Object -ExpandProperty FullName)
     }
     $paths
+} else {
+    # Which environment is current comes from the last invocation in the rolling attempt
+    # ledger, not from file timestamps: restoring or copying an old evidence file would
+    # otherwise make it look like the newest run and quietly change what gets validated.
+    $attemptLedger = Join-Path $root "results\ledgers\attempts.jsonl"
+    $currentId = ""
+    if (Test-Path -LiteralPath $attemptLedger) {
+        $attempts = @(Get-Content -LiteralPath $attemptLedger -Encoding UTF8 |
+            Where-Object { $_.Trim() })
+        if ($attempts.Count) {
+            $currentId = [string](($attempts[-1] | ConvertFrom-Json).environment_snapshot_id)
+        }
+    }
+    if (-not $currentId) {
+        throw ("Cannot tell which environment is current: $attemptLedger is missing or empty. " +
+            "Run benchmark\run-suite.ps1, or pass -Ledger <file> / -All.")
+    }
+    $currentPath = Join-Path $runDirectory "$currentId.jsonl"
+    if (-not (Test-Path -LiteralPath $currentPath)) {
+        throw "The last suite invocation ($currentId) recorded no accuracy evidence: $currentPath"
+    }
+    $scope = "current environment $currentId"
+    @($currentPath)
 }
 foreach ($path in $ledgerPaths) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Accuracy ledger does not exist: $path" }
@@ -51,6 +91,12 @@ foreach ($record in $records) {
     }
     if ([int]$record.reference_agreement.decision_flips -ne 0) {
         $errors.Add("$($record.workload_id)/$($record.execution_profile): reference decision flip")
+    }
+    if ([int]$record.reference_agreement.language_drifts -ne 0) {
+        $errors.Add("$($record.workload_id)/$($record.execution_profile): detected language differs from baseline")
+    }
+    if ([int]$record.reference_agreement.task_drifts -ne 0) {
+        $errors.Add("$($record.workload_id)/$($record.execution_profile): Whisper task differs from baseline")
     }
     $intended = Test-BenchmarkIntendedProvider $record.metrics ([string]$record.requested_device)
     if ([bool]$record.trust_gate.intended_provider_resolved -ne $intended) {
@@ -98,13 +144,17 @@ if ($wholeNpu.Count) { $errors.Add("whole-graph FakeAudio NPU appeared in the ac
 
 $whisperCohorts = @($records | Where-Object { $_.workload_kind -eq "asr" } |
     Select-Object -ExpandProperty execution_profile -Unique)
-if ($isAggregateValidation -and
+# Only demanded of a scope that recorded ASR at all: a classifier-only run has no
+# Whisper cohorts to be missing.
+if ($isAggregateValidation -and $whisperCohorts.Count -and
     ("static-onnx" -notin $whisperCohorts -or "dynamic-kv-onnx" -notin $whisperCohorts)) {
     $errors.Add("static and dynamic Whisper cohorts were not both recorded")
 }
 
 if ($errors.Count) {
-    $errors | ForEach-Object { Write-Error $_ }
+    # -ErrorAction Continue: the script-wide "Stop" preference would otherwise make
+    # the first Write-Error terminate and hide every remaining finding.
+    $errors | ForEach-Object { Write-Error $_ -ErrorAction Continue }
     exit 1
 }
 
@@ -115,6 +165,7 @@ $npuAssignments = @($records | Where-Object {
 }).Count
 $runtimes = @($records | Select-Object -ExpandProperty runtime_target -Unique | Sort-Object)
 Write-Host "Accuracy evidence valid: $valid / $($records.Count) records" -ForegroundColor Green
+Write-Host "Scope                : $scope"
 Write-Host "Accuracy sources     : $($ledgerPaths.Count)"
 Write-Host "Runtime targets      : $($runtimes -join ', ')"
 Write-Host "Whisper cohorts      : $($whisperCohorts -join ', ')"

@@ -19,8 +19,16 @@ invocation-scoped accuracy evidence. The default suite mode is
 campaign file instead of appending to a shared tracked ledger.
 
 `ledgers/accuracy.jsonl` is the frozen pre-migration history. New campaigns must
-not append to it. `benchmark/validate-accuracy.ps1` reads that history together
-with every run-scoped accuracy file by default.
+not append to it. `benchmark/validate-accuracy.ps1` validates one environment by
+default — the one the last suite invocation recorded, per `ledgers/attempts.jsonl`
+— and reads that frozen history together with every run-scoped file only under
+`-All`.
+
+`-All` asserts that no run on any past build or host ever failed the trust gate,
+which the recorded history does not satisfy: three records from 2026-07-15 asked
+for the NPU and resolved to `DmlExecutionProvider`, and two others recorded a
+reference decision flip. That is the gate doing its job, so those records stay.
+Use `-All` to audit history, not as a pass/fail gate.
 
 `ledgers/asr.csv` and `ledgers/classifiers.csv` contain latency measurements
 created only by explicit `-Mode latency` runs.

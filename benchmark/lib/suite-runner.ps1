@@ -159,17 +159,37 @@ function Invoke-NativeBenchmark {
         $intended = @($clipResults | Where-Object {
             -not (Test-BenchmarkIntendedProvider $_ $RequestedDevice)
         }).Count -eq 0
+        $baselineKey = if ($Workload.PSObject.Properties.Name -contains "baselineKey") {
+            [string]$Workload.baselineKey
+        } else { "" }
         $agreement = Measure-BenchmarkWhisperBaselineAgreement `
-            -ClipResults $clipResults -EvalRows $evalRows -Aggregate $aggregate
+            -ClipResults $clipResults -EvalRows $evalRows -Aggregate $aggregate `
+            -BaselineKey $baselineKey
         if ($null -ne $agreement.baseline_wer) {
             $aggregate | Add-Member -NotePropertyName baseline_wer -NotePropertyValue $agreement.baseline_wer
             $aggregate | Add-Member -NotePropertyName baseline_cer -NotePropertyValue $agreement.baseline_cer
             $aggregate | Add-Member -NotePropertyName wer_delta -NotePropertyValue $agreement.wer_delta
             $aggregate | Add-Member -NotePropertyName cer_delta -NotePropertyValue $agreement.cer_delta
-            Write-Host ("baseline   : WER={0:P2} CER={1:P2}  delta WER={2:+0.000%} CER={3:+0.000%}  hyp_mismatches={4}/{5}" -f `
+            Write-Host ("baseline   : WER={0:P2} CER={1:P2}  delta WER={2:+0.000%} CER={3:+0.000%}  hyp_mismatches={4}/{5}  lang_drift={6}/{5}" -f `
                 $agreement.baseline_wer, $agreement.baseline_cer,
                 $agreement.wer_delta, $agreement.cer_delta,
-                $agreement.decision_flips, $agreement.compared) -ForegroundColor DarkCyan
+                $agreement.decision_flips, $agreement.compared,
+                $agreement.language_drifts) -ForegroundColor DarkCyan
+        }
+        if ([int]$agreement.language_drifts -gt 0) {
+            $drifted = @($agreement.clips |
+                Where-Object { -not $_.language_matches_baseline } |
+                ForEach-Object { "$($_.id): $($_.baseline_language) -> $(if ($_.language) { $_.language } else { '(none)' })" })
+            Write-Warning ("$($Workload.id)/$($ExecutionProfile.id): detected language differs from baseline " +
+                "on $([int]$agreement.language_drifts)/$([int]$agreement.compared) clips - " + ($drifted -join ', '))
+        }
+        if ([int]$agreement.task_drifts -gt 0) {
+            $tasks = @($agreement.clips |
+                Where-Object { -not $_.task_matches_baseline } |
+                ForEach-Object { "$($_.baseline_task) -> $(if ($_.task) { $_.task } else { '(none)' })" } |
+                Select-Object -Unique)
+            Write-Warning ("$($Workload.id)/$($ExecutionProfile.id): Whisper task differs from baseline " +
+                "on $([int]$agreement.task_drifts)/$([int]$agreement.compared) clips - " + ($tasks -join ', '))
         }
         $eligible = -not ($ExecutionProfile.PSObject.Properties.Name -contains "accuracyEligible") -or
             [bool]$ExecutionProfile.accuracyEligible
@@ -178,7 +198,17 @@ function Invoke-NativeBenchmark {
         if ($RequestedDevice -eq "npu" -and -not $assignmentRecorded) {
             Write-Warning "$($Workload.id)/$($ExecutionProfile.id): NPU operation assignment was not recorded"
         }
-        $baselineOk = ([int]$agreement.compared -eq 0) -or ([int]$agreement.decision_flips -eq 0)
+        # A run is only certifiable when it was actually compared against a baked
+        # baseline. Comparing nothing is not the same as agreeing with everything.
+        $baselineOk = ([int]$agreement.compared -gt 0) -and
+            ([int]$agreement.decision_flips -eq 0) -and
+            ([int]$agreement.language_drifts -eq 0) -and
+            ([int]$agreement.task_drifts -eq 0)
+        if ([int]$agreement.compared -eq 0) {
+            $keyLabel = if ($baselineKey) { $baselineKey } else { "flat baseline_* fields" }
+            Write-Warning ("$($Workload.id)/$($ExecutionProfile.id): no baked baseline compared " +
+                "(key: $keyLabel) - run tools/eval/bake-whisper-baselines.ps1")
+        }
         $valid = $finite -and $intended -and $eligible -and $assignmentRecorded -and $baselineOk
         $record = New-BenchmarkAccuracyRecord -Workload $Workload `
             -ExecutionProfile $ExecutionProfile -RuntimeTarget $Runtime `
