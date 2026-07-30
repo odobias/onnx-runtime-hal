@@ -15,9 +15,9 @@
     the top level next to the other hand-uploaded payload,
     ai-models-generic-local/sherpa-onnx/whisper/small/1/.
 
-    Paths include the short commit of the HAL checkout that produced the bytes.
-    That makes a re-export land beside the old copy instead of silently
-    replacing it, which matters because the WER baselines committed in
+    Upload paths are content-addressed: a short digest over the payload's own
+    SHA-256 list, so a re-export lands beside the old copy instead of silently
+    replacing it. That matters because the WER baselines committed in
     AvastClient are only meaningful against one specific export.
 
     Uploads are skipped when a file of the same SHA-256 is already at the
@@ -70,21 +70,28 @@ if (-not $DryRun -and [string]::IsNullOrWhiteSpace($Token))
         "set ARTIFACTORY_TOKEN, or use -DryRun.")
 }
 
-Push-Location $HalRoot
-try
+# Name the upload directory after the payload itself: SHA-256 over the sorted
+# "<file>:<sha256>" list, truncated. Not after a git commit, which was the
+# obvious first choice and is wrong twice over -- /artifacts/** is gitignored, so
+# no commit describes these bytes at all, and HEAD would rewrite every URL
+# whenever an unrelated file changed.
+#
+# Content addressing gives exactly the property the WER baselines need: the path
+# changes when and only when the payload does, so a re-export cannot land on top
+# of the export a committed baseline was measured against.
+function Get-PayloadDigest([hashtable]$shaByName)
 {
-    $commit = (& git rev-parse --short HEAD).Trim()
-    $dirty = [bool](& git status --porcelain -- artifacts/workloads)
-}
-finally
-{
-    Pop-Location
-}
-
-if ($dirty)
-{
-    Write-Warning ("artifacts/workloads has uncommitted changes; the bytes you " +
-        "upload will not match commit $commit that names them.")
+    $lines = $shaByName.Keys | Sort-Object | ForEach-Object { "${_}:$($shaByName[$_])" }
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try
+    {
+        return (($sha.ComputeHash($bytes) | ForEach-Object { '{0:x2}' -f $_ }) -join '').Substring(0, 12)
+    }
+    finally
+    {
+        $sha.Dispose()
+    }
 }
 
 # The 4 files StaticOrtSession.cpp actually opens, plus the rest of the HF
@@ -192,12 +199,10 @@ foreach ($asset in $assets)
         throw "asset source missing: $sourceDir"
     }
 
-    Write-Host ""
-    Write-Host ("=== {0} @ {1}" -f $asset.Name, $commit) -ForegroundColor Cyan
-
-    $map = [ordered]@{}
-    $sums = @()
-
+    # First pass: hash everything, because the directory name is derived from
+    # the whole payload and nothing can be uploaded before it is known.
+    $shaByName = @{}
+    $lengthByName = @{}
     foreach ($name in $asset.Files)
     {
         $source = Join-Path $sourceDir $name
@@ -205,10 +210,25 @@ foreach ($asset in $assets)
         {
             throw "$($asset.Name): $name not in the HAL tree ($source)"
         }
+        $shaByName[$name] = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLower()
+        $lengthByName[$name] = (Get-Item -LiteralPath $source).Length
+    }
 
-        $length = (Get-Item -LiteralPath $source).Length
-        $sha = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLower()
-        $target = "$BaseUrl/$Repository/whisper-npu-hal/$($asset.Name)/$commit/$name"
+    $digest = Get-PayloadDigest $shaByName
+
+    Write-Host ""
+    Write-Host ("=== {0} @ {1} ({2} file(s))" -f $asset.Name, $digest, $asset.Files.Count) `
+        -ForegroundColor Cyan
+
+    $map = [ordered]@{}
+    $sums = @()
+
+    foreach ($name in $asset.Files)
+    {
+        $source = Join-Path $sourceDir $name
+        $length = $lengthByName[$name]
+        $sha = $shaByName[$name]
+        $target = "$BaseUrl/$Repository/whisper-npu-hal/$($asset.Name)/$digest/$name"
 
         # download.ps1 derives the on-disk name as <key><extension-of-url>, so
         # the key must NOT carry the extension. sdk/sherpa-onnx-whisper-small
@@ -219,7 +239,7 @@ foreach ($asset in $assets)
         $map[$key] = $target
         $sums += ("{0}  models/{1}" -f $sha, $name)
 
-        $existing = Get-RemoteSha256 "$BaseUrl/api/storage/$Repository/whisper-npu-hal/$($asset.Name)/$commit/$name"
+        $existing = Get-RemoteSha256 "$BaseUrl/api/storage/$Repository/whisper-npu-hal/$($asset.Name)/$digest/$name"
         if ($existing -eq $sha)
         {
             Write-Host ("  = {0} ({1:N2} MB, already deployed)" -f $name, ($length / 1MB)) -ForegroundColor DarkGray
@@ -228,8 +248,12 @@ foreach ($asset in $assets)
         }
         if ($existing)
         {
-            throw ("$name exists at $target with a different checksum. " +
-                "Refusing to overwrite; upload under a fresh commit instead.")
+            # Content addressing should make this unreachable: different bytes
+            # produce a different directory. If it fires, the digest scheme is
+            # broken, so stop rather than overwrite something a baseline cites.
+            throw ("$name exists at $target with a DIFFERENT checksum, which " +
+                "should be impossible under content addressing. Refusing to " +
+                "overwrite. Expected $sha, found $existing.")
         }
 
         if ($DryRun)
