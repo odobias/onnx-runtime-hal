@@ -132,8 +132,44 @@ $assets = @(
 # of a 113 MB file over a VPN does not.
 function Test-DeployAccess([string]$token)
 {
-    $probe = "$BaseUrl/$Repository/whisper-npu-hal/.preflight-$([guid]::NewGuid().ToString('N'))"
     $headers = @{ "Authorization" = "Bearer $token" }
+
+    # Ask who we are FIRST, because a 403 on its own cannot tell "authenticated
+    # but unprivileged" from "credential ignored". This instance does not answer
+    # 401 for a bad token, and it lets anonymous read /api/repositories and even
+    # /api/security/encryptedPassword -- so a 200 from those endpoints is no
+    # evidence of having authenticated. Measured: a real token, deliberate
+    # rubbish and no header at all produce identical results on every one of them.
+    #
+    # This endpoint reports the principal's name, which is the one thing that
+    # actually distinguishes the two cases.
+    $identityUrl = ($BaseUrl -replace '/artifactory/?$', '') + "/ui/api/v1/ui/auth/current"
+    $who = $null
+    try
+    {
+        $who = (Invoke-RestMethod -Uri $identityUrl -Headers $headers -TimeoutSec 30).name
+    }
+    catch
+    {
+        Write-Warning ("could not determine the authenticated identity ({0}); " -f $_.Exception.Message.Trim() +
+            "continuing to the deploy probe, which is the authoritative check anyway")
+    }
+
+    if ($who -and $who -ne "anonymous")
+    {
+        Write-Host "preflight: authenticated as $who" -ForegroundColor DarkGray
+    }
+    elseif ($who -eq "anonymous")
+    {
+        throw ("preflight failed: Artifactory resolves this token to 'anonymous', " +
+            "so the credential is not being accepted at all -- it is expired, revoked, " +
+            "or was issued by a different Artifactory host than $BaseUrl. Note that a " +
+            "well-formed token is not enough: a reference token still decodes to " +
+            "'reftkn:01...' long after it stops working, and this instance answers 403 " +
+            "rather than 401, so nothing else here will tell you.")
+    }
+
+    $probe = "$BaseUrl/$Repository/whisper-npu-hal/.preflight-$([guid]::NewGuid().ToString('N'))"
     try
     {
         Invoke-RestMethod -Uri $probe -Method Put -Body "preflight" `
@@ -148,9 +184,10 @@ function Test-DeployAccess([string]$token)
         $hint = switch ($code)
         {
             401 { "the token was rejected outright; generate a fresh one" }
-            403 { "no deploy rights on $Repository for this token -- either it " +
-                  "lacks the permission or it is not a valid token, which " +
-                  "Artifactory treats as anonymous" }
+            403 { "authenticated, but without deploy rights on $Repository. The " +
+                  "identity check above passed, so this is a missing permission " +
+                  "and not a bad credential: someone with admin on $Repository " +
+                  "has to grant deploy" }
             default { $_.Exception.Message }
         }
         throw "preflight failed (HTTP $code): $hint"
