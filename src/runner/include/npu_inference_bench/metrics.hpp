@@ -13,6 +13,21 @@ namespace npu_inference_bench {
 // Lowercase, drop punctuation (keep alphanumerics + spaces + apostrophes),
 // collapse whitespace. Deliberately simple and language-agnostic-ish; good enough
 // for comparing variants on the same references (relative, not absolute, truth).
+//
+// This function defines what a `wer` in src/workloads/eval/eval.jsonl means,
+// because the harness bakes its output into those baselines. tools/validate/
+// scoring.py is a deliberate port; change one and you must change both, or the
+// Python and C++ numbers silently disagree.
+//
+// NOT language-agnostic in one important way: the loop walks bytes and the
+// C-locale isalnum/isspace/ispunct all answer false for anything >= 0x80, so
+// every non-ASCII byte falls through all three branches and is dropped.
+// Accented Latin text degrades to an accent-insensitive comparison, and a
+// script with no ASCII at all normalises to the empty string, which makes
+// ref_words zero and collapses WER to 0.0 or 1.0 with nothing in between.
+// The multilingual clips in artifacts/workloads/speech/multilingual are
+// affected. Making this Unicode-aware would invalidate every committed
+// baseline, so it is a deliberate re-bake and not a drive-by fix.
 inline std::string normalize_text(const std::string& in) {
     std::string out;
     out.reserve(in.size());

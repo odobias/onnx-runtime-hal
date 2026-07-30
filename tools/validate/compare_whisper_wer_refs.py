@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -23,6 +22,10 @@ from transformers import WhisperForConditionalGeneration, WhisperProcessor
 from transformers import WhisperTokenizer
 from transformers.models.whisper.feature_extraction_whisper import WhisperFeatureExtractor
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from scoring import normalize_text as normalize  # noqa: E402
+from scoring import wer  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 ONNX = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
 EVAL = ROOT / "src/workloads/eval/eval.jsonl"
@@ -30,30 +33,6 @@ SPEECH = ROOT / "artifacts/workloads/speech"
 
 ENC_SEQ, D_MODEL, MAXLEN = 1500, 384, 128
 FULL_SAMPLES, SR = 480000, 16000
-
-
-def normalize(text: str) -> str:
-    out: list[str] = []
-    for ch in text.lower():
-        if ch.isalnum() or ch.isspace():
-            out.append(ch)
-    return re.sub(r"\s+", " ", "".join(out)).strip()
-
-
-def wer(ref: str, hyp: str) -> float:
-    r = normalize(ref).split()
-    h = normalize(hyp).split()
-    if not r:
-        return 0.0 if not h else 1.0
-    dp = list(range(len(h) + 1))
-    for i, rw in enumerate(r, 1):
-        prev = dp[0]
-        dp[0] = i
-        for j, hw in enumerate(h, 1):
-            cur = dp[j]
-            dp[j] = prev if rw == hw else 1 + min(prev, dp[j], dp[j - 1])
-            prev = cur
-    return dp[-1] / len(r)
 
 
 def load_clips() -> list[dict]:

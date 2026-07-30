@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from pathlib import Path
@@ -28,6 +27,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import baseline  # noqa: E402  (local helpers, need the path insert above)
 from providers import DEVICE_PROVIDERS, pick_providers  # noqa: E402
 
+# wer must match the C++ harness that bakes the baselines; the soft diagnostics
+# below must not, because normalize_text deletes the non-ASCII letters they
+# exist to look for. See scoring.py.
+from scoring import normalize_text as normalize  # noqa: E402
+from scoring import normalize_unicode, wer  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
 MANIFEST = ROOT / "artifacts/workloads/speech/multilingual/manifest.jsonl"
@@ -36,38 +41,14 @@ ENC_SEQ, D_MODEL, MAXLEN = 1500, 384, 128
 FULL_SAMPLES, PRODUCT_SAMPLES, SR = 480000, 112000, 16000
 
 
-def normalize(text: str) -> str:
-    out: list[str] = []
-    for ch in text.lower():
-        if ch.isalnum() or ch.isspace():
-            out.append(ch)
-    return re.sub(r"\s+", " ", "".join(out)).strip()
-
-
-def wer(ref: str, hyp: str) -> float:
-    r = normalize(ref).split()
-    h = normalize(hyp).split()
-    if not r:
-        return 0.0 if not h else 1.0
-    dp = list(range(len(h) + 1))
-    for i, rw in enumerate(r, 1):
-        prev = dp[0]
-        dp[0] = i
-        for j, hw in enumerate(h, 1):
-            cur = dp[j]
-            dp[j] = prev if rw == hw else 1 + min(prev, dp[j], dp[j - 1])
-            prev = cur
-    return dp[-1] / len(r)
-
-
 def content_overlap(ref: str, hyp: str) -> float:
     """Fraction of ref tokens (len>=3) that appear in hyp — soft multilingual check."""
-    r = [t for t in normalize(ref).split() if len(t) >= 3]
+    r = [t for t in normalize_unicode(ref).split() if len(t) >= 3]
     if not r:
-        r = normalize(ref).split()
+        r = normalize_unicode(ref).split()
     if not r:
         return 1.0
-    h = set(normalize(hyp).split())
+    h = set(normalize_unicode(hyp).split())
     return sum(1 for t in r if t in h) / len(r)
 
 
@@ -78,10 +59,10 @@ def looks_non_english(hyp: str) -> bool:
 
 def char_recall(ref: str, hyp: str) -> float:
     """Crude char-set recall of alnum chars from ref present in hyp (order-free)."""
-    r = [c for c in normalize(ref) if c.isalnum()]
+    r = [c for c in normalize_unicode(ref) if c.isalnum()]
     if not r:
         return 1.0
-    h = set(normalize(hyp))
+    h = set(normalize_unicode(hyp))
     return sum(1 for c in r if c in h) / len(r)
 
 

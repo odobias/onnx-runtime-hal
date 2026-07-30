@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from dataclasses import dataclass
@@ -23,6 +22,8 @@ from transformers.models.whisper.feature_extraction_whisper import WhisperFeatur
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import baseline  # noqa: E402  (local helpers, need the path insert above)
 from providers import DEVICE_PROVIDERS, pick_providers  # noqa: E402
+from scoring import normalize_text as normalize  # noqa: E402
+from scoring import wer  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
@@ -39,32 +40,8 @@ JFK_REF = (
 )
 
 
-def normalize(text: str) -> str:
-    out: list[str] = []
-    for ch in text.lower():
-        if ch.isalnum() or ch.isspace():
-            out.append(ch)
-    return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
-def wer(ref: str, hyp: str) -> float:
-    r = normalize(ref).split()
-    h = normalize(hyp).split()
-    if not r:
-        return 0.0 if not h else 1.0
-    # classic Levenshtein on tokens
-    dp = list(range(len(h) + 1))
-    for i, rw in enumerate(r, 1):
-        prev = dp[0]
-        dp[0] = i
-        for j, hw in enumerate(h, 1):
-            cur = dp[j]
-            if rw == hw:
-                dp[j] = prev
-            else:
-                dp[j] = 1 + min(prev, dp[j], dp[j - 1])
-            prev = cur
-    return dp[-1] / len(r)
 
 
 def load_wav(path: Path, max_samples: int) -> tuple[np.ndarray, float]:
