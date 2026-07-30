@@ -26,7 +26,13 @@
 
 .PARAMETER Token
     Artifactory identity token or API key with deploy rights on
-    ai-models-generic-local. Falls back to $env:ARTIFACTORY_TOKEN.
+    ai-models-generic-local. Falls back to $env:ARTIFACTORY_TOKEN, then to the
+    first line of the file named by -TokenFile.
+
+.PARAMETER TokenFile
+    Read the token from this file instead of passing it on a command line, where
+    it would end up in shell history and in any transcript of the session.
+    Defaults to %USERPROFILE%\.artifactory-token if that exists.
 
 .PARAMETER DryRun
     Report what would be uploaded and write models.json, but transfer nothing.
@@ -41,6 +47,7 @@
 [CmdletBinding()]
 param(
     [string]$Token = $env:ARTIFACTORY_TOKEN,
+    [string]$TokenFile = (Join-Path $env:USERPROFILE ".artifactory-token"),
     [string]$HalRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$BaseUrl = "https://artifactory.ida.avast.com/artifactory",
     [string]$Repository = "ai-models-generic-local",
@@ -53,9 +60,14 @@ chcp 65001 > $null
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 $ProgressPreference = "SilentlyContinue"
 
+if ([string]::IsNullOrWhiteSpace($Token) -and (Test-Path -LiteralPath $TokenFile))
+{
+    $Token = (Get-Content -LiteralPath $TokenFile -TotalCount 1).Trim()
+}
 if (-not $DryRun -and [string]::IsNullOrWhiteSpace($Token))
 {
-    throw "No Artifactory token. Pass -Token or set ARTIFACTORY_TOKEN, or use -DryRun."
+    throw ("No Artifactory token. Write one to $TokenFile, or pass -Token, or " +
+        "set ARTIFACTORY_TOKEN, or use -DryRun.")
 }
 
 Push-Location $HalRoot
@@ -106,6 +118,49 @@ $assets = @(
     }
 )
 
+# Prove the token can actually deploy before moving 149 MB. Artifactory has no
+# read-only way to ask "may I write here", and a token that authenticates fine
+# can still lack deploy rights on this repository, so the check is a tiny PUT
+# followed by a DELETE. Failing this costs a second; failing on byte 100 million
+# of a 113 MB file over a VPN does not.
+function Test-DeployAccess([string]$token)
+{
+    $probe = "$BaseUrl/$Repository/whisper-npu-hal/.preflight-$([guid]::NewGuid().ToString('N'))"
+    $headers = @{ "Authorization" = "Bearer $token" }
+    try
+    {
+        Invoke-RestMethod -Uri $probe -Method Put -Body "preflight" `
+            -Headers $headers -ContentType "text/plain" -TimeoutSec 60 | Out-Null
+    }
+    catch
+    {
+        $code = $_.Exception.Response.StatusCode.value__
+        # Artifactory answers an unrecognised token by falling back to anonymous
+        # rather than by rejecting it, so a typo arrives here as 403 and not 401.
+        # Do not claim the token authenticated.
+        $hint = switch ($code)
+        {
+            401 { "the token was rejected outright; generate a fresh one" }
+            403 { "no deploy rights on $Repository for this token -- either it " +
+                  "lacks the permission or it is not a valid token, which " +
+                  "Artifactory treats as anonymous" }
+            default { $_.Exception.Message }
+        }
+        throw "preflight failed (HTTP $code): $hint"
+    }
+
+    try
+    {
+        Invoke-RestMethod -Uri $probe -Method Delete -Headers $headers -TimeoutSec 60 | Out-Null
+    }
+    catch
+    {
+        # Deploy works, which is what the payload needs. Leaving a marker behind
+        # is untidy but not a reason to stop.
+        Write-Warning "preflight marker could not be removed: $probe"
+    }
+}
+
 function Get-RemoteSha256([string]$url)
 {
     try
@@ -117,6 +172,12 @@ function Get-RemoteSha256([string]$url)
     {
         return $null
     }
+}
+
+if (-not $DryRun)
+{
+    Test-DeployAccess $Token
+    Write-Host "preflight: deploy to $Repository confirmed" -ForegroundColor DarkGray
 }
 
 $uploaded = 0
