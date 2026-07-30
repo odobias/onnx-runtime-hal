@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>models.onnx.@NAME@</id>
+    <version>%VERSION%</version>
+    <title>@NAME@</title>
+    <authors>Avast</authors>
+    <owners>GEN Digital</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Whisper tiny multilingual, exported to static-shape ONNX for a 7 s product window on a 30 s mel canvas. Consumed by asw::framework::whisper StaticOrtSession.</description>
+    <summary>@NAME@</summary>
+    <tags>native sdk c++ onnx nativepackage whisper asr</tags>
+  </metadata>
+</package>

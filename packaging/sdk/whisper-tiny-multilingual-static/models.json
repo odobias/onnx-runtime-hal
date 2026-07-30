@@ -1,0 +1,15 @@
+{
+  "encoder_model": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/encoder_model.onnx",
+  "decoder_model": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/decoder_model.onnx",
+  "vocab": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/vocab.json",
+  "generation_config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/generation_config.json",
+  "config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/config.json",
+  "preprocessor_config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/preprocessor_config.json",
+  "merges": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/merges.txt",
+  "tokenizer": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/tokenizer.json",
+  "tokenizer_config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/tokenizer_config.json",
+  "special_tokens_map": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/special_tokens_map.json",
+  "added_tokens": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/added_tokens.json",
+  "normalizer": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/normalizer.json",
+  "npu_hal_package": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/28f7d7b/npu_hal_package.json"
+}
