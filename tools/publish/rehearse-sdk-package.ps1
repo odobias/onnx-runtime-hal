@@ -14,9 +14,11 @@
     stands in for download.ps1 by copying the payload from this HAL tree, then
     runs the real build-nuget.ps1 and lists the package contents.
 
-    What this does NOT cover: download.ps1 itself, since the point is to work
-    before the bytes are uploaded. Run upload-model-assets.ps1 -DryRun for the
-    URL side.
+    By default the payload is copied out of this tree, so the rehearsal works
+    without a credential. Pass -RealDownload to run the actual download.ps1
+    instead: that fetches from the pinned Hugging Face revision, verifies against
+    the committed SHA256SUMS, and then checks the result is byte-identical to the
+    local payload the WER baselines were measured on. It needs HF_TOKEN.
 
 .PARAMETER CommonRepo
     Checkout of git.int.avast.com/sdk/common, which provides create_nuget.ps1
@@ -35,7 +37,8 @@ param(
     [string]$HalRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$CommonRepo = "C:\Sources\tools\sdk-common",
     [string]$Root = (Join-Path $env:TEMP "sdk-rehearsal"),
-    [string]$Version = "1.0.0"
+    [string]$Version = "1.0.0",
+    [switch]$RealDownload
 )
 
 $ErrorActionPreference = "Stop"
@@ -74,20 +77,60 @@ $entries = @((Get-Content (Join-Path $work "models.json") -Raw | ConvertFrom-Jso
 if (-not $entries)
 {
     throw ("models.json in packaging\sdk\$Package is empty. Run " +
-        "upload-model-assets.ps1 (even with -DryRun) to generate it.")
+        "write-hf-manifests.ps1 to generate it.")
 }
-foreach ($property in $entries)
+
+if ($RealDownload)
 {
-    # Mirror download.ps1's rule exactly: <key> + extension taken from the URL.
-    $name = "$($property.Name)$($property.Value.Substring($property.Value.LastIndexOf('.')))"
-    $source = Join-Path $from $name
-    if (-not (Test-Path -LiteralPath $source))
+    # Run the actual download.ps1 under Windows PowerShell, because that is what
+    # build.cmd invokes on the agent and it is not the same interpreter as the one
+    # running this script. Its checksum verification against SHA256SUMS is the
+    # part worth exercising: it proves the URLs, the credential handling and the
+    # committed hashes all agree.
+    Write-Host "running the real download.ps1 (Windows PowerShell, as build.cmd does)" -ForegroundColor Cyan
+    Push-Location $work
+    try
     {
-        throw "models.json names $name, which is not in $from"
+        & powershell -NoProfile -File .\download.ps1 2>&1 | ForEach-Object { "  $_" }
+        if ($LASTEXITCODE -ne 0) { throw "download.ps1 exited $LASTEXITCODE" }
     }
-    Copy-Item -LiteralPath $source -Destination (Join-Path $models $name) -Force
+    finally
+    {
+        Pop-Location
+    }
+
+    # Downloading is not the same as downloading the right thing. Compare what
+    # landed against this tree, which is what the baselines were measured on.
+    $drift = @()
+    foreach ($property in $entries)
+    {
+        $name = "$($property.Name)$($property.Value.Substring($property.Value.LastIndexOf('.')))"
+        $got = Join-Path $models $name
+        $want = Join-Path $from $name
+        if (-not (Test-Path -LiteralPath $got)) { $drift += "$name : not downloaded"; continue }
+        if (-not (Test-Path -LiteralPath $want)) { continue }
+        $a = (Get-FileHash -LiteralPath $got -Algorithm SHA256).Hash
+        $b = (Get-FileHash -LiteralPath $want -Algorithm SHA256).Hash
+        if ($a -ne $b) { $drift += "$name : differs from the local payload" }
+    }
+    if ($drift) { throw ("downloaded payload does not match this tree:`n  " + ($drift -join "`n  ")) }
+    Write-Host ("downloaded {0} file(s), all identical to {1}" -f $entries.Count, $sources[$Package]) -ForegroundColor Green
 }
-Write-Host ("staged {0} file(s) into models\" -f $entries.Count)
+else
+{
+    foreach ($property in $entries)
+    {
+        # Mirror download.ps1's rule exactly: <key> + extension taken from the URL.
+        $name = "$($property.Name)$($property.Value.Substring($property.Value.LastIndexOf('.')))"
+        $source = Join-Path $from $name
+        if (-not (Test-Path -LiteralPath $source))
+        {
+            throw "models.json names $name, which is not in $from"
+        }
+        Copy-Item -LiteralPath $source -Destination (Join-Path $models $name) -Force
+    }
+    Write-Host ("staged {0} file(s) into models\ (copied locally; pass -RealDownload to fetch)" -f $entries.Count)
+}
 
 Push-Location $work
 try

@@ -35,6 +35,12 @@ same five clips.
 
 ## Provenance
 
-Uploaded from [whisper-npu-hal](https://git.int.avast.com/ai/whisper-npu-hal)
-by `tools/publish/upload-model-assets.ps1`, which regenerates `models.json` and
-`SHA256SUMS` here. `download.ps1` verifies both and fails the build on drift.
+Hosted on Hugging Face in the private `gendigital/npu-hal-over-9000`, alongside
+the model package. [whisper-npu-hal](https://github.com/odobias/whisper-npu-hal)
+generates `models.json` and `SHA256SUMS` here with
+`tools/publish/write-hf-manifests.ps1`; `download.ps1` verifies both and fails the
+build on drift.
+
+URLs pin a commit SHA, not `main`, and `download.ps1` needs `HF_TOKEN` because the
+repo is private. Only the package build job needs that token; the published
+`.nupkg` comes from Artifactory, which consuming agents read anonymously.

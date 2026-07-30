@@ -1,15 +1,15 @@
 {
-  "encoder_model": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/encoder_model.onnx",
-  "decoder_model": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/decoder_model.onnx",
-  "vocab": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/vocab.json",
-  "generation_config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/generation_config.json",
-  "config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/config.json",
-  "preprocessor_config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/preprocessor_config.json",
-  "merges": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/merges.txt",
-  "tokenizer": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/tokenizer.json",
-  "tokenizer_config": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/tokenizer_config.json",
-  "special_tokens_map": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/special_tokens_map.json",
-  "added_tokens": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/added_tokens.json",
-  "normalizer": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/normalizer.json",
-  "npu_hal_package": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/static-onnx-tiny-multi-7s/f607b8921407/npu_hal_package.json"
+  "encoder_model": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/encoder_model.onnx",
+  "decoder_model": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/decoder_model.onnx",
+  "vocab": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/vocab.json",
+  "generation_config": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/generation_config.json",
+  "config": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/config.json",
+  "preprocessor_config": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/preprocessor_config.json",
+  "merges": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/merges.txt",
+  "tokenizer": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/tokenizer.json",
+  "tokenizer_config": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/tokenizer_config.json",
+  "special_tokens_map": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/special_tokens_map.json",
+  "added_tokens": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/added_tokens.json",
+  "normalizer": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/normalizer.json",
+  "npu_hal_package": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/whisper/static-onnx-tiny-multi-7s/npu_hal_package.json"
 }

@@ -8,10 +8,39 @@ Two package recipes staged here, ready to push to `git.int.avast.com/sdk`:
 | `whisper-accuracy-samples` | `sdk/whisper-accuracy-samples` | `models.speech.whisper-accuracy-samples` |
 
 They live in HAL rather than only in the sdk repos because HAL exports the
-bytes. `tools/publish/upload-model-assets.ps1` uploads the payload and
-regenerates `models.json` and `SHA256SUMS` in both directories in one pass, so
-the recipe and the export that produced it are visible in a single diff. Once
-the sdk repos exist, each directory is pushed to its own repo root.
+bytes. `tools/publish/write-hf-manifests.ps1` regenerates `models.json` and
+`SHA256SUMS` in both directories in one pass, so the recipe and the export that
+produced it are visible in a single diff. Once the sdk repos exist, each
+directory is pushed to its own repo root.
+
+## Where the payload is hosted
+
+Hugging Face, `gendigital/npu-hal-over-9000`, pinned to a commit SHA.
+
+The first design uploaded the payload to Artifactory's `ai-models-generic-local`
+so that `download.ps1` needed no credential. Reads there really are anonymous --
+verified against the existing `sherpa-onnx` payload, `HEAD` included -- but
+writes need a deploy permission that we do not have, and Artifactory makes that
+awkward to diagnose: it never answers 401, it silently demotes an unrecognised
+token to anonymous, and it lets anonymous read `/api/repositories`. A real token,
+deliberate rubbish and no header at all all behave identically.
+
+HF needs no upload at all: the payload is already there and byte-identical to
+`artifacts/workloads/`, checked by SHA-256 rather than assumed. The trade is a
+credential, because the repo is private. That trade is cheap in this direction:
+
+- the fetch happens **once per package version, on the sdk package build agent**;
+- the resulting `.nupkg` goes to Artifactory, which every consuming agent already
+  reads anonymously.
+
+So exactly one TeamCity job needs the secret, and AvastClient's build agents need
+nothing. `tools/publish/upload-model-assets.ps1` still implements the Artifactory
+route should the deploy grant ever arrive.
+
+URLs pin a commit SHA, never `main`. `main` is mutable, and AvastClient's
+accuracy gate asserts a mean WER against one specific export -- a package that
+quietly followed a re-upload would move that number, and the failure would look
+like a code regression in a different repository entirely.
 
 ## Layout
 
@@ -27,15 +56,32 @@ see the note in `whisper-tiny-multilingual-static/README.md`.
 
 ## Publishing, end to end
 
-1. `tools/publish/upload-model-assets.ps1` with an Artifactory token that can
-   deploy to `ai-models-generic-local`. Reads from that repository are
-   anonymous, so only this step needs credentials.
+1. `tools/publish/write-hf-manifests.ps1`. Pins the current `main` of the HF repo
+   and verifies all 18 files against the local payload before writing anything.
+   Needs `HF_TOKEN`, or a token cached by `hf auth login`.
 2. Commit the regenerated `models.json` and `SHA256SUMS`.
 3. Create the two `sdk` repos and push each directory to its repo, on a branch
    named for the version (`1.0.0`). The branch name *is* the package version.
 4. Register both in [sdk/tcsettings](https://git.int.avast.com/sdk/tcsettings)
    `ProjectCommon.kt` `sdks`, one line each, with that branch as the default.
    The subproject, VCS root and publish steps are generated from the name.
+5. **Add an `HF_TOKEN` secure parameter to both generated build configurations,
+   exposed as `env.HF_TOKEN`.** Without it `download.ps1` fails immediately with
+   an explanation rather than publishing an empty package. This is the one manual
+   step the generated job does not cover.
+
+Rehearse the whole thing first, no repos and no Artifactory required:
+
+```powershell
+$env:HF_TOKEN = "<token>"
+.\tools\publish\rehearse-sdk-package.ps1 -Package whisper-accuracy-samples -RealDownload
+.\tools\publish\rehearse-sdk-package.ps1 -Package whisper-tiny-multilingual-static -RealDownload
+```
+
+`-RealDownload` runs the actual `download.ps1` under Windows PowerShell, which is
+what `build.cmd` invokes, then checks the downloaded bytes against this tree.
+Omit it to rehearse the packaging alone with no credential. Verified: 5 files and
+0.68 MB, 13 files and 85.16 MB, checksums confirmed, 33 s.
 
 ## Consuming them
 

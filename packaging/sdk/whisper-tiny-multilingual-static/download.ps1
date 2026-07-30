@@ -23,6 +23,31 @@ if (-not (Test-Path -Path $outputDir)) {
 
 $models = Get-Content -Path (Join-Path $scriptDir "models.json") -Raw | ConvertFrom-Json
 
+# The payload lives in a PRIVATE Hugging Face repo, so unlike the other sdk model
+# packages this one needs a credential. Anonymous requests get 401, and because
+# every URL here is pinned to a commit SHA rather than to main, a package built
+# today fetches exactly the export the WER baselines were measured against.
+#
+# The token is only needed HERE, on the package build agent. The resulting NuGet
+# goes to Artifactory, which the consuming build agents already read anonymously.
+$needsAuth = @($models.PSObject.Properties | Where-Object { $_.Value -like "https://huggingface.co/*" }).Count -gt 0
+$authHeader = @{}
+if ($needsAuth) {
+    $token = $env:HF_TOKEN
+    if (-not $token) {
+        $cached = Join-Path $env:USERPROFILE ".cache\huggingface\token"
+        if (Test-Path -Path $cached) { $token = (Get-Content -Path $cached -Raw).Trim() }
+    }
+    if (-not $token) {
+        throw ("models.json points at the private repo gendigital/npu-hal-over-9000, " +
+            "which returns 401 without a credential. Set the HF_TOKEN environment " +
+            "variable to a token with read access to it. In TeamCity this belongs in " +
+            "a secure parameter exposed as env.HF_TOKEN, not in this repository.")
+    }
+    $authHeader = @{ Authorization = "Bearer $token" }
+    Write-Host "Using HF_TOKEN for huggingface.co downloads."
+}
+
 $jobs = foreach ($model in $models.PSObject.Properties) {
     $url = $model.Value
     $fileName = "$($model.Name)$($url.Substring($url.LastIndexOf('.')))"
@@ -30,10 +55,10 @@ $jobs = foreach ($model in $models.PSObject.Properties) {
 
     Write-Host "Downloading $fileName from $url..."
     Start-Job -Name $fileName -ScriptBlock {
-        param($url, $path)
+        param($url, $path, $headers)
         $ProgressPreference = 'SilentlyContinue'
-        Invoke-WebRequest -Uri $url -OutFile $path -UseBasicParsing
-    } -ArgumentList $url, $target
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $path -UseBasicParsing
+    } -ArgumentList $url, $target, $authHeader
 }
 
 $failed = @()
@@ -51,7 +76,9 @@ if ($failed) {
 }
 
 # Fail loudly on drift between the committed checksums and what the URLs now
-# serve. The URLs are immutable by convention, not by Artifactory policy.
+# serve. The URLs pin a commit SHA, so this should never fire -- which is exactly
+# why it is worth checking. A silent substitution here would surface much later as
+# an unexplained WER regression in a completely different repository.
 $sumsFile = Join-Path $scriptDir "SHA256SUMS"
 if (Test-Path -Path $sumsFile) {
     $mismatched = @()

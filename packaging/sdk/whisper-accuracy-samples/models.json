@@ -1,7 +1,7 @@
 {
-  "ls_000": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/accuracy-samples/44c94ce74d1e/ls_000.wav",
-  "ls_001": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/accuracy-samples/44c94ce74d1e/ls_001.wav",
-  "ls_006": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/accuracy-samples/44c94ce74d1e/ls_006.wav",
-  "ls_008": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/accuracy-samples/44c94ce74d1e/ls_008.wav",
-  "ls_010": "https://artifactory.ida.avast.com/artifactory/ai-models-generic-local/whisper-npu-hal/accuracy-samples/44c94ce74d1e/ls_010.wav"
+  "ls_000": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/speech/ls_000.wav",
+  "ls_001": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/speech/ls_001.wav",
+  "ls_006": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/speech/ls_006.wav",
+  "ls_008": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/speech/ls_008.wav",
+  "ls_010": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/speech/ls_010.wav"
 }

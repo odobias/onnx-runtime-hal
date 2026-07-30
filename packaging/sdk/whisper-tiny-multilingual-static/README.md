@@ -25,11 +25,19 @@ a re-export or a tokenizer investigation needs, so it ships too.
 ## Provenance
 
 The bytes are produced by
-[whisper-npu-hal](https://git.int.avast.com/ai/whisper-npu-hal) and uploaded by
-its `tools/publish/upload-model-assets.ps1`, which also regenerates
-`models.json` and `SHA256SUMS` here. The Artifactory path carries the short
-commit of the HAL checkout that exported them, so a re-export lands beside the
-old copy rather than replacing it.
+[whisper-npu-hal](https://github.com/odobias/whisper-npu-hal) and hosted on
+Hugging Face in the private `gendigital/npu-hal-over-9000`. Its
+`tools/publish/write-hf-manifests.ps1` regenerates `models.json` and
+`SHA256SUMS` here, verifying every file against the local export first.
+
+Each URL pins a commit SHA rather than `main`, so a re-upload cannot silently
+change what this package version contains. That matters more than it sounds: the
+WER baselines asserted in AvastClient's `whisper_unit_test` hold for this export
+and no other.
+
+Because the repo is private, `download.ps1` needs `HF_TOKEN` with read access.
+Only the package build job needs it -- the published `.nupkg` is served from
+Artifactory, which consuming agents read anonymously.
 
 That immutability is not decoration. The Whisper accuracy gate in AvastClient
 (`framework/whisper/src/whisper_unit_test/StaticAccuracyTest.cpp`) asserts a

@@ -3,6 +3,14 @@
     Upload the Whisper static package and accuracy corpus to Artifactory, and
     write the models.json that the sdk package repos download them with.
 
+    NOT the route currently in use. The packages fetch from Hugging Face instead;
+    see tools/publish/write-hf-manifests.ps1 and packaging/sdk/README.md. This
+    script is kept because the Artifactory route is preferable in one respect --
+    reads are anonymous, so no build job needs a secret -- and it becomes usable
+    the moment somebody grants deploy on ai-models-generic-local. Nothing here is
+    stale: the preflight and the content-addressed paths were both exercised
+    against the live server.
+
 .DESCRIPTION
     The sdk model packages under git.int.avast.com/sdk fetch their payload with
     a shared download.ps1 that does a plain unauthenticated Invoke-WebRequest
