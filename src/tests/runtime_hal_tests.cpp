@@ -127,10 +127,14 @@ void test_provider_policy() {
 
 }  // namespace
 
+// Defined in metrics_tests.cpp, which keeps its own main for a standalone build.
+void test_metrics();
+
 int main() {
     try {
         test_tensor_contracts();
         test_profile_parser();
+        test_metrics();
 #ifdef NPU_INFERENCE_BENCH_ORT
         test_provider_policy();
 #endif

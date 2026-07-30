@@ -26,12 +26,8 @@ from transformers.models.whisper.feature_extraction_whisper import WhisperFeatur
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import baseline  # noqa: E402  (local helpers, need the path insert above)
 from providers import DEVICE_PROVIDERS, pick_providers  # noqa: E402
-
-# wer must match the C++ harness that bakes the baselines; the soft diagnostics
-# below must not, because normalize_text deletes the non-ASCII letters they
-# exist to look for. See scoring.py.
 from scoring import normalize_text as normalize  # noqa: E402
-from scoring import normalize_unicode, wer  # noqa: E402
+from scoring import wer  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = ROOT / "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s"
@@ -43,12 +39,12 @@ FULL_SAMPLES, PRODUCT_SAMPLES, SR = 480000, 112000, 16000
 
 def content_overlap(ref: str, hyp: str) -> float:
     """Fraction of ref tokens (len>=3) that appear in hyp — soft multilingual check."""
-    r = [t for t in normalize_unicode(ref).split() if len(t) >= 3]
+    r = [t for t in normalize(ref).split() if len(t) >= 3]
     if not r:
-        r = normalize_unicode(ref).split()
+        r = normalize(ref).split()
     if not r:
         return 1.0
-    h = set(normalize_unicode(hyp).split())
+    h = set(normalize(hyp).split())
     return sum(1 for t in r if t in h) / len(r)
 
 
@@ -59,10 +55,10 @@ def looks_non_english(hyp: str) -> bool:
 
 def char_recall(ref: str, hyp: str) -> float:
     """Crude char-set recall of alnum chars from ref present in hyp (order-free)."""
-    r = [c for c in normalize_unicode(ref) if c.isalnum()]
+    r = [c for c in normalize(ref) if c.isalnum()]
     if not r:
         return 1.0
-    h = set(normalize_unicode(hyp))
+    h = set(normalize(hyp))
     return sum(1 for c in r if c in h) / len(r)
 
 

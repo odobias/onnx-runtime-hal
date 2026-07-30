@@ -6,16 +6,16 @@
         "host": "WA-CZC5177DH7",
         "os": "Windows-11-10.0.26100-SP0",
         "provider": "CPUExecutionProvider",
-        "commit": "0f4f89a"
+        "commit": "9e03d98"
       },
-      "mean_wer": 0.1415,
+      "mean_wer": 0.1615,
       "clips": {
         "ls_000": {
           "wer": 0.0588,
           "lang": "en"
         },
         "ls_001": {
-          "wer": 0.1,
+          "wer": 0.2,
           "lang": "en"
         },
         "ls_006": {
@@ -37,9 +37,9 @@
         "host": "WA-CZC5177DH7",
         "os": "Windows-11-10.0.26100-SP0",
         "provider": "CPUExecutionProvider",
-        "commit": "0f4f89a"
+        "commit": "9e03d98"
       },
-      "mean_wer": 0.0986,
+      "mean_wer": 0.1063,
       "clips": {
         "jfk": {
           "wer": 0.0,
@@ -50,7 +50,7 @@
           "lang": "en"
         },
         "ls_001": {
-          "wer": 0.1,
+          "wer": 0.2,
           "lang": "en"
         },
         "ls_002": {
@@ -100,16 +100,16 @@
         "host": "WA-CZC5177DH7",
         "os": "Windows-11-10.0.26100-SP0",
         "provider": "CPUExecutionProvider",
-        "commit": "0f4f89a"
+        "commit": "9e03d98"
       },
-      "mean_wer": 0.4491,
+      "mean_wer": 0.4509,
       "clips": {
         "fleurs_de": {
           "wer": 0.381,
           "lang": "de"
         },
         "fleurs_fr": {
-          "wer": 0.72,
+          "wer": 0.7308,
           "lang": "fr"
         },
         "fleurs_es": {

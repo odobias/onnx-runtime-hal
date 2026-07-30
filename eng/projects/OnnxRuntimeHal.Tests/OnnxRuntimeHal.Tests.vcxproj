@@ -44,6 +44,7 @@
 
   <ItemGroup>
     <ClCompile Include="$(NpuInferenceBenchRoot)src\tests\runtime_hal_tests.cpp" />
+    <ClCompile Include="$(NpuInferenceBenchRoot)src\tests\metrics_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OnnxRuntimeHal\OnnxRuntimeHal.vcxproj">

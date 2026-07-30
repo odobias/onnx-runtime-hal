@@ -1,0 +1,59 @@
+# Shared normalisation corpus, read by BOTH implementations.
+#
+# The scorer exists three times -- metrics.hpp, tools/validate/scoring.py and
+# AvastClient's whisper_unit_test Wer.cpp -- and every one of them is supposed to
+# behave identically. They did not: the Python copies deleted the apostrophe the
+# C++ one keeps, which put the reported error rate below the baseline it was
+# being compared against, and nothing failed. Each copy had its own tests, and
+# each copy passed its own tests.
+#
+# So the copies are now checked against each other on this file rather than
+# against separately invented expectations. Add a line here when a rule changes;
+# it is the one place that makes a divergence show up.
+#
+# Format: one input per line, UTF-8, no trailing whitespace. Lines starting with
+# '#' and blank lines are ignored. Leading and trailing spaces cannot be
+# expressed and do not need to be: they are covered by the unit tests either
+# side, which can quote them.
+Hello   WORLD
+tabs	and newlines
+up-guards and at 'em!
+Mister Quilter's manner
+QUILTER'S
+Quilters'
+Mr. Quilter, is he?
+a(b)c[d]
+...hello!!!
+a -- b
+1234 and 5.6
+don't
+Ondřej řekl ano
+ONDŘEJ ŘEKL ANO
+Ondšej
+Die Höhle befindet sich auf der Spitze
+DIE HÖHLE
+Škoda, žena, kůra, ěčřďňťů
+ŠKODA ŽENA KŮRA
+il a ajouté qu'on ne devrait pas
+Il A AJOUTÉ QU'ON
+fue tanta la cantidad de gente que se concentró
+¿Qué pasó? ¡Nada!
+kůra je silná přibližně 70 km
+ΑΒΓΔΕΖΗΘ
+αβγδεζηθ
+ДАЖЕ ЕСЛИ
+даже если
+日本語
+日本語のテキスト
+中国
+日　本
+don’t
+wait… now
+«oui»
+a b
+straße
+İstanbul
+ǅ
+ﬀ
+Ÿ
+ſ

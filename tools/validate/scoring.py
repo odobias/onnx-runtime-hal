@@ -17,25 +17,23 @@ inside the gap, disguised as an improvement.
 Run `python scoring.py --self-test` to check the port against every committed
 baseline and against the edge cases that corpus happens not to exercise.
 
-KNOWN LIMITATION, inherited on purpose
---------------------------------------
-The C++ scorer walks bytes and uses the C-locale std::isalnum / isspace /
-ispunct. Every byte >= 0x80 therefore matches no branch and is dropped, so
-non-ASCII text does not survive normalisation:
+Both are now Unicode-aware. They were not always: the original walked bytes with
+the C-locale classifiers, which answer false for everything >= 0x80, so all
+non-ASCII was silently deleted. That was not a rounding error. The accented byte
+was dropped rather than folded, so "Ondrej" MISMATCHED an accented reference
+while two different accented letters compared EQUAL, and a reference in a script
+with no ASCII normalised to nothing, which made any hypothesis in that script
+score a perfect 0.0 -- Japanese against Chinese included.
 
-    "Ondrej rekl" with accents -> "ondej ekl"      (accents deleted)
-    Japanese                   -> ""               (nothing left at all)
+Fixing it moved no committed baseline, because every ref and hyp in eval.jsonl is
+pure ASCII. That was checked before the change, not hoped for afterwards.
 
-For Latin scripts this silently degrades WER into an accent-insensitive metric.
-For scripts with no ASCII at all the reference normalises to empty, ref_words is
-zero, and the result collapses to 0.0 or 1.0 with no signal in between. Six
-clips in artifacts/workloads/speech/multilingual/manifest.jsonl have non-ASCII
-references and are affected.
-
-This port reproduces that behaviour rather than quietly improving on it, because
-diverging here would mean the Python and C++ numbers disagree again -- which is
-the exact bug being fixed. Making the metric Unicode-aware is a separate change
-that invalidates every committed baseline and needs a re-bake.
+Case folding covers ASCII, Latin-1 Supplement, Latin Extended-A, Greek and
+Cyrillic. Scripts outside that set are left alone, which is right rather than
+merely cheap: CJK, Kana, Hangul, Arabic, Hebrew, Devanagari and Thai have no case
+to fold. Python could of course just call str.lower(), but this module has to
+agree with a dependency-free C++ header byte for byte, so it deliberately does
+only what that header does.
 """
 
 from __future__ import annotations
@@ -47,7 +45,8 @@ from pathlib import Path
 
 __all__ = [
     "normalize_text",
-    "normalize_unicode",
+    "simple_lowercase",
+    "is_non_ascii_separator",
     "split_words",
     "edit_distance",
     "error_rate",
@@ -56,57 +55,103 @@ __all__ = [
 ]
 
 
-def _c_isalnum(byte: int) -> bool:
-    return (48 <= byte <= 57) or (65 <= byte <= 90) or (97 <= byte <= 122)
+def _c_isalnum(cp: int) -> bool:
+    return (48 <= cp <= 57) or (65 <= cp <= 90) or (97 <= cp <= 122)
 
 
-def _c_isspace(byte: int) -> bool:
+def _c_isspace(cp: int) -> bool:
     # space, \t, \n, \v, \f, \r
-    return byte == 32 or 9 <= byte <= 13
+    return cp == 32 or 9 <= cp <= 13
 
 
-def _c_ispunct(byte: int) -> bool:
-    return 33 <= byte <= 126 and not _c_isalnum(byte)
+def _c_ispunct(cp: int) -> bool:
+    return 33 <= cp <= 126 and not _c_isalnum(cp)
+
+
+def simple_lowercase(cp: int) -> int:
+    """Port of npu_inference_bench::simple_lowercase.
+
+    Not str.lower(): this has to agree with a dependency-free C++ header, which
+    covers ASCII, Latin-1 Supplement, Latin Extended-A, Greek and Cyrillic and
+    leaves the caseless scripts alone.
+    """
+    if cp < 0x80:
+        return cp + 0x20 if 0x41 <= cp <= 0x5A else cp
+    if 0x00C0 <= cp <= 0x00D6 or 0x00D8 <= cp <= 0x00DE:
+        return cp + 0x20
+    if 0x0100 <= cp <= 0x0137:
+        if cp in (0x0130, 0x0131):
+            return cp
+        return cp + 1 if cp % 2 == 0 else cp
+    if 0x0139 <= cp <= 0x0148:
+        return cp + 1 if cp % 2 == 1 else cp
+    if 0x014A <= cp <= 0x0177:
+        return cp + 1 if cp % 2 == 0 else cp
+    if cp == 0x0178:
+        return 0x00FF
+    if 0x0179 <= cp <= 0x017E:
+        return cp + 1 if cp % 2 == 1 else cp
+    if cp == 0x017F:
+        return 0x73  # long s -> s
+    if cp == 0x0386:
+        return 0x03AC
+    if 0x0388 <= cp <= 0x038A:
+        return cp + 0x25
+    if cp == 0x038C:
+        return 0x03CC
+    if 0x038E <= cp <= 0x038F:
+        return cp + 0x3F
+    if 0x0391 <= cp <= 0x03A1 or 0x03A3 <= cp <= 0x03AB:
+        return cp + 0x20
+    if 0x0400 <= cp <= 0x040F:
+        return cp + 0x50
+    if 0x0410 <= cp <= 0x042F:
+        return cp + 0x20
+    return cp
+
+
+def is_non_ascii_separator(cp: int) -> bool:
+    """Port of npu_inference_bench::is_non_ascii_separator."""
+    return (
+        0x00A0 <= cp <= 0x00BF
+        or cp in (0x00D7, 0x00F7)
+        or 0x2000 <= cp <= 0x206F
+        or 0x2E00 <= cp <= 0x2E7F
+        or 0x3000 <= cp <= 0x303F
+        or 0xFE10 <= cp <= 0xFE1F
+        or 0xFE30 <= cp <= 0xFE4F
+        or 0xFF01 <= cp <= 0xFF20
+        or 0xFF3B <= cp <= 0xFF40
+        or 0xFF5B <= cp <= 0xFF65
+    )
 
 
 def normalize_text(text: str) -> str:
     """Lowercase, keep alphanumerics and the apostrophe, collapse everything else.
 
     Punctuation becomes a separator rather than vanishing, so "up-guards" is two
-    words and not one. Bytes >= 0x80 are dropped; see the module docstring.
+    words and not one. Letters of every script survive.
     """
     out: list[str] = []
-    for byte in text.encode("utf-8"):
-        if _c_isalnum(byte):
-            out.append(chr(byte).lower())
-        elif byte == 0x27:  # '
-            out.append("'")
-        elif _c_isspace(byte) or _c_ispunct(byte):
-            if out and out[-1] != " ":
-                out.append(" ")
-    while out and out[-1] == " ":
-        out.pop()
-    return "".join(out)
 
-
-def normalize_unicode(text: str) -> str:
-    """Same shape as normalize_text, but letters of every script survive.
-
-    Do NOT score baselines with this: it disagrees with the C++ harness on any
-    non-ASCII text and would reopen the bug this module exists to close. It is
-    here for the soft multilingual diagnostics -- content overlap and character
-    recall -- whose entire purpose is judging non-English output, and which
-    normalize_text would reduce to noise by deleting the very characters that
-    make a transcript Czech rather than English.
-    """
-    out: list[str] = []
-    for ch in text:
-        if ch.isalnum():
-            out.append(ch.lower())
-        elif ch == "'":
-            out.append("'")
-        elif out and out[-1] != " ":
+    def separate() -> None:
+        if out and out[-1] != " ":
             out.append(" ")
+
+    for ch in text:
+        cp = ord(ch)
+        if cp < 0x80:
+            if _c_isalnum(cp):
+                out.append(ch.lower())
+            elif cp == 0x27:  # '
+                out.append("'")
+            elif _c_isspace(cp) or _c_ispunct(cp):
+                separate()
+        elif is_non_ascii_separator(cp):
+            separate()
+        else:
+            out.append(chr(simple_lowercase(cp)))
+
     while out and out[-1] == " ":
         out.pop()
     return "".join(out)
@@ -153,6 +198,8 @@ def error_rate(reference: str, hypothesis: str) -> ErrorRate:
     result.word_edits = edit_distance(rw, hw)
     result.wer = result.word_edits / result.ref_words if rw else (0.0 if not hw else 1.0)
 
+    # Code points, not bytes: over UTF-8 a single wrong accented letter would
+    # count as three errors and penalise a language for its encoding.
     rc, hc = list(r), list(h)
     result.ref_chars = len(rc)
     result.char_edits = edit_distance(rc, hc)
@@ -186,18 +233,35 @@ def _self_test() -> int:
     check("whitespace collapses", normalize_text("  a \t\n b  "), "a b")
     check("trailing punctuation trimmed", normalize_text("hello."), "hello")
     check("leading punctuation drops", normalize_text(".hello"), "hello")
-    check("accents deleted (known limitation)", normalize_text("Ond\u0159ej"), "ondej")
-    check("cjk deleted (known limitation)", normalize_text("\u65e5\u672c\u8a9e"), "")
+    print("non-ASCII survives and folds")
+    check("czech survives", normalize_text("Ond\u0159ej"), "ond\u0159ej")
+    check("czech folds", normalize_text("OND\u0158EJ"), "ond\u0159ej")
+    check("german folds", normalize_text("H\u00d6HLE"), "h\u00f6hle")
+    check("s-caron folds", normalize_text("\u0160koda"), "\u0161koda")
+    check("greek folds", normalize_text("\u0391\u0392"), "\u03b1\u03b2")
+    check("cyrillic folds", normalize_text("\u0414\u0410"), "\u0434\u0430")
+    check("cjk survives", normalize_text("\u65e5\u672c\u8a9e"), "\u65e5\u672c\u8a9e")
 
-    print("unicode variant, for the soft multilingual metrics only")
-    check("accents survive", normalize_unicode("Ond\u0159ej"), "ond\u0159ej")
-    check("cjk survives", normalize_unicode("\u65e5\u672c\u8a9e"), "\u65e5\u672c\u8a9e")
-    check("still separates punctuation", normalize_unicode("up-guards"), "up guards")
-    check("still keeps the apostrophe", normalize_unicode("Quilter's"), "quilter's")
+    print("unicode punctuation still separates")
+    check("curly quote separates", normalize_text("don\u2019t"), "don t")
+    check("ellipsis separates", normalize_text("wait\u2026 now"), "wait now")
+    check("nbsp separates", normalize_text("a\u00a0b"), "a b")
+    check("guillemets separate", normalize_text("\u00aboui\u00bb"), "oui")
     check(
-        "agrees with the C++ port on pure ASCII",
-        normalize_unicode("Up-Guards and at 'em!"),
-        normalize_text("Up-Guards and at 'em!"),
+        "ideographic space separates",
+        normalize_text("\u65e5\u3000\u672c"),
+        "\u65e5 \u672c",
+    )
+
+    print("errors that used to be invisible")
+    check("accent is a real difference", wer("Ond\u0159ej", "Ondrej"), 1.0)
+    check("two accents are not equal", wer("Ond\u0159ej", "Ond\u0161ej"), 1.0)
+    check("case alone is not", wer("Ond\u0159ej", "OND\u0158EJ"), 0.0)
+    check("japanese vs chinese", wer("\u65e5\u672c", "\u4e2d\u56fd"), 1.0)
+    check(
+        "cer counts code points, not bytes",
+        error_rate("h\u00f6hle", "h\u00e4hle").char_edits,
+        1,
     )
 
     print("scoring")
@@ -242,8 +306,54 @@ def _self_test() -> int:
     return 0
 
 
+def _cross_check(dump_path: str) -> int:
+    """Diff this port against the C++ implementation on the shared corpus.
+
+    The C++ side writes "<input>\\t<normalized>" for every case in
+    src/tests/normalization-cases.txt; this reads that back and normalises the
+    same inputs here. Checking the two implementations against EACH OTHER is the
+    point: for a long time they disagreed while both passed their own tests,
+    because each had its own separately invented expectations.
+    """
+    path = Path(dump_path)
+    if not path.exists():
+        print(f"missing {path}", file=sys.stderr)
+        return 2
+
+    mismatches = []
+    checked = 0
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        if not raw:
+            continue
+        # Split on the LAST tab, not the first: an input may contain a tab (one
+        # of the cases does, to check that it collapses), while the normalised
+        # output never can, because a tab is whitespace and becomes a space.
+        source, _, expected = raw.rpartition("\t")
+        checked += 1
+        got = normalize_text(source)
+        if got != expected:
+            mismatches.append((source, expected, got))
+
+    print(f"{checked} shared case(s) compared against the C++ implementation")
+    if mismatches:
+        print(f"{len(mismatches)} DISAGREEMENT(S):")
+        for source, expected, got in mismatches:
+            print(f"  input {source!r}")
+            print(f"    c++    {expected!r}")
+            print(f"    python {got!r}")
+        return 1
+    print("the two implementations agree on every case")
+    return 0
+
+
 if __name__ == "__main__":
     if "--self-test" in sys.argv:
         raise SystemExit(_self_test())
+    if "--cross-check" in sys.argv:
+        index = sys.argv.index("--cross-check")
+        if index + 1 >= len(sys.argv):
+            print("--cross-check needs the path to the C++ dump", file=sys.stderr)
+            raise SystemExit(2)
+        raise SystemExit(_cross_check(sys.argv[index + 1]))
     print(__doc__)
-    print("run with --self-test to verify the port")
+    print("run with --self-test, or --cross-check <c++-dump> to compare ports")
