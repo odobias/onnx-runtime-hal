@@ -1,180 +1,187 @@
-﻿# NPU Inference Benchmark
+﻿# ONNX Runtime HAL
 
-`npu-inference-bench` is a Windows C++ benchmark suite for finding out what
-actually happens when ONNX inference is requested on a CPU, GPU, or NPU.
+`onnx-runtime-hal` is a source-available Windows C++23 project centered on
+`OnnxRuntimeHal`, a reusable static library for ONNX Runtime inference across
+CPU, GPU, and NPU hardware. The repository also contains a reference CLI,
+hardware-validation workloads, packaging automation, and a benchmark harness
+that verifies where models actually execute.
 
-It benchmarks three production-shaped workloads:
+## Deliverables
 
-- **Whisper tiny.en** automatic speech recognition, including a fixed-shape
-  NPU-compatible export and a dynamic KV-cache CPU/GPU export.
-- **TSC**, a text scam classifier.
-- **FakeAudio / GAD**, a generated-audio detector.
+- **`OnnxRuntimeHal.lib`** — workload-neutral session creation, logical and
+  explicit provider selection, ordered fallback, optional strict-device
+  enforcement, named tensor I/O, provider caching, and execution diagnostics.
+- **`GenDigital.OnnxRuntimeHal.Source`** — source NuGet package definition with
+  public headers, implementation translation units, native MSBuild integration,
+  the execution-plan schema, and example plans. Consumers provide their own
+  compatible ONNX Runtime SDK and runtime DLLs.
+- **`NpuInferenceBench.exe`** — reference CLI and validation application. It
+  hosts generic ONNX inference plus Whisper, TSC, and FakeAudio workload
+  adapters.
+- **Isolated runner distributions** — architecture-specific packages that keep
+  incompatible vendor ONNX Runtime DLL families in separate runner directories.
 
-Latency and accuracy are only half the result. The runner also records execution
-provider selection, failed provider attempts, fallback, runtime versions,
-profiler placement, and original graph operations assigned to NPU versus CPU.
-An NPU request that silently executes on the CPU—or cannot report a trustworthy
-operation split—is therefore invalid instead of being celebrated as an NPU result.
+The solution is split into `OnnxRuntimeHal`, `OnnxRuntimeHal.Tests`,
+`NpuInferenceBench.Core`, and `NpuInferenceBench.App`.
 
-This is a benchmark and runtime-diagnostics project. The old Whisper HAL is now
-an internal workload adapter rather than the product architecture.
+## Use the HAL
 
-## Reusable ONNX runtime
+The library has a same-compiler C++ ABI. Consumers must use the same MSVC
+toolset, CRT mode, architecture, and runtime flavor that built the library.
 
-The benchmark consumes a workload-neutral `OnnxRuntimeHal` **C++23 static
-library** (same-compiler ABI — include `onnx_runtime_hal.hpp`, link
-`OnnxRuntimeHal.lib`). It exposes logical CPU/GPU/NPU selection, explicit
-providers, strict requested-device enforcement, vendor caching, named tensor
-I/O, and provider offload diagnostics without depending on Whisper or
-benchmark ledgers.
+```cpp
+#include <onnx_runtime_hal.hpp>
 
-```powershell
-.\tools\build\package-onnx-runtime-hal.ps1 -Flavor ort
-# -> artifacts/dist/onnx-runtime-hal-<arch>-ort/{include,lib,msbuild}
+using namespace onnx_runtime_hal;
+
+RuntimeOptions options;
+options.device = Device::NPU;
+options.require_requested_device = true;
+
+RuntimeContext context(options);
+ModelSession session = context.load_one(ModelSpec{.model_path = model_path});
+std::vector<Tensor> outputs = session.run(inputs);
+const ExecutionDiagnostics& diagnostics = session.diagnostics();
 ```
 
-`NpuInferenceBench run-onnx` is a generic tensor-manifest reference consumer.
-See [`docs/onnx-runtime-hal.md`](docs/onnx-runtime-hal.md) for the C++ consumer
-contract and MSBuild props.
+`ExecutionPlan` describes whole-graph and staged model layouts, but the HAL does
+not execute adapter-specific multi-stage plans itself. Consumers own stage
+orchestration and preprocessing.
 
-## Run the portable suite
+See [`docs/onnx-runtime-hal.md`](docs/onnx-runtime-hal.md) for the public API,
+MSBuild integration, advanced ORT session access, and the `run-onnx` reference
+consumer.
+
+## Package the HAL
+
+Build the source NuGet package without model weights, benchmark code, or runtime
+binaries:
 
 ```powershell
-.\tools\build\bootstrap.ps1
-.\benchmark\run-suite.ps1
+.\tools\build\package-onnx-runtime-hal-source.ps1 -Version 1.0.0
+# -> artifacts/dist/onnx-runtime-hal-source/
 ```
 
-Useful variants:
+Tags matching `onnx-runtime-hal-source-v*` run the GitHub workflow that can
+publish the package, checksum, and provenance document. For same-toolchain local
+consumers, package a prebuilt static library instead:
 
 ```powershell
-# Portable provider chain for the current machine.
-.\benchmark\run-suite.ps1 -Provider auto
+.\tools\build\package-onnx-runtime-hal.ps1 -Flavor ort -Configuration Release
+# -> artifacts/dist/onnx-runtime-hal-<arch>-ort/
+```
 
-# Try all portable workloads on NPU, GPU, and CPU.
+## Run the validation suite
+
+The portable suite needs model and fixture assets plus an ORT-capable build.
+From a fresh clone, a neutral x64 CPU path is:
+
+```powershell
+hf auth login
+.\tools\fetch\get-models.ps1
+.\tools\setup\get-ort-sdk.ps1 `
+  -Package Microsoft.ML.OnnxRuntime `
+  -Version 1.24.4 `
+  -Rid win-x64
+.\tools\build\build.ps1 -EnableOrt -DisableIntel
+.\benchmark\run-suite.ps1 -Runtime bundled -Device cpu -Provider auto
+```
+
+Use `-Rid win-arm64` and `-Platform ARM64` for a neutral ARM64 build.
+Vendor-specific NPU and GPU paths use the setup and build switches in the
+[Build](#build) section. `tools/build/bootstrap.ps1` is a one-shot setup for the
+Intel, AMD, or Qualcomm Whisper path, but its default Intel build uses OpenVINO
+GenAI rather than the neutral ORT classifier path.
+
+Useful suite selections:
+
+```powershell
 .\benchmark\run-suite.ps1 -Device npu,gpu,cpu -Provider auto
-
-# Limit the suite.
 .\benchmark\run-suite.ps1 -Only whisper
 .\benchmark\run-suite.ps1 -Only tsc,fakeaudio
 ```
 
-The suite is driven by `benchmark/manifests/portable.json`. Unsupported,
-missing, and failed combinations are recorded rather than disappearing from the
-comparison.
+`benchmark/manifests/portable.json` is the suite contract. Unsupported, missing,
+and failed combinations are recorded rather than silently omitted.
 
-## What gets recorded
+## Reference workloads
 
-Benchmark outputs are written locally under `results/` and ignored by the
-public repository. Reviewed evidence is versioned in a private companion
-repository; the paths below describe the local harness contract.
+The workloads validate the runtime and runner; they are not part of the HAL API.
 
-The default `accuracy-quick` mode writes one immutable campaign file:
+| Workload | Execution contract |
+|----------|--------------------|
+| `whisper-tiny-static` | Fixed encoder/decoder shapes on NPU, GPU, or CPU |
+| `whisper-tiny-static-multi-7s` | Fixed multilingual 7-second window on NPU, GPU, or CPU |
+| `whisper-tiny-dynamic` | Growing KV cache on GPU or CPU; intentionally unsupported on NPU |
+| `whisper-tiny-sherpa` | Sherpa export on GPU/CPU, with non-accuracy NPU best-effort probing |
+| `tsc` | Text-classifier fixture replay on NPU, GPU, or CPU |
+| `fakeaudio` | Whole graph on GPU/CPU; accuracy-eligible NPU runs use vendor-specific CPU-frontend/NPU-backbone fixtures |
 
-- `results/accuracy-runs/<environment-snapshot-id>.jsonl`
+Classifier fixtures are generated by `tools/fixtures/generate.py`. Whisper
+reports latency, real-time factor, WER, CER, provider fallback, and offload.
+Classifiers report latency, labeled accuracy, CPU-reference drift, and offload.
+FakeAudio NPU fixture variants are generated by the export/build scripts under
+`tools/research/`.
 
-Each record links the exact model and fixture hashes, host/runtime snapshot,
-provider-input provenance, reference agreement, resolved provider, fallback
-state, and workload metrics. A fresh file per invocation keeps concurrent vendor
-campaigns independent and avoids append conflicts in a shared Git ledger.
+## Benchmark evidence
 
-Explicit `-Mode latency` runs append performance rows to
-`results/ledgers/asr.csv` and `results/ledgers/classifiers.csv`; accuracy-quick
-never writes those latency ledgers.
+Benchmark output is local, machine-specific data under `results/` and is
+gitignored. The harness writes:
 
-Repetitions are mode-aware. `accuracy-quick` defaults to one measured inference
-per Whisper clip or classifier fixture. `latency` defaults to 10 measured
-Whisper transcriptions per clip and 20 measured classifier inferences per
-fixture. Both modes perform untimed warm-up separately. Override these defaults
-with `-Runs <N>` and `-ClassifierRuns <N>`.
+- immutable accuracy campaigns to
+  `results/accuracy-runs/<environment-snapshot-id>.jsonl`;
+- complete requested-attempt records, including failures and unsupported
+  profiles, to `results/run-attempts/<environment-snapshot-id>.jsonl`;
+- rolling attempt state to `results/ledgers/attempts.jsonl`; and
+- explicit `-Mode latency` rows to `results/ledgers/asr.csv` and
+  `results/ledgers/classifiers.csv`.
 
-Every invocation also records all requested combinations—including failures
-and unsupported profiles—to:
+Records include model and fixture hashes, runtime and host snapshots, provider
+attempts, fallback, workload metrics, and available CPU/NPU operation-assignment
+evidence. Machine-readable contracts live in `benchmark/schemas/`; see
+[`results/README.md`](results/README.md) for the complete output contract.
 
-- `results/run-attempts/<environment-snapshot-id>.jsonl`
+## Runtime and provider model
 
-`results/ledgers/attempts.jsonl` remains ignored rolling local state.
+An explicit `-Provider` performs one provider attempt. `-Provider auto` uses the
+logical device chain supported by the selected runtime:
 
-The attempt ledger includes:
-
-- requested workload, device, and provider;
-- status and error;
-- resolved execution provider;
-- every failed and successful provider attempt;
-- whether fallback occurred;
-- CPU-offload evidence when ORT profiling is available;
-- provider/compiler CPU-versus-NPU operation assignments for valid NPU rows;
-- the workload-specific JSON result.
-
-Profiler node counts and operation assignments are deliberately separate. One
-accelerator profiler node may contain hundreds of fused operations. New NPU
-accuracy rows are valid only when `assigned_ops_cpu`, `assigned_ops_npu`, and
-`operation_assignment_source` contain trustworthy partition evidence.
-
-Machine-readable column contracts live in `benchmark/schemas/`.
-
-## Workloads
-
-### Whisper tiny.en
-
-`whisper-tiny-static` uses fixed encoder and decoder shapes. It recomputes the
-decoder context, but NPU compilers can compile it.
-
-`whisper-tiny-dynamic` uses a growing KV cache. It is faster on CPU and GPU, but
-dynamic cache shapes are intentionally marked unsupported on NPU.
-
-ASR metrics include cold and hot load time, mean/median/p90 latency, real-time
-factor, WER, CER, token timing, provider fallback, and CPU offload.
-
-### Text Scam Classifier
-
-TSC replays validated fixture tensors through the requested ORT provider. It
-reports latency, labeled accuracy, numerical drift from the CPU reference, and
-CPU offload.
-
-### FakeAudio / Generated Audio Detector
-
-FakeAudio uses the same fixture-replay contract as TSC. Keeping preprocessing
-outside the C++ timing loop isolates runtime/compiler behavior from Python audio
-pipeline differences.
-
-Fixtures are generated by `tools/fixtures/generate.py`.
-
-## Executor model
-
-For automatic provider selection, the logical device chains are:
-
-- NPU: QNN, VitisAI, OpenVINO NPU, then GPU and CPU candidates.
-- GPU: DirectML, OpenVINO GPU, then CPU.
+- NPU: ordered QNN, VitisAI, and OpenVINO NPU attempts available in the selected
+  runtime before eligible GPU/CPU fallbacks;
+- GPU: DirectML or OpenVINO GPU before CPU fallback;
 - CPU: ONNX Runtime CPU.
 
-An explicit `-Provider` performs one provider attempt. `-Provider auto` enables
-the fallback chain.
+Windows ML uses policy providers (`PREFER_NPU`, `PREFER_GPU`, or `PREFER_CPU`)
+from its execution-provider catalog. Strict-device mode rejects a session when
+the resolved provider does not satisfy the requested device.
 
-In a redistributable package, `-Executor fastest` or `-Executor most-accurate`
-races the packaged runners on the eval/fixture samples (Whisper uses baked
-baseline WER) and prints the winning runner, runtime, and device.
+| Runner | Architecture | Runtime/provider family |
+|--------|--------------|-------------------------|
+| `ort` | x64, ARM64 | Generic ONNX Runtime SDK supplied at build time |
+| `dml` | x64, ARM64 | ONNX Runtime with DirectML |
+| `winml` | x64, ARM64 | Windows ML EP catalog; Windows build 26100 or newer |
+| `ovep` | x64 | Intel OpenVINO execution provider |
+| `amd` | x64 | AMD VitisAI execution provider |
+| `qualcomm` | ARM64 | Qualcomm QNN execution provider |
 
-The provider implementations are:
+Vendor ONNX Runtime distributions are not binary-compatible. Their DLLs and
+provider libraries stay in isolated build and runner-package directories rather
+than being combined into one process.
 
-- Qualcomm Snapdragon: QNN execution provider.
-- AMD Ryzen AI: VitisAI execution provider.
-- Intel AI Boost: OpenVINO execution provider.
-- GPU: DirectML or OpenVINO GPU.
-- CPU: ONNX Runtime CPU or OpenVINO CPU.
-
-Vendor ONNX Runtime distributions are not binary-compatible. Separate runtime
-packages and the `artifacts/build/<platform>-ovep` output remain necessary;
-pretending one set of vendor DLLs can serve every machine would produce
-misleading results.
+In a runner distribution, `-Executor fastest` or `-Executor most-accurate`
+evaluates eligible packaged runners against the included eval/fixture samples
+and reports the selected runner, runtime, and device.
 
 ## Repository architecture
 
-Source, published evidence, and local artifacts are separated on purpose.
+Source, package definitions, benchmark evidence, and generated artifacts are
+separated on purpose.
 See [`LAYOUT.md`](LAYOUT.md) for the full contract.
 
 ```text
-src/                         C++ product (runner, workloads, tests)
-eng/                         MSBuild projects/props + packaging metadata
+src/                         HAL, reference app, workload adapters, tests
+eng/                         MSBuild projects/props + runner packaging metadata
+packaging/                   source NuGet project and package README
 benchmark/                   suite-of-record harness, manifests, schemas
 tools/                       bootstrap, fetch, setup, export, research, repros
 docs/                        guides and engineering notes
@@ -184,20 +191,22 @@ artifacts/                   all generated/local outputs (gitignored)
 
 ## Build
 
-The project targets Windows x64 and ARM64 using C++23 (`/std:c++23preview` via
-MSBuild `stdcpp23`) and MSBuild with VS 2022 (MSVC 19.4x+).
+The project targets Windows x64 and ARM64 using MSBuild and C++23
+(`LanguageStandard=stdcpp23`). `build.ps1` prefers Visual Studio 2026 and falls
+back to the newest installed Visual Studio with MSBuild and C++ tools.
 
 ```powershell
-# Dependency-free build; all runtime backends are stubs.
+# Dependency-free compile check; runtime backends are unavailable.
 .\tools\build\build.ps1 -DisableIntel
 
-# Intel OpenVINO GenAI.
+# Default reference app: Intel OpenVINO GenAI Whisper adapter.
 .\tools\build\build.ps1
 
-# Portable ONNX Runtime.
+# Generic ONNX Runtime supplied under artifacts/third_party/onnxruntime
+# or through -OrtDir / ORT_DIR.
 .\tools\build\build.ps1 -EnableOrt -DisableIntel
 
-# DirectML GPU (downloads the matched ORT and DirectML NuGet runtimes).
+# DirectML GPU.
 .\tools\fetch\get-onnxruntime-directml.ps1
 .\tools\build\build.ps1 -EnableDirectML -DisableIntel
 .\benchmark\run-suite.ps1 -Device gpu -Provider DmlExecutionProvider
@@ -207,6 +216,7 @@ MSBuild `stdcpp23`) and MSBuild with VS 2022 (MSVC 19.4x+).
 .\tools\build\build.ps1 -EnableOvep
 
 # AMD Ryzen AI.
+.\tools\setup\setup-amd.ps1
 .\tools\build\build.ps1 -EnableAmd -DisableIntel
 
 # Qualcomm ARM64.
@@ -218,6 +228,10 @@ MSBuild `stdcpp23`) and MSBuild with VS 2022 (MSVC 19.4x+).
 .\tools\build\build.ps1 -EnableWinML -DisableIntel
 .\benchmark\run-suite.ps1 -Runtime winml -Device cpu,gpu,npu
 ```
+
+Windows ML cannot be combined with bundled DirectML, OVEP, AMD, or Qualcomm
+runtimes. The other vendor runtime-pack switches are also mutually exclusive;
+each produces an isolated output tree.
 
 The Qualcomm setup stages one native ARM64 executable with both execution
 providers: QNN targets the Hexagon NPU and DirectML targets the Adreno GPU.
@@ -234,10 +248,22 @@ for requirements, provider-policy mode, and verification guidance.
 Build output:
 
 ```text
-build/<platform>[/variant]/<configuration>/NpuInferenceBench.exe
+artifacts/build/<platform-tag>/<configuration>/NpuInferenceBench.exe
+artifacts/build/<platform-tag>/<configuration>/OnnxRuntimeHal.lib
 ```
 
-## Publish isolated runners
+Platform tags include `x64`, `x64-dml`, `x64-ovep`, `x64-amd`, `x64-winml`,
+`ARM64`, `ARM64-qualcomm`, and `ARM64-winml`.
+
+The build also produces `OnnxRuntimeHal.Tests.exe` in the same output directory.
+Run it from an ORT-capable build to exercise tensor contracts, provider policy,
+and profile parsing:
+
+```powershell
+.\artifacts\build\x64\Release\OnnxRuntimeHal.Tests.exe
+```
+
+## Package isolated runners
 
 One distribution is produced per CPU architecture. Runtime DLL families stay in
 separate runner directories while benchmark scripts, workloads, and models are
@@ -256,7 +282,8 @@ copied once:
 
 Unavailable vendor SDKs are recorded in `runner-package.json` as skipped.
 Matching runner artifacts from CI or another SDK host can be merged with
-`-AdditionalRunnerRoot`. The packaged entry point preserves the suite options:
+`-AdditionalRunnerRoot`. From the generated package root, the packaged entry
+point preserves the suite options:
 
 ```powershell
 .\run-benchmark.ps1 --list-runners
@@ -270,6 +297,7 @@ layout, selection rules, external-artifact contract, and publishing workflow.
 ## Single-workload CLI
 
 ```powershell
+NpuInferenceBench.exe run-onnx <model.onnx> <inputs.json> [options]
 NpuInferenceBench.exe run whisper <model_dir> <audio.wav> [backend] [device] [runs] [options]
 NpuInferenceBench.exe run tsc <fixture_dir> [device] [runs] [options]
 NpuInferenceBench.exe run fakeaudio <fixture_dir> [device] [runs] [options]
@@ -291,14 +319,19 @@ defines the local and Hugging Face paths used by:
 .\tools\fetch\push-models.ps1
 ```
 
-The default repository is private, so downloading requires authorization.
+The default Hugging Face model repository is private, so downloading its
+contents requires `hf auth login`. A different repository can be selected with
+the fetch script's `-Repo` parameter.
 
 ## Scope and limitations
 
 - Windows 10 or newer only.
 - x64 and ARM64 only.
-- Whisper input must be 16 kHz audio; there is no resampler.
+- The benchmark WAV loader expects 16 kHz mono input and does not resample it;
+  individual workload adapters may provide their own preprocessing.
 - Vendor execution providers require matching drivers, SDKs, and ORT builds.
+- Windows ML runner packages require Windows build 26100 or newer.
+- Staged `ExecutionPlan` adapter execution is a consumer responsibility.
 - NPU compiler acceptance is model- and shape-dependent.
 - Research quantization results are not part of the portable benchmark contract.
 - Hardware paths must be validated on the corresponding physical device.
