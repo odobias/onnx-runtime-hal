@@ -10,15 +10,9 @@ on:
         description: SemVer package version
         required: true
         type: string
-      publish:
-        description: Publish to GitHub Packages
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   package:
@@ -61,18 +55,6 @@ jobs:
           name: onnx-runtime-hal-source-${{ steps.version.outputs.version }}
           path: ${{ env.PACKAGE_DIR }}/*
           if-no-files-found: error
-
-      - name: Publish to GitHub Packages
-        if: github.event_name == 'push' || inputs.publish
-        shell: pwsh
-        env:
-          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          $pkg = "GenDigital.OnnxRuntimeHal.Source.$env:PACKAGE_VERSION"
-          dotnet nuget push "$env:PACKAGE_DIR/$pkg.nupkg" `
-            --api-key "${{ secrets.GITHUB_TOKEN }}" `
-            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
-            --skip-duplicate
 
       - name: Publish immutable GitHub Release
         if: github.event_name == 'push'

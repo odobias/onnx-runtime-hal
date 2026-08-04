@@ -94,10 +94,11 @@ The package also carries the execution-plan schema and FakeAudio whole/split exa
 # -> artifacts/dist/onnx-runtime-hal-source/ (.nupkg + .sha256 + .provenance.json)
 ```
 
-Tags `onnx-runtime-hal-source-v<version>` publish those three artifacts to GitHub
-Packages and a GitHub Release. Developer machines restore from GitHub Packages;
-downstream CI can mirror via `tools/publish/mirror-onnx-runtime-hal-source.ps1`
-(verifies sidecars and pushes unchanged bytes to its configured NuGet feed).
+Tags `onnx-runtime-hal-source-v<version>` publish those three artifacts to an
+immutable GitHub Release. Developer machines can download the release package;
+downstream CI can either build the mirrored source tag or use
+`tools/publish/mirror-onnx-runtime-hal-source.ps1` to verify and push the release
+package unchanged when GitHub Release access is available.
 
 For local same-toolchain use, the prebuilt install tree is still available:
 
