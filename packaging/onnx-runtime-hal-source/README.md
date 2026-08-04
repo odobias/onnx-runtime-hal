@@ -49,3 +49,9 @@ project only needs the public headers and links the implementation elsewhere.
 - Provider-specific compile definitions remain consumer policy.
 - Package versions are immutable. Published `.nupkg`, `.sha256`, and
   `.provenance.json` assets identify the same source commit.
+
+## License
+
+This package is source-available, not open source. Production, commercial, and
+redistribution rights are reserved to Gen Digital except where a separate
+written agreement applies. See `LICENSE.txt` in the package.

@@ -302,3 +302,9 @@ The default repository is private, so downloading requires authorization.
 - NPU compiler acceptance is model- and shape-dependent.
 - Research quantization results are not part of the portable benchmark contract.
 - Hardware paths must be validated on the corresponding physical device.
+
+## License
+
+This repository is source-available, not open source. It permits public
+evaluation and benchmarking while reserving production, commercial, and
+redistribution rights to Gen Digital. See [`LICENSE.txt`](LICENSE.txt).

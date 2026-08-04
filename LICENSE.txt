@@ -1,0 +1,98 @@
+Gen Digital Source-Available License 1.0
+
+Copyright (c) 2026 Gen Digital Inc. All rights reserved.
+
+This license makes the source code available for review and limited reuse. It is
+not an open-source license.
+
+1. Definitions
+
+"Licensor" means Gen Digital Inc.
+
+"Software" means the source code and accompanying materials distributed with
+this license, excluding third-party materials identified as such.
+
+"Gen Digital Group" means the Licensor and entities that directly or indirectly
+control, are controlled by, or are under common control with the Licensor.
+
+"Authorized Personnel" means employees and contractors acting on behalf of the
+Gen Digital Group within the scope of their employment or engagement.
+
+2. Public evaluation license
+
+Subject to this license, the Licensor grants you a non-exclusive, worldwide,
+royalty-free, non-transferable, non-sublicensable copyright license to:
+
+- view, download, and copy the Software;
+- compile, execute, and modify the Software solely for evaluation, security
+  research, interoperability testing, and benchmarking in a non-production
+  environment; and
+- create a public or private fork of the Software on GitHub solely for those
+  permitted purposes.
+
+You may publish benchmark results that do not include or disclose the Software.
+
+3. Gen Digital use
+
+Authorized Personnel may use, copy, modify, create derivative works from, and
+distribute the Software as authorized by the Gen Digital Group, including
+incorporating it into Gen Digital products and services. This section grants no
+rights to anyone acting outside that authorization.
+
+4. Restrictions
+
+Unless section 3 applies to you or you have a separate written agreement with
+the Licensor, you may not:
+
+- use the Software or a derivative work in production or for a commercial
+  purpose;
+- distribute, publish, sell, lease, license, sublicense, or otherwise make the
+  Software or a derivative work available to a third party, except for a GitHub
+  fork permitted by section 2;
+- provide the Software or a derivative work as a hosted or managed service;
+- remove or obscure copyright, license, attribution, or proprietary notices; or
+- use Gen Digital names, logos, or trademarks to endorse or promote a product or
+  service.
+
+No patent, trademark, or other intellectual-property license is granted except
+for the copyright permissions expressly stated above.
+
+5. Contributions
+
+The Licensor does not accept contributions unless they are covered by a
+separate written contribution agreement. Opening an issue does not transfer
+ownership of its content or grant rights to the Software.
+
+6. Ownership
+
+The Software is licensed, not sold. The Licensor and its suppliers retain all
+right, title, and interest in the Software. All rights not expressly granted by
+this license are reserved.
+
+7. Third-party materials
+
+Third-party materials remain subject to their own license terms. This license
+does not expand or restrict rights granted by those terms.
+
+8. Termination
+
+Your rights under this license terminate automatically if you breach it. If the
+breach is curable, your rights are reinstated when you cure it within 30 days
+after receiving notice from the Licensor. Sections 4, 6, 7, 9, and 10 survive
+termination.
+
+9. Disclaimer of warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+10. Limitation of liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR AND ITS SUPPLIERS WILL NOT
+BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+CONSEQUENTIAL, OR OTHER DAMAGES ARISING FROM THE SOFTWARE OR THIS LICENSE,
+HOWEVER CAUSED AND UNDER ANY THEORY OF LIABILITY.
+
+For production, commercial, redistribution, or other rights not granted here,
+obtain a separate written license from Gen Digital Inc.

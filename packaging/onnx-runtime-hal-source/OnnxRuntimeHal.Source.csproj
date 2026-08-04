@@ -11,14 +11,16 @@
     <Description>Workload-neutral ONNX Runtime HAL sources and MSBuild integration for native C++ consumers.</Description>
     <PackageTags>onnxruntime;native;cpp;npu;gpu;inference</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/odobias/onnx-runtime-hal</RepositoryUrl>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <DevelopmentDependency>true</DevelopmentDependency>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" />
     <None Include="build\native\GenDigital.OnnxRuntimeHal.Source.props"
           Pack="true"
           PackagePath="build\native\" />
