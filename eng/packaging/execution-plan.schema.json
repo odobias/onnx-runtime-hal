@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/odobias/onnx-runtime-hal/schemas/execution-plan-v1.json",
+  "title": "ONNX Runtime HAL execution plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "adapter",
+    "runtime",
+    "stages"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter": {
+      "enum": [
+        "generic_onnx",
+        "staged_onnx",
+        "whisper_static",
+        "whisper_dynamic_kv",
+        "whisper_sherpa"
+      ]
+    },
+    "eligible_architectures": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "x64",
+          "arm64"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/stage"
+      }
+    }
+  },
+  "$defs": {
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device"
+      ],
+      "properties": {
+        "device": {
+          "enum": [
+            "cpu",
+            "gpu",
+            "npu"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "provider_order": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allow_fallback": {
+          "type": "boolean",
+          "default": true
+        },
+        "require_requested_device": {
+          "type": "boolean",
+          "default": false
+        },
+        "cache_dir": {
+          "type": "string"
+        },
+        "cache_key": {
+          "type": "string"
+        },
+        "cpu_threads": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "precision": {
+          "enum": [
+            "preferred",
+            "f32",
+            "f16",
+            "bf16"
+          ]
+        },
+        "profile_execution": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input",
+        "source_stage",
+        "source_output"
+      ],
+      "properties": {
+        "input": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_output": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "artifact"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device": {
+          "enum": [
+            "requested",
+            "cpu"
+          ],
+          "default": "requested"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/binding"
+          }
+        }
+      }
+    }
+  }
+}

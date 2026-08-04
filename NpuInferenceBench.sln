@@ -1,0 +1,67 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NpuInferenceBench.Core", "eng\projects\NpuInferenceBench.Core\NpuInferenceBench.Core.vcxproj", "{6E8B1C2A-0001-4A00-9000-00000000C0DE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE} = {6E8B1C2A-0003-4A00-9000-00000000C0DE}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OnnxRuntimeHal", "eng\projects\OnnxRuntimeHal\OnnxRuntimeHal.vcxproj", "{6E8B1C2A-0003-4A00-9000-00000000C0DE}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OnnxRuntimeHal.Tests", "eng\projects\OnnxRuntimeHal.Tests\OnnxRuntimeHal.Tests.vcxproj", "{6E8B1C2A-0004-4A00-9000-00000000C0DE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE} = {6E8B1C2A-0003-4A00-9000-00000000C0DE}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NpuInferenceBench.App", "eng\projects\NpuInferenceBench.App\NpuInferenceBench.App.vcxproj", "{6E8B1C2A-0002-4A00-9000-00000000C0DE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE} = {6E8B1C2A-0001-4A00-9000-00000000C0DE}
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE} = {6E8B1C2A-0003-4A00-9000-00000000C0DE}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+		Debug|ARM64 = Debug|ARM64
+		Release|ARM64 = Release|ARM64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Debug|x64.ActiveCfg = Debug|x64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Debug|x64.Build.0 = Debug|x64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Release|x64.ActiveCfg = Release|x64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Release|x64.Build.0 = Release|x64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Debug|ARM64.Build.0 = Debug|ARM64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Release|ARM64.ActiveCfg = Release|ARM64
+		{6E8B1C2A-0001-4A00-9000-00000000C0DE}.Release|ARM64.Build.0 = Release|ARM64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Debug|x64.ActiveCfg = Debug|x64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Debug|x64.Build.0 = Debug|x64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Release|x64.ActiveCfg = Release|x64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Release|x64.Build.0 = Release|x64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Debug|ARM64.Build.0 = Debug|ARM64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Release|ARM64.ActiveCfg = Release|ARM64
+		{6E8B1C2A-0003-4A00-9000-00000000C0DE}.Release|ARM64.Build.0 = Release|ARM64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Debug|x64.ActiveCfg = Debug|x64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Debug|x64.Build.0 = Debug|x64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Release|x64.ActiveCfg = Release|x64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Release|x64.Build.0 = Release|x64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Debug|ARM64.Build.0 = Debug|ARM64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Release|ARM64.ActiveCfg = Release|ARM64
+		{6E8B1C2A-0004-4A00-9000-00000000C0DE}.Release|ARM64.Build.0 = Release|ARM64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Debug|x64.ActiveCfg = Debug|x64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Debug|x64.Build.0 = Debug|x64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Release|x64.ActiveCfg = Release|x64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Release|x64.Build.0 = Release|x64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Debug|ARM64.Build.0 = Debug|ARM64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Release|ARM64.ActiveCfg = Release|ARM64
+		{6E8B1C2A-0002-4A00-9000-00000000C0DE}.Release|ARM64.Build.0 = Release|ARM64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

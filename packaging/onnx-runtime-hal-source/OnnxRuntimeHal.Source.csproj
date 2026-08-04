@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <PackageId>GenDigital.OnnxRuntimeHal.Source</PackageId>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">0.1.0-local</PackageVersion>
+    <Version>$(PackageVersion)</Version>
+    <Authors>Gen Digital</Authors>
+    <Company>Gen Digital</Company>
+    <Description>Workload-neutral ONNX Runtime HAL sources and MSBuild integration for native C++ consumers.</Description>
+    <PackageTags>onnxruntime;native;cpp;npu;gpu;inference</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/odobias/onnx-runtime-hal</RepositoryUrl>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <DevelopmentDependency>true</DevelopmentDependency>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="build\native\GenDigital.OnnxRuntimeHal.Source.props"
+          Pack="true"
+          PackagePath="build\native\" />
+
+    <None Include="..\..\src\runner\include\onnx_runtime_hal.hpp"
+          Pack="true"
+          PackagePath="include\" />
+    <None Include="..\..\src\runner\include\npu_inference_bench\runtime\**\*.hpp"
+          Pack="true"
+          PackagePath="include\npu_inference_bench\runtime\%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="..\..\eng\packaging\execution-plan.schema.json"
+          Pack="true"
+          PackagePath="schema\" />
+    <None Include="..\..\eng\packaging\examples\*.json"
+          Pack="true"
+          PackagePath="examples\%(Filename)%(Extension)" />
+
+    <None Include="..\..\src\runner\runtime\ort_model_session.cpp"
+          Pack="true"
+          PackagePath="src\onnx_runtime_hal\" />
+    <None Include="..\..\src\runner\runtime\ort_offload.cpp"
+          Pack="true"
+          PackagePath="src\onnx_runtime_hal\" />
+    <None Include="..\..\src\runner\runtime\ort_ep.hpp"
+          Pack="true"
+          PackagePath="src\onnx_runtime_hal\" />
+    <None Include="..\..\src\runner\runtime\ort_offload.hpp"
+          Pack="true"
+          PackagePath="src\onnx_runtime_hal\" />
+  </ItemGroup>
+</Project>

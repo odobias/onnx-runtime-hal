@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "fakeaudio-split",
+  "adapter": "staged_onnx",
+  "runtime": {
+    "device": "npu",
+    "allow_fallback": true
+  },
+  "eligible_architectures": [
+    "x64",
+    "arm64"
+  ],
+  "stages": [
+    {
+      "id": "frontend",
+      "artifact": "model.frontend-fp32.onnx",
+      "device": "cpu",
+      "outputs": [
+        "/embedder/base/htsat/logmel_extractor/Log_output_0"
+      ]
+    },
+    {
+      "id": "backbone",
+      "artifact": "model.backbone-fp32.onnx",
+      "device": "requested",
+      "bindings": [
+        {
+          "input": "/embedder/base/htsat/logmel_extractor/Log_output_0",
+          "source_stage": "frontend",
+          "source_output": "/embedder/base/htsat/logmel_extractor/Log_output_0"
+        }
+      ],
+      "outputs": [
+        "output"
+      ]
+    }
+  ]
+}

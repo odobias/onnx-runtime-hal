@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Intel backend: OpenVINO GenAI. Adds the compile define + include dir (used by
+     the core lib and app) and the link libraries (used by the app). Runtime DLLs
+     are copied next to the exe by the CopyIntelRuntime target in the app project. -->
+<Project>
+  <PropertyGroup>
+    <OpenVINOInclude>$(OpenVINODir)\runtime\include</OpenVINOInclude>
+    <OpenVINOLibDir>$(OpenVINODir)\runtime\lib\intel64\$(Configuration)</OpenVINOLibDir>
+    <OpenVINOBinDir>$(OpenVINODir)\runtime\bin\intel64\$(Configuration)</OpenVINOBinDir>
+    <OpenVINOTbbDir>$(OpenVINODir)\runtime\3rdparty\tbb\bin</OpenVINOTbbDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OpenVINOInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NPU_INFERENCE_BENCH_INTEL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OpenVINOLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Library names differ by config (OpenVINO ships 'd'-suffixed debug libs). -->
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <Link>
+      <AdditionalDependencies>openvino_genai.lib;openvino.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <Link>
+      <AdditionalDependencies>openvino_genaid.lib;openvinod.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

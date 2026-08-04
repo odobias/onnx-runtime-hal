@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Accuracy-first benchmark record",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "measurement_purpose",
+    "workload_id",
+    "execution_profile",
+    "graph_role",
+    "runtime_target",
+    "requested_device",
+    "resolved_provider",
+    "model_sha256",
+    "fixture_sha256",
+    "graph_artifacts",
+    "environment_snapshot_id",
+    "model_compilation_provenance_ids",
+    "reference_agreement",
+    "trust_gate",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "measurement_purpose": { "const": "accuracy-quick" },
+    "execution_profile": { "type": "string", "minLength": 1 },
+    "graph_role": { "enum": ["whole", "frontend", "backbone"] },
+    "environment_snapshot_id": { "type": "string", "minLength": 1 },
+    "model_compilation_provenance_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "graph_artifacts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "reference_agreement": {
+      "type": "object",
+      "required": ["outputs_finite", "compared", "decision_flips"],
+      "properties": {
+        "outputs_finite": { "type": "boolean" },
+        "compared": { "type": "integer", "minimum": 0 },
+        "decision_flips": { "type": "integer", "minimum": 0 },
+        "language_drifts": { "type": "integer", "minimum": 0 },
+        "task_drifts": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "trust_gate": {
+      "type": "object",
+      "required": [
+        "outputs_finite",
+        "no_reference_decision_flips",
+        "intended_provider_resolved",
+        "accuracy_eligible",
+        "valid"
+      ],
+      "properties": {
+        "outputs_finite": { "type": "boolean" },
+        "no_reference_decision_flips": { "type": "boolean" },
+        "intended_provider_resolved": { "type": "boolean" },
+        "accuracy_eligible": { "type": "boolean" },
+        "npu_operation_assignment_recorded": { "type": "boolean" },
+        "baseline_compared": { "type": "boolean" },
+        "no_language_drift": { "type": "boolean" },
+        "no_task_drift": { "type": "boolean" },
+        "valid": { "type": "boolean" }
+      }
+    }
+  }
+}

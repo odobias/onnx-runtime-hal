@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "description": "Allowlist of trees copied into redistributable packages. Model/fixture payloads live under artifacts/workloads/; tracked eval.jsonl stays under src/workloads/eval/.",
+  "always_copy": [
+    "benchmark",
+    "run-benchmark.ps1",
+    "src/workloads/eval/eval.jsonl",
+    "tools/eval",
+    "tools/fetch",
+    "tools/fixtures",
+    "tools/validate"
+  ],
+  "manifest": "eng/packaging/portable.redistributable.json",
+  "require_eval_wavs": true,
+  "paths": [
+    {
+      "id": "whisper-static",
+      "workload": "whisper-tiny-static",
+      "include": [
+        "artifacts/workloads/whisper/models/static-onnx",
+        "artifacts/workloads/whisper/manifest.json",
+        "artifacts/workloads/speech"
+      ]
+    },
+    {
+      "id": "tsc",
+      "workload": "tsc",
+      "include": [
+        "artifacts/workloads/classifiers/tsc",
+        "artifacts/workloads/classifiers/fixtures/tsc"
+      ]
+    },
+    {
+      "id": "fakeaudio-whole",
+      "workload": "fakeaudio",
+      "include": [
+        "artifacts/workloads/classifiers/fakeaudio/model.onnx",
+        "artifacts/workloads/classifiers/fixtures/fakeaudio",
+        "artifacts/workloads/classifiers/audio-samples"
+      ]
+    },
+    {
+      "id": "fakeaudio-npu-split",
+      "workload": "fakeaudio",
+      "include": [
+        "artifacts/workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
+        "artifacts/workloads/classifiers/fakeaudio/model.frontend-fp32.onnx",
+        "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32"
+      ]
+    }
+  ]
+}

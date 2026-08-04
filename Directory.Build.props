@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Repo-wide defaults, auto-imported by every project. Override on the MSBuild
+     command line, e.g. /p:EnableAmd=true /p:OpenVINODir=C:\sdk\openvino_genai -->
+<Project>
+  <PropertyGroup>
+    <NpuInferenceBenchRoot>$(MSBuildThisFileDirectory)</NpuInferenceBenchRoot>
+    <!-- Single root for generated output (build, dist, SDKs, caches, workload payloads). -->
+    <ArtifactsRoot>$(NpuInferenceBenchRoot)artifacts\</ArtifactsRoot>
+
+    <!-- OpenVINO GenAI C++ SDK location (Intel backend). Priority:
+         explicit /p:OpenVINODir  >  OPENVINO_GENAI_DIR env  >  bundled artifacts/third_party -->
+    <OpenVINODir Condition="'$(OpenVINODir)'=='' and '$(OPENVINO_GENAI_DIR)'!=''">$(OPENVINO_GENAI_DIR)</OpenVINODir>
+    <OpenVINODir Condition="'$(OpenVINODir)'==''">$(ArtifactsRoot)third_party\openvino_genai</OpenVINODir>
+
+    <!-- Per-backend build toggles. Intel is the working reference (on by default);
+         AMD/Qualcomm compile as throwing stubs unless their SDKs are wired in. -->
+    <EnableIntel Condition="'$(EnableIntel)'==''">true</EnableIntel>
+    <EnableAmd Condition="'$(EnableAmd)'==''">false</EnableAmd>
+    <EnableQualcomm Condition="'$(EnableQualcomm)'==''">false</EnableQualcomm>
+    <!-- Windows ML uses its own ONNX Runtime distribution and EP catalog. It is
+         emitted into a separate <platform>-winml tree. -->
+    <EnableWinML Condition="'$(EnableWinML)'==''">false</EnableWinML>
+    <EnableOrt Condition="'$(EnableOrt)'=='' and '$(EnableWinML)'=='true'">true</EnableOrt>
+
+    <!-- Intel native path through ONNX Runtime's OpenVINO EP (OVEP). This makes the
+         unified ORT binary cover Intel NPU/GPU/CPU too, alongside AMD (VitisAI) and
+         Qualcomm (QNN). It requires the vendored ORT+OVEP package (ORT 1.24.1 built
+         against OpenVINO 2025.4.1) under artifacts\third_party (see tools\setup\setup-ovep.ps1).
+         EnableOvep implies EnableOrt and is mutually exclusive with the OpenVINO
+         GenAI backend (EnableIntel): both drag in openvino.dll at incompatible
+         versions, so a single process can host only one. -->
+    <EnableOvep Condition="'$(EnableOvep)'==''">false</EnableOvep>
+    <EnableOrt Condition="'$(EnableOrt)'=='' and '$(EnableOvep)'=='true'">true</EnableOrt>
+
+    <!-- Bundle the portable static ONNX model next to the exe so the build output
+         is a self-contained package. Set /p:BundleModel=false to skip the (large)
+         copy during iterative dev builds. -->
+    <BundleModel Condition="'$(BundleModel)'==''">true</BundleModel>
+    <BundledModelDir Condition="'$(BundledModelDir)'==''">$(ArtifactsRoot)workloads\whisper\models\static-onnx</BundledModelDir>
+
+    <!-- The AMD-native whisper/amd model is ONLY used by the `amd` backend
+         variant; the unified auto/onnx-static path runs the portable static model
+         above. It is ~155 MB, so bundling it is opt-in (off by default). Turn on
+         with /p:BundleAmdModel=true (or build.ps1 -BundleAmdModel) when you want a
+         package that can also run the amd-native benchmark variant offline. -->
+    <BundleAmdModel Condition="'$(BundleAmdModel)'==''">false</BundleAmdModel>
+  </PropertyGroup>
+</Project>

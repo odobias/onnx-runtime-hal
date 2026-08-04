@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows ML's self-contained native SDK. This deliberately uses a separate
+     ORT distribution/output tree from the bundled QNN, DirectML and OVEP builds. -->
+<Project>
+  <PropertyGroup>
+    <WinMLDir Condition="'$(WinMLDir)'==''">$(NpuInferenceBenchRoot)artifacts\third_party\windows-ml</WinMLDir>
+    <OrtInclude>$(WinMLDir)\include</OrtInclude>
+    <OrtLibDir>$(WinMLDir)\lib\$(Platform)</OrtLibDir>
+    <OrtBinDir>$(WinMLDir)\bin\$(Platform)</OrtBinDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OrtInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NPU_INFERENCE_BENCH_ORT;NPU_INFERENCE_BENCH_WINML;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OrtLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;Microsoft.Windows.AI.MachineLearning.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

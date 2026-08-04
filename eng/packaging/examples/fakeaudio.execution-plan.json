@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "fakeaudio-plan",
+  "adapter": "generic_onnx",
+  "runtime": {
+    "device": "cpu",
+    "allow_fallback": true
+  },
+  "eligible_architectures": [
+    "x64",
+    "arm64"
+  ],
+  "stages": [
+    {
+      "id": "model",
+      "artifact": "model.onnx",
+      "device": "requested",
+      "outputs": [
+        "output"
+      ]
+    }
+  ]
+}

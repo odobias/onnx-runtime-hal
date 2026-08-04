@@ -1,0 +1,24 @@
+# Python deps for the deepfake ONNX experiments
+# (benchmark_deepfake_onnx.py, validate_tsc_onnx.py, validate_fakeaudio_onnx.py).
+#
+# IMPORTANT: onnxruntime is intentionally NOT pinned here, because there is no
+# single wheel that carries every execution provider, and the vendor NPU builds
+# are mutually exclusive within one process/env (see README.md + the repo's
+# results/reports/single-binary-cross-vendor.md). Install exactly ONE onnxruntime
+# flavour per environment, matching the platform you want to benchmark:
+#
+#   x64  CPU + DirectML (GPU)     pip install onnxruntime-directml
+#   x64  + Intel NPU/GPU (OVEP)   pip install onnxruntime-openvino   (or onnxruntime-ep-openvino)
+#   x64  + AMD NPU (VitisAI)      use the Ryzen AI SDK conda env (its OWN custom onnxruntime; do not pip-install another)
+#   ARM64 CPU + Qualcomm NPU      pip install onnxruntime-qnn        (ARM64 Python; x64 QNN wheel is AOT-compile-only)
+#
+# Everything below is platform-agnostic and safe to pin.
+
+numpy>=1.26
+onnx>=1.17
+tokenizers>=0.20          # TSC: byte-level BPE tokenizer reconstruction
+soundfile>=0.12           # FakeAudio: WAV loading (libsndfile)
+
+# Optional -- only needed to (re)fetch the gitignored FakeAudio sample clips.
+# yt-dlp
+# imageio-ffmpeg           # bundles a static ffmpeg; used to trim/resample clips

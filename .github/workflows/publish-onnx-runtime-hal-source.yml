@@ -1,0 +1,90 @@
+name: Publish ONNX Runtime HAL source package
+
+on:
+  push:
+    tags:
+      - onnx-runtime-hal-source-v*
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer package version
+        required: true
+        type: string
+      publish:
+        description: Publish to GitHub Packages
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  package:
+    runs-on: windows-2022
+    env:
+      PACKAGE_DIR: artifacts/dist/onnx-runtime-hal-source
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Resolve package version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          }
+          else {
+            $version = $env:GITHUB_REF_NAME -replace '^onnx-runtime-hal-source-v', ''
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Invalid package version '$version'."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build package and provenance
+        shell: pwsh
+        run: |
+          ./tools/build/package-onnx-runtime-hal-source.ps1 `
+            -Version "${{ steps.version.outputs.version }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnx-runtime-hal-source-${{ steps.version.outputs.version }}
+          path: ${{ env.PACKAGE_DIR }}/*
+          if-no-files-found: error
+
+      - name: Publish to GitHub Packages
+        if: github.event_name == 'push' || inputs.publish
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $pkg = "GenDigital.OnnxRuntimeHal.Source.$env:PACKAGE_VERSION"
+          dotnet nuget push "$env:PACKAGE_DIR/$pkg.nupkg" `
+            --api-key "${{ secrets.GITHUB_TOKEN }}" `
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+            --skip-duplicate
+
+      - name: Publish immutable GitHub Release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $pkg = "GenDigital.OnnxRuntimeHal.Source.$env:PACKAGE_VERSION"
+          gh release create "$env:GITHUB_REF_NAME" `
+            "$env:PACKAGE_DIR/$pkg.nupkg" `
+            "$env:PACKAGE_DIR/$pkg.nupkg.sha256" `
+            "$env:PACKAGE_DIR/$pkg.nupkg.provenance.json" `
+            --verify-tag `
+            --generate-notes

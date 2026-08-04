@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "columns": [
+    "timestamp_utc", "requested_backend", "resolved_backend", "device", "device_name",
+    "device_full_name", "model_package", "model_sha256", "variant_id", "base_model", "precision",
+    "quant_method", "execution_provider", "model_dir", "audio_path", "audio_seconds",
+    "runs", "warmup", "cache_dir", "cold_load_seconds", "hot_load_seconds", "warm_load_seconds",
+    "mean_infer_seconds", "rtf", "realtime_factor", "label", "model_size_mb",
+    "avg_logprob", "ttft_ms", "tpot_ms", "throughput_tps", "wer", "cer",
+    "transcription", "runtime", "model_format", "decode_strategy", "max_context",
+    "eval_clips", "status", "cold_start_seconds", "hot_start_seconds", "power_source",
+    "host_arch", "host_os", "runtime_version", "inference_precision",
+    "requested_provider", "resolved_provider",
+    "fallback_occurred", "provider_attempts", "ep_nodes", "cpu_nodes",
+    "cpu_offload_pct", "cpu_offload_ops",
+    "assigned_ops_cpu", "assigned_ops_npu", "operation_assignment_source",
+    "measurement_purpose", "execution_profile", "graph_role",
+    "environment_snapshot_id", "model_compilation_provenance_ids", "error"
+  ]
+}

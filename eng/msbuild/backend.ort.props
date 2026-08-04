@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic ONNX Runtime backend. Point OrtDir at a platform ORT distribution.
+     On AMD machines this defaults to the Ryzen AI SDK's ORT package. -->
+<Project>
+  <PropertyGroup>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'=='' and '$(RYZEN_AI_INSTALLATION_PATH)'!=''">$(RYZEN_AI_INSTALLATION_PATH)</RyzenAiDir>
+    <RyzenAiDir Condition="'$(RyzenAiDir)'==''">C:\Program Files\RyzenAI\1.7.1</RyzenAiDir>
+    <!-- Intel native path: the vendored ORT+OpenVINO EP package wins over the AMD
+         Ryzen AI default when EnableOvep=true (explicit /p:OrtDir still overrides). -->
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(EnableOvep)'=='true'">$(NpuInferenceBenchRoot)artifacts\third_party\onnxruntime-openvino</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(EnableAmd)'=='true'">$(RyzenAiDir)\onnxruntime</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and '$(ORT_DIR)'!=''">$(ORT_DIR)</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and Exists('$(NpuInferenceBenchRoot)artifacts\third_party\onnxruntime-directml\include')">$(NpuInferenceBenchRoot)artifacts\third_party\onnxruntime-directml</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'=='' and Exists('$(NpuInferenceBenchRoot)artifacts\third_party\onnxruntime\include')">$(NpuInferenceBenchRoot)artifacts\third_party\onnxruntime</OrtDir>
+    <OrtDir Condition="'$(OrtDir)'==''">$(RyzenAiDir)\onnxruntime</OrtDir>
+    <OrtInclude Condition="'$(OrtInclude)'=='' and Exists('$(OrtDir)\include\onnxruntime\core\session')">$(OrtDir)\include\onnxruntime\core\session</OrtInclude>
+    <OrtInclude Condition="'$(OrtInclude)'==''">$(OrtDir)\include</OrtInclude>
+    <OrtLibDir Condition="'$(OrtLibDir)'==''">$(OrtDir)\lib</OrtLibDir>
+    <OrtBinDir Condition="'$(OrtBinDir)'==''">$(OrtDir)\bin</OrtBinDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OrtInclude);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NPU_INFERENCE_BENCH_ORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(OrtLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

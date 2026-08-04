@@ -1,0 +1,169 @@
+{
+  "model": "whisper/static-onnx-tiny-multi-7s",
+  "suites": {
+    "english-product": {
+      "recorded": {
+        "host": "benchmark-reference",
+        "os": "Windows-11-10.0.26100-SP0",
+        "provider": "CPUExecutionProvider",
+        "commit": "0f4f89a"
+      },
+      "mean_wer": 0.1415,
+      "clips": {
+        "ls_000": {
+          "wer": 0.0588,
+          "lang": "en"
+        },
+        "ls_001": {
+          "wer": 0.1,
+          "lang": "en"
+        },
+        "ls_006": {
+          "wer": 0.1667,
+          "lang": "en"
+        },
+        "ls_008": {
+          "wer": 0.1818,
+          "lang": "en"
+        },
+        "ls_010": {
+          "wer": 0.2,
+          "lang": "en"
+        }
+      }
+    },
+    "english-full": {
+      "recorded": {
+        "host": "benchmark-reference",
+        "os": "Windows-11-10.0.26100-SP0",
+        "provider": "CPUExecutionProvider",
+        "commit": "0f4f89a"
+      },
+      "mean_wer": 0.0986,
+      "clips": {
+        "jfk": {
+          "wer": 0.0,
+          "lang": "en"
+        },
+        "ls_000": {
+          "wer": 0.0588,
+          "lang": "en"
+        },
+        "ls_001": {
+          "wer": 0.1,
+          "lang": "en"
+        },
+        "ls_002": {
+          "wer": 0.0312,
+          "lang": "en"
+        },
+        "ls_003": {
+          "wer": 0.0417,
+          "lang": "en"
+        },
+        "ls_004": {
+          "wer": 0.2059,
+          "lang": "en"
+        },
+        "ls_005": {
+          "wer": 0.0556,
+          "lang": "en"
+        },
+        "ls_006": {
+          "wer": 0.1667,
+          "lang": "en"
+        },
+        "ls_007": {
+          "wer": 0.0526,
+          "lang": "en"
+        },
+        "ls_008": {
+          "wer": 0.1818,
+          "lang": "en"
+        },
+        "ls_009": {
+          "wer": 0.0698,
+          "lang": "en"
+        },
+        "ls_010": {
+          "wer": 0.2,
+          "lang": "en"
+        },
+        "ls_011": {
+          "wer": 0.1176,
+          "lang": "en"
+        }
+      }
+    },
+    "multilingual-product": {
+      "recorded": {
+        "host": "benchmark-reference",
+        "os": "Windows-11-10.0.26100-SP0",
+        "provider": "CPUExecutionProvider",
+        "commit": "0f4f89a"
+      },
+      "mean_wer": 0.4491,
+      "clips": {
+        "fleurs_de": {
+          "wer": 0.381,
+          "lang": "de"
+        },
+        "fleurs_fr": {
+          "wer": 0.72,
+          "lang": "fr"
+        },
+        "fleurs_es": {
+          "wer": 0.3182,
+          "lang": "es"
+        },
+        "fleurs_cs": {
+          "wer": 0.6875,
+          "lang": "cs"
+        },
+        "fleurs_it": {
+          "wer": 0.0,
+          "lang": "it"
+        },
+        "fleurs_pl": {
+          "wer": 0.5882,
+          "lang": "pl"
+        }
+      }
+    },
+    "multilingual-full": {
+      "recorded": {
+        "host": "benchmark-reference",
+        "os": "Windows-11-10.0.26100-SP0",
+        "provider": "CPUExecutionProvider",
+        "commit": "0f4f89a"
+      },
+      "mean_wer": 0.3998,
+      "clips": {
+        "fleurs_de": {
+          "wer": 0.2857,
+          "lang": "de"
+        },
+        "fleurs_fr": {
+          "wer": 0.72,
+          "lang": "fr"
+        },
+        "fleurs_es": {
+          "wer": 0.0,
+          "lang": "es"
+        },
+        "fleurs_cs": {
+          "wer": 0.6875,
+          "lang": "cs"
+        },
+        "fleurs_it": {
+          "wer": 0.0,
+          "lang": "it"
+        },
+        "fleurs_pl": {
+          "wer": 0.7059,
+          "lang": "pl"
+        }
+      }
+    }
+  }
+}

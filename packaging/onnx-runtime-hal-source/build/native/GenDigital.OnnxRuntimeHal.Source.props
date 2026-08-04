@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <OnnxRuntimeHalSourceRoot>$(MSBuildThisFileDirectory)..\..\</OnnxRuntimeHalSourceRoot>
+    <OnnxRuntimeHalCompileSources Condition="'$(OnnxRuntimeHalCompileSources)' == ''">true</OnnxRuntimeHalCompileSources>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(OnnxRuntimeHalSourceRoot)include;$(OnnxRuntimeHalSourceRoot)src\onnx_runtime_hal;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NPU_INFERENCE_BENCH_ORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <ItemGroup Condition="'$(OnnxRuntimeHalCompileSources)' == 'true'">
+    <ClCompile Include="$(OnnxRuntimeHalSourceRoot)src\onnx_runtime_hal\ort_model_session.cpp">
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="$(OnnxRuntimeHalSourceRoot)src\onnx_runtime_hal\ort_offload.cpp">
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+</Project>

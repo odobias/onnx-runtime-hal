@@ -1,0 +1,172 @@
+﻿{
+  "schema_version": 1,
+  "suite": "portable",
+  "description": "Portable inference benchmark workloads and supported executor classes.",
+  "workloads": [
+    {
+      "id": "whisper-tiny-static",
+      "kind": "asr",
+      "backend": "onnx-static",
+      "path": "artifacts/workloads/whisper/models/static-onnx",
+      "executionProfiles": [
+        {
+          "id": "static-onnx",
+          "devices": ["npu", "gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "whisper-tiny-static-multi-7s",
+      "kind": "asr",
+      "backend": "onnx-static",
+      "path": "artifacts/workloads/whisper/models/static-onnx-tiny-multi-7s",
+      "baselineKey": "static-onnx-tiny-multi-7s",
+      "executionProfiles": [
+        {
+          "id": "static-onnx-multi-7s",
+          "devices": ["npu", "gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "whisper-tiny-dynamic",
+      "kind": "asr",
+      "backend": "onnx-dynamic",
+      "path": "artifacts/workloads/whisper/models/dynamic-onnx",
+      "executionProfiles": [
+        {
+          "id": "dynamic-kv-onnx",
+          "devices": ["gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        }
+      ],
+      "devices": ["gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "whisper-tiny-sherpa",
+      "kind": "asr",
+      "backend": "onnx-sherpa",
+      "path": "artifacts/workloads/whisper/models/sherpa-export",
+      "executionProfiles": [
+        {
+          "id": "sherpa-export-kv",
+          "devices": ["gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1"
+        },
+        {
+          "id": "sherpa-export-kv-npu-best-effort",
+          "devices": ["npu"],
+          "graphRole": "whole",
+          "referenceContract": "whisper-eval-v1",
+          "accuracyEligible": false,
+          "default": false
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "rtf", "wer", "cer", "cpu_offload"]
+    },
+    {
+      "id": "tsc",
+      "kind": "classifier",
+      "backend": "onnx-fixture",
+      "path": "artifacts/workloads/classifiers/fixtures/tsc",
+      "executionProfiles": [
+        {
+          "id": "whole-fp32",
+          "devices": ["npu", "gpu", "cpu"],
+          "graphRole": "whole",
+          "referenceContract": "full-model-cpu-fp32"
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
+    },
+    {
+      "id": "fakeaudio",
+      "kind": "classifier",
+      "backend": "onnx-fixture",
+      "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
+      "executionProfiles": [
+        {
+          "id": "whole-fp32",
+          "devices": ["cpu", "gpu"],
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
+          "graphRole": "whole",
+          "referenceContract": "full-model-cpu-fp32",
+          "accuracyEligible": true
+        },
+        {
+          "id": "npu-split-intel",
+          "devices": ["npu"],
+          "hostVendors": ["Intel"],
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias",
+          "graphRole": "backbone",
+          "frontendContract": "cpu-fp32-logmel",
+          "referenceContract": "full-model-cpu-fp32",
+          "accuracyEligible": true,
+          "outputs": [
+            "artifacts/workloads/classifiers/fakeaudio/model.backbone.expanded-attention-bias.onnx",
+            "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/model.tsv",
+            "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-expanded-attention-bias/fixture-step.json"
+          ],
+          "steps": [
+            {
+              "script": "tools/research/export_fakeaudio_variants.py",
+              "arguments": ["--skip-int8"]
+            },
+            {
+              "script": "tools/research/build_fakeaudio_variant_fixtures.py",
+              "arguments": ["--only", "intel-npu"]
+            }
+          ]
+        },
+        {
+          "id": "npu-split-generic",
+          "devices": ["npu"],
+          "hostVendors": ["AMD", "Qualcomm"],
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32",
+          "graphRole": "backbone",
+          "frontendContract": "cpu-fp32-logmel",
+          "referenceContract": "full-model-cpu-fp32",
+          "accuracyEligible": true,
+          "outputs": [
+            "artifacts/workloads/classifiers/fakeaudio/model.backbone-fp32.onnx",
+            "artifacts/workloads/classifiers/fixtures/fakeaudio-bb-fp32/model.tsv"
+          ],
+          "steps": [
+            {
+              "script": "tools/research/export_fakeaudio_variants.py",
+              "arguments": ["--skip-int8"]
+            },
+            {
+              "script": "tools/research/build_fakeaudio_variant_fixtures.py",
+              "arguments": ["--only", "generic-npu"]
+            }
+          ]
+        },
+        {
+          "id": "npu-whole-diagnostic",
+          "devices": ["npu"],
+          "path": "artifacts/workloads/classifiers/fixtures/fakeaudio",
+          "graphRole": "whole",
+          "referenceContract": "full-model-cpu-fp32",
+          "accuracyEligible": false,
+          "default": false
+        }
+      ],
+      "devices": ["npu", "gpu", "cpu"],
+      "metrics": ["latency", "accuracy", "reference_drift", "cpu_offload"]
+    }
+  ]
+}
