@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "model": {
+    "package": "models.onnx.whisper-tiny-multilingual-static",
+    "encoder_sha256": "d3affa48d0060382da925ab0254e8ecbdc0d239a932c9ad0cbda0b50a16df9de",
+    "decoder_sha256": "82f65f5ba7186943debdec9923326ade2ca54a25d2af16617fca99ebad677012"
+  },
+  "task": "transcribe",
+  "language_mode": "auto",
+  "sample_rate_hz": 16000,
+  "window": "full",
+  "cpu_baseline_mean_wer": 0.40165,
+  "maximum_mean_wer": 0.45,
+  "max_abs_wer_regression": 0.05,
+  "samples": [
+    {
+      "id": "fleurs_de",
+      "language": "de",
+      "duration_s": 9.9,
+      "source": "google/fleurs:de_de:test[4]",
+      "sentence_id": 1739,
+      "reference": "die höhle befindet sich auf der spitze eines der berge nördlich von mekka und ist vom rest der welt völlig isoliert",
+      "reference_en": "Resting on the top of one of the mountains north of Mecca, the cave is completely isolated from the rest of the world.",
+      "expected_detected_language": "de",
+      "cpu_baseline_wer": 0.2857
+    },
+    {
+      "id": "fleurs_fr",
+      "language": "fr",
+      "duration_s": 8.28,
+      "source": "google/fleurs:fr_fr:test[2]",
+      "sentence_id": 1857,
+      "reference": "il a ajouté qu’« on ne devrait cependant pas leur demander d’assumer des obligations qui dépassent leur stade de développement leur responsabilité et leurs capacités. »",
+      "reference_en": "He added that \"they should not, however, be asked to take on obligations that go beyond their development stage, responsibility and capabilities.\"",
+      "expected_detected_language": "fr",
+      "cpu_baseline_wer": 0.7308
+    },
+    {
+      "id": "fleurs_es",
+      "language": "es",
+      "duration_s": 9.72,
+      "source": "google/fleurs:es_419:test[2]",
+      "sentence_id": 1764,
+      "reference": "fue tanta la cantidad de gente que se concentró que no todos pudieron acceder al funeral en la plaza de san pedro",
+      "reference_en": "The number of people present was so large that it was not possible for everybody to gain access to the funeral in St. Peter's Square.",
+      "expected_detected_language": "es",
+      "cpu_baseline_wer": 0.0
+    },
+    {
+      "id": "fleurs_cs",
+      "language": "cs",
+      "duration_s": 7.32,
+      "source": "google/fleurs:cs_cz:test[2]",
+      "sentence_id": 1827,
+      "reference": "kůra je silná přibližně 70 km na přivrácené straně a okolo 100 km na odvrácené straně",
+      "reference_en": "The crust is about 70 km thick on the near side and 100 km thick on the far side.",
+      "expected_detected_language": "cs",
+      "cpu_baseline_wer": 0.6875
+    },
+    {
+      "id": "fleurs_it",
+      "language": "it",
+      "duration_s": 7.08,
+      "source": "google/fleurs:it_it:test[4]",
+      "sentence_id": 1987,
+      "reference": "l'incidente è avvenuto in alta montagna e si ritiene sia stato causato da fuoco nemico",
+      "reference_en": "The crash occurred high up in mountainous terrain, and is believed to have been the result of hostile fire.",
+      "expected_detected_language": "it",
+      "cpu_baseline_wer": 0.0
+    },
+    {
+      "id": "fleurs_pl",
+      "language": "pl",
+      "duration_s": 7.68,
+      "source": "google/fleurs:pl_pl:test[1]",
+      "sentence_id": 1912,
+      "reference": "większość mniejszych wysp to narody niezależne lub sprzymierzone z francją i słynące jako luksusowe nadmorskie miejscowości wypoczynkowe",
+      "reference_en": "Most of the smaller islands are independent nations, or associated with France, and known as luxury beach resorts.",
+      "expected_detected_language": "pl",
+      "cpu_baseline_wer": 0.7059
+    }
+  ]
+}

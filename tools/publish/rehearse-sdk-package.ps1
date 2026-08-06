@@ -32,7 +32,12 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("fakeaudio-samples", "whisper-accuracy-samples", "whisper-tiny-multilingual-static")]
+    [ValidateSet(
+        "fakeaudio-samples",
+        "whisper-accuracy-samples",
+        "whisper-multilingual-accuracy-samples",
+        "whisper-tiny-multilingual-static"
+    )]
     [string]$Package,
     [string]$HalRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$CommonRepo = "C:\Sources\tools\sdk-common",
