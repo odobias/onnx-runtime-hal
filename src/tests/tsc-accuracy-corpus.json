@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "model_sha256": "08b2c466cc9336934e52697e95e30858fb6faa24db73a28654ce5b63510ed44e",
+  "positive_label": "scam",
+  "positive_index": 1,
+  "threshold": 0.5,
+  "max_abs_probability_delta": 0.05,
+  "minimum_accuracy": 1.0,
+  "samples": [
+    {
+      "id": "scam_1",
+      "label": "scam",
+      "text": "Today I have decided to give away a small portion of my Bitcoins. You can enter the competition by scanning this QR code.",
+      "expected_probability": 0.999978368,
+      "inputs": [
+        {
+          "name": "input_ids",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/scam_1__input_ids.bin",
+          "sha256": "18af75d0863253ec976c09ddd888037834f2e4019d34ea744f89f44f62ee53ec"
+        },
+        {
+          "name": "attention_mask",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/scam_1__attention_mask.bin",
+          "sha256": "e15d4aacc7cfec4b4cfb089230d2335faf6ce4dbff79a797658773496d7e2fca"
+        }
+      ]
+    },
+    {
+      "id": "scam_2",
+      "label": "scam",
+      "text": "I want to share a secret of how to get rich extremely fast. This is my way of giving back to the community.",
+      "expected_probability": 0.909332774,
+      "inputs": [
+        {
+          "name": "input_ids",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/scam_2__input_ids.bin",
+          "sha256": "e64a7d6b93749d6e1b94a27dd1da35a9a7a23a047830978ac343a2eed841e0c0"
+        },
+        {
+          "name": "attention_mask",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/scam_2__attention_mask.bin",
+          "sha256": "e15d4aacc7cfec4b4cfb089230d2335faf6ce4dbff79a797658773496d7e2fca"
+        }
+      ]
+    },
+    {
+      "id": "clean_8",
+      "label": "clean",
+      "text": "hi",
+      "expected_probability": 0.000001324,
+      "inputs": [
+        {
+          "name": "input_ids",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/clean_8__input_ids.bin",
+          "sha256": "6ec0a8cebc406cbae8974353c7dfcfcb6ef1a298e1b69c8bb092b1da1cbdb252"
+        },
+        {
+          "name": "attention_mask",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/clean_8__attention_mask.bin",
+          "sha256": "90506aad32e4cdb37aa32a14f915f6e7cc16e522519d05a6388d21690840406c"
+        }
+      ]
+    },
+    {
+      "id": "clean_12",
+      "label": "clean",
+      "text": "You can buy Bitcoins on an online cryptocurrency exchange or store them directly into your physical wallet.",
+      "expected_probability": 0.013057840,
+      "inputs": [
+        {
+          "name": "input_ids",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/clean_12__input_ids.bin",
+          "sha256": "161d454c5aac85a29da7d517078bb21e5b3452a5a92639bb9139ee359f15b87b"
+        },
+        {
+          "name": "attention_mask",
+          "dtype": "int64",
+          "shape": [1, 512],
+          "url": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/fixtures/tsc/data/clean_12__attention_mask.bin",
+          "sha256": "1adf1d8522eae0a503b6ee679bbf15f7481cdfa2f4b247948d6d753d4ce839a0"
+        }
+      ]
+    }
+  ]
+}
