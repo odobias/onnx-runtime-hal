@@ -32,7 +32,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("whisper-accuracy-samples", "whisper-tiny-multilingual-static")]
+    [ValidateSet("fakeaudio-samples", "whisper-accuracy-samples", "whisper-tiny-multilingual-static")]
     [string]$Package,
     [string]$HalRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path,
     [string]$CommonRepo = "C:\Sources\tools\sdk-common",
@@ -52,17 +52,46 @@ if (-not (Test-Path -LiteralPath (Join-Path $CommonRepo "nuget\create_nuget.ps1"
         "https://git.int.avast.com/sdk/common.git or pass -CommonRepo.")
 }
 
-# Where each package's payload comes from in this tree, standing in for the
-# URLs in models.json.
-$sources = @{
-    "whisper-accuracy-samples" = "artifacts\workloads\speech"
-    "whisper-tiny-multilingual-static" = "artifacts\workloads\whisper\models\static-onnx-tiny-multi-7s"
+# models.json key + URL extension, matching download.ps1 (e.g. real_1 + .wav).
+function Get-FlatOutputName($property)
+{
+    $url = [string]$property.Value
+    return "$($property.Name)$($url.Substring($url.LastIndexOf('.')))"
+}
+
+# Resolve one pinned HF URL back to its local source byte using asset-map.json.
+# This also handles renamed nested files: FakeAudio packages
+# test_audio/real/1.wav as models/real_1.wav.
+function Get-LocalFileFor([string]$url, [string]$halRoot)
+{
+    if ($url -notmatch '/resolve/[0-9a-f]+/(.+)$')
+    {
+        throw ("cannot read a Hugging Face path out of '$url'. If these packages " +
+            "move to another host, teach this function the new URL shape.")
+    }
+    $hfPath = $Matches[1]
+
+    $map = (Get-Content -LiteralPath (Join-Path $halRoot "tools\fetch\asset-map.json") -Raw -Encoding UTF8 |
+        ConvertFrom-Json).map
+    $entry = $map |
+        Where-Object { $hfPath -eq $_.hf -or $hfPath.StartsWith("$($_.hf)/") } |
+        Sort-Object { $_.hf.Length } -Descending |
+        Select-Object -First 1
+    if (-not $entry)
+    {
+        throw "no asset-map.json entry maps the Hugging Face path '$hfPath' back to a local directory"
+    }
+
+    $suffix = $hfPath.Substring($entry.hf.Length).TrimStart("/")
+    return Join-Path (Join-Path $halRoot $entry.local) ($suffix -replace '/', '\')
 }
 
 $work = Join-Path $Root $Package
 Remove-Item -Recurse -Force $work -ErrorAction Ignore
 New-Item -ItemType Directory -Force $work | Out-Null
 Copy-Item (Join-Path $HalRoot "packaging\sdk\$Package\*") $work -Recurse -Force
+Remove-Item -Recurse -Force (Join-Path $work "models") -ErrorAction Ignore
+Remove-Item -Recurse -Force (Join-Path $work "nugets") -ErrorAction Ignore
 
 $commonLink = Join-Path $Root "common"
 if (-not (Test-Path -LiteralPath $commonLink))
@@ -72,7 +101,6 @@ if (-not (Test-Path -LiteralPath $commonLink))
 
 $models = Join-Path $work "models"
 New-Item -ItemType Directory -Force $models | Out-Null
-$from = Join-Path $HalRoot $sources[$Package]
 $entries = @((Get-Content (Join-Path $work "models.json") -Raw | ConvertFrom-Json).PSObject.Properties)
 if (-not $entries)
 {
@@ -104,9 +132,9 @@ if ($RealDownload)
     $drift = @()
     foreach ($property in $entries)
     {
-        $name = "$($property.Name)$($property.Value.Substring($property.Value.LastIndexOf('.')))"
+        $name = Get-FlatOutputName $property
         $got = Join-Path $models $name
-        $want = Join-Path $from $name
+        $want = Get-LocalFileFor ([string]$property.Value) $HalRoot
         if (-not (Test-Path -LiteralPath $got)) { $drift += "$name : not downloaded"; continue }
         if (-not (Test-Path -LiteralPath $want)) { continue }
         $a = (Get-FileHash -LiteralPath $got -Algorithm SHA256).Hash
@@ -114,22 +142,28 @@ if ($RealDownload)
         if ($a -ne $b) { $drift += "$name : differs from the local payload" }
     }
     if ($drift) { throw ("downloaded payload does not match this tree:`n  " + ($drift -join "`n  ")) }
-    Write-Host ("downloaded {0} file(s), all identical to {1}" -f $entries.Count, $sources[$Package]) -ForegroundColor Green
+    Write-Host ("downloaded {0} file(s), all identical to their mapped local payloads" -f $entries.Count) -ForegroundColor Green
 }
 else
 {
     foreach ($property in $entries)
     {
-        # Mirror download.ps1's rule exactly: <key> + extension taken from the URL.
-        $name = "$($property.Name)$($property.Value.Substring($property.Value.LastIndexOf('.')))"
-        $source = Join-Path $from $name
+        $name = Get-FlatOutputName $property
+        $source = Get-LocalFileFor ([string]$property.Value) $HalRoot
         if (-not (Test-Path -LiteralPath $source))
         {
-            throw "models.json names $name, which is not in $from"
+            throw "models.json names $name, which is not at $source"
         }
         Copy-Item -LiteralPath $source -Destination (Join-Path $models $name) -Force
     }
     Write-Host ("staged {0} file(s) into models\ (copied locally; pass -RealDownload to fetch)" -f $entries.Count)
+}
+
+$contract = Join-Path $work "samples.json"
+if ((Test-Path -LiteralPath $contract) -and
+    -not (Test-Path -LiteralPath (Join-Path $models "samples.json")))
+{
+    Copy-Item -LiteralPath $contract -Destination (Join-Path $models "samples.json")
 }
 
 Push-Location $work

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>models.speech.@NAME@</id>
+    <version>%VERSION%</version>
+    <title>@NAME@</title>
+    <authors>Avast</authors>
+    <owners>GEN Digital</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>WAV clips used by FakeAudio / deepfake classifier tests. Test input, not a model.</description>
+    <summary>@NAME@</summary>
+    <tags>native sdk c++ nativepackage testdata</tags>
+  </metadata>
+</package>

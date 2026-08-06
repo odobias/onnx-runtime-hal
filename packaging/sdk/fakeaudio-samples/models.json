@@ -1,0 +1,12 @@
+{
+  "real_1": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/real/1.wav",
+  "real_2": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/real/2.wav",
+  "real_3": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/real/3.wav",
+  "real_4": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/real/4.wav",
+  "real_5": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/real/5.wav",
+  "deepfake_1": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/synthetic/1.wav",
+  "deepfake_2": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/synthetic/2.wav",
+  "deepfake_3": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/synthetic/3.wav",
+  "deepfake_4": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/synthetic/4.wav",
+  "deepfake_5": "https://huggingface.co/gendigital/npu-hal-over-9000/resolve/ccf1943146f34e9d2a56e5054a92d394dd97a675/deepfake/audio-samples/test_audio/synthetic/5.wav"
+}

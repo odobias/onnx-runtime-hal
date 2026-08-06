@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "model_sha256": "d4b2dde8f4f95862ecb9f5e90821d853adea3774e7c48857f60ee6084d5e85c6",
+  "sample_rate_hz": 44100,
+  "window_samples": 308700,
+  "positive_label": "deepfake",
+  "threshold": 0.5,
+  "max_abs_probability_delta": 0.05,
+  "minimum_accuracy": 1.0,
+  "samples": [
+    { "id": "real_1", "label": "real", "expected_probability": 0.004199810 },
+    { "id": "real_2", "label": "real", "expected_probability": 0.000000399 },
+    { "id": "real_3", "label": "real", "expected_probability": 0.000128881 },
+    { "id": "real_4", "label": "real", "expected_probability": 0.000115543 },
+    { "id": "real_5", "label": "real", "expected_probability": 0.000000251 },
+    { "id": "deepfake_1", "label": "deepfake", "expected_probability": 0.999991014 },
+    { "id": "deepfake_2", "label": "deepfake", "expected_probability": 0.999994394 },
+    { "id": "deepfake_3", "label": "deepfake", "expected_probability": 0.999874062 },
+    { "id": "deepfake_4", "label": "deepfake", "expected_probability": 0.999996992 },
+    { "id": "deepfake_5", "label": "deepfake", "expected_probability": 0.999962861 }
+  ]
+}
