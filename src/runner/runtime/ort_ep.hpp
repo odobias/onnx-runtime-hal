@@ -346,10 +346,6 @@ inline void register_windows_ml_catalog(Ort::Env& env, Device requested_device) 
 #endif
 
 #ifdef NPU_INFERENCE_BENCH_QUALCOMM
-inline std::string qnn_ep_library_path() {
-    return env_or("WHISPER_QNN_EP_DLL", "onnxruntime_providers_qnn.dll");
-}
-
 inline std::string qnn_backend_path(Device device) {
     switch (device) {
         case Device::GPU: return env_or("WHISPER_QNN_GPU_DLL", "QnnGpu.dll");
@@ -359,37 +355,6 @@ inline std::string qnn_backend_path(Device device) {
     }
 }
 
-#ifdef _WIN32
-inline std::wstring ort_tstring(const std::string& value) {
-    if (value.empty()) return {};
-    const int size = MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, nullptr, 0);
-    if (size <= 0) throw std::runtime_error("Failed to convert path to UTF-16: " + value);
-    std::wstring out(static_cast<size_t>(size - 1), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, value.c_str(), -1, out.data(), size);
-    return out;
-}
-#endif
-
-inline void register_qnn_library(Ort::Env& env) {
-    // EP-library registration lives on the ORT environment; may be called more
-    // than once (probe + engine env), so swallow the "already registered" error.
-    try {
-#ifdef _WIN32
-        env.RegisterExecutionProviderLibrary(kQnnEpName, ort_tstring(qnn_ep_library_path()));
-#else
-        env.RegisterExecutionProviderLibrary(kQnnEpName, qnn_ep_library_path());
-#endif
-    } catch (const Ort::Exception&) {
-        // Already registered on this (or a shared) environment -- fine.
-    }
-}
-
-inline Ort::ConstEpDevice find_qnn_device(Ort::Env& env) {
-    for (Ort::ConstEpDevice ep_device : env.GetEpDevices()) {
-        if (std::strcmp(ep_device.EpName(), kQnnEpName) == 0) return ep_device;
-    }
-    throw std::runtime_error("QNNExecutionProvider device not found after registration");
-}
 #endif  // NPU_INFERENCE_BENCH_QUALCOMM
 
 // Append the requested execution provider to `so`. `model_dir`/`cache_key` feed
@@ -565,9 +530,6 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
     if (p == "qnn" || p == "qnnexecutionprovider" || p == "qnnnpu" || p == "qnncpu") {
         validate_inference_precision(options, provider);
 #ifdef NPU_INFERENCE_BENCH_QUALCOMM
-        register_qnn_library(env);
-        const Ort::ConstEpDevice qnn_device = find_qnn_device(env);  // throws if absent
-        std::vector<Ort::ConstEpDevice> selected{qnn_device};
         Device qnn_device_class = options.device;
         if (p == "qnnnpu") qnn_device_class = Device::NPU;
         if (p == "qnncpu") qnn_device_class = Device::CPU;
@@ -577,8 +539,10 @@ inline void append_provider(Ort::Env& env, Ort::SessionOptions& so,
             opts.emplace("htp_performance_mode", "burst");
             opts.emplace("enable_htp_fp16_precision", "1");
         }
-        Ort::KeyValuePairs ep_options(opts);
-        so.AppendExecutionProvider_V2(env, selected, ep_options);
+        // ORT 1.21 exposes QNN through the generic provider append API. The
+        // newer Env::RegisterExecutionProviderLibrary/EpDevice API is not
+        // available in the product's pinned runtime headers.
+        so.AppendExecutionProvider(kQnnEpName, opts);
         return;
 #else
         throw std::runtime_error("QNN execution provider not compiled into this build");
