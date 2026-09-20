@@ -688,9 +688,6 @@ Device RuntimeContext::probe_best_device() {
 #ifdef NPU_INFERENCE_BENCH_WINML
     ort_common::register_windows_ml_catalog(env, Device::NPU);
 #endif
-#ifdef NPU_INFERENCE_BENCH_QUALCOMM
-    ort_common::register_qnn_library(env);
-#endif
 #if ORT_API_VERSION >= 22
     bool saw_gpu = false;
     for (Ort::ConstEpDevice candidate : env.GetEpDevices()) {
