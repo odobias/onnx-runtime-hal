@@ -42,7 +42,10 @@ namespace ort_common {
 
 namespace fs = std::filesystem;
 
-inline constexpr const char* kQnnEpName = "QNNExecutionProvider";
+// ORT 1.21's generic AppendExecutionProvider API identifies the Qualcomm
+// provider as "QNN".  The longer "QNNExecutionProvider" label is used by
+// provider enumeration and diagnostics, but is rejected as the API name.
+inline constexpr const char* kQnnEpName = "QNN";
 
 inline std::string env_or(const char* key, const std::string& fallback) {
     const char* v = std::getenv(key);
@@ -65,7 +68,7 @@ inline std::string normalize_provider_token(std::string provider) {
     // Product OpenVINO default: AUTO prefers NPU then CPU (see ep_config.cpp).
     if (p == "openvino") return "openvino:AUTO:NPU,CPU";
     if (p == "qnnnpu" || p == "qnncpu") return p;
-    if (p == "qnn") return "QNNExecutionProvider";
+    if (p == "qnn") return kQnnEpName;
     return provider;
 }
 

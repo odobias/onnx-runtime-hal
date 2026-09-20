@@ -95,6 +95,13 @@ void test_provider_policy() {
                 Device::NPU, "DmlExecutionProvider"),
             "NPU to GPU demotion is fallback");
 
+    require(ort_common::normalize_provider_token("qnn") == "QNN",
+            "ORT generic QNN provider name");
+    require(ort_common::normalize_provider_token("QNN") == "QNN",
+            "canonical QNN provider name remains stable");
+    require(ort_common::normalize_provider_token("qnnnpu") == "qnnnpu",
+            "product QNN NPU token remains distinct");
+
 #ifdef NPU_INFERENCE_BENCH_WINML
     options = runtime::RuntimeOptions{};
     options.device = Device::NPU;
