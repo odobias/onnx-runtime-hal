@@ -17,6 +17,7 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <cstdint>
@@ -50,6 +51,59 @@ namespace {
 
 #include "benchmark_support.ipp"
 #include "classifier_benchmark.ipp"
+
+struct CacheSnapshot {
+    std::uintmax_t files = 0;
+    std::uintmax_t bytes = 0;
+    std::uintmax_t errors = 0;
+};
+
+CacheSnapshot snapshot_cache(const std::string& cache_dir) {
+    CacheSnapshot snapshot;
+    if (cache_dir.empty()) return snapshot;
+
+    std::error_code error;
+    const std::filesystem::path root(cache_dir);
+    if (!std::filesystem::exists(root, error)) {
+        if (error) ++snapshot.errors;
+        return snapshot;
+    }
+
+    for (std::filesystem::recursive_directory_iterator it(
+             root, std::filesystem::directory_options::skip_permission_denied, error),
+         end;
+         it != end;
+         it.increment(error)) {
+        if (error) {
+            ++snapshot.errors;
+            error.clear();
+            continue;
+        }
+
+        std::error_code type_error;
+        if (!it->is_regular_file(type_error)) {
+            if (type_error) ++snapshot.errors;
+            continue;
+        }
+
+        std::error_code size_error;
+        const std::uintmax_t size = it->file_size(size_error);
+        if (size_error) {
+            ++snapshot.errors;
+            continue;
+        }
+
+        ++snapshot.files;
+        snapshot.bytes += size;
+    }
+    if (error) ++snapshot.errors;
+    return snapshot;
+}
+
+void print_cache_snapshot(const char* label, const CacheSnapshot& snapshot) {
+    std::cerr << "[cache] " << label << ": files=" << snapshot.files
+              << " bytes=" << snapshot.bytes << " errors=" << snapshot.errors << "\n";
+}
 
 void append_utf8(std::string& out, unsigned int cp) {
     if (cp < 0x80u) {
@@ -400,6 +454,11 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
     // a negative load as N/A rather than a real zero-second cold start.
     std::unique_ptr<IWhisperEngine> engine;
     double cold_load = -1.0, warm_load = -1.0;
+    const CacheSnapshot cache_before = snapshot_cache(cache_dir);
+    CacheSnapshot cache_after_cold;
+    CacheSnapshot cache_before_hot;
+    CacheSnapshot cache_after_hot;
+    print_cache_snapshot("before", cache_before);
 
     if (hot_only) {
         // Hot-only: skip the cold compile entirely and load once straight from a
@@ -419,6 +478,8 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         try {
             engine = create_engine(backend, opt);
             cold_load = engine->load_seconds();
+            cache_after_cold = snapshot_cache(cache_dir);
+            print_cache_snapshot("after-cold", cache_after_cold);
         } catch (const std::exception& e) {
             return fail(3, std::string("Engine creation failed: ") + e.what());
         }
@@ -437,9 +498,13 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
 #endif
                 }
                 engine.reset();
+                cache_before_hot = snapshot_cache(cache_dir);
+                print_cache_snapshot("before-hot", cache_before_hot);
                 opt.profile_execution = true;
                 auto hot = create_engine(backend, opt);
                 warm_load = hot->load_seconds();
+                cache_after_hot = snapshot_cache(cache_dir);
+                print_cache_snapshot("after-hot", cache_after_hot);
                 engine = std::move(hot);
             } catch (const std::exception& e) {
                 if (!json_out) std::cerr << "Hot reload failed: " << e.what() << "\n";
@@ -653,6 +718,18 @@ int npu_inference_bench::benchmark::run_cli(int argc, char* argv[]) {
         js << ",\"cold_load_seconds\":" << cold_load;
         js << ",\"hot_load_seconds\":" << warm_load;
         js << ",\"warm_load_seconds\":" << warm_load;  // migration alias
+        js << ",\"cache_before_files\":" << cache_before.files;
+        js << ",\"cache_before_bytes\":" << cache_before.bytes;
+        js << ",\"cache_before_errors\":" << cache_before.errors;
+        js << ",\"cache_after_cold_files\":" << cache_after_cold.files;
+        js << ",\"cache_after_cold_bytes\":" << cache_after_cold.bytes;
+        js << ",\"cache_after_cold_errors\":" << cache_after_cold.errors;
+        js << ",\"cache_before_hot_files\":" << cache_before_hot.files;
+        js << ",\"cache_before_hot_bytes\":" << cache_before_hot.bytes;
+        js << ",\"cache_before_hot_errors\":" << cache_before_hot.errors;
+        js << ",\"cache_after_hot_files\":" << cache_after_hot.files;
+        js << ",\"cache_after_hot_bytes\":" << cache_after_hot.bytes;
+        js << ",\"cache_after_hot_errors\":" << cache_after_hot.errors;
         js << ",\"mean_ms\":" << mean * 1000.0;
         js << ",\"median_ms\":" << median * 1000.0;
         js << ",\"p90_ms\":" << p90 * 1000.0;

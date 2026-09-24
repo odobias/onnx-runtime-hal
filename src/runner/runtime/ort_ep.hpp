@@ -391,6 +391,12 @@ inline std::unordered_map<std::string, std::string> winml_catalog_provider_optio
         // between AC/DC power overlays.
         provider_options.emplace("htp_performance_mode", "burst");
     }
+    if (selected_ep.contains("openvino") && !options.cache_dir.empty()) {
+        // Keep the Windows ML catalog path equivalent to the native ORT
+        // OpenVINO path. Without this, the benchmark's shared cache directory
+        // is never offered to the catalog-selected OpenVINO EP.
+        provider_options.emplace("cache_dir", options.cache_dir);
+    }
     return provider_options;
 }
 #endif
